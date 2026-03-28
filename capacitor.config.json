@@ -1,0 +1,24 @@
+{
+  "appId": "com.edupulse.app",
+  "appName": "EduPulse",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "wa.me",
+      "api.whatsapp.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#07091a"
+  },
+  "plugins": {
+    "App": {
+      "launchShowDuration": 0
+    }
+  }
+}
+```
