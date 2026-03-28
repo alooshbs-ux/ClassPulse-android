@@ -13,51 +13,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Install npm dependencies
+      - name: Install dependencies
         run: npm install
 
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Copy web assets to Android
+      - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android licenses
+      - name: Accept licenses
         run: yes | sdkmanager --licenses || true
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: EduPulse-Debug-APK
+          name: EduPulse-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
-
-      - name: Show APK info
-        run: |
-          echo "✅ Build complete"
-          ls -lh android/app/build/outputs/apk/debug/
-```
