@@ -3723,10 +3723,21 @@ body.privacy-mode .hide-privacy{display:none!important}
         <div class="settings-section">
           <h3>Data Management</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-ghost" onclick="App.loadDemoData()">Load Demo Students</button>
-            <button class="btn btn-ghost btn-sm" onclick="StorageManager.exportJSON()" data-title="Export Backup PDF" data-description="Exports a full backup PDF of all student data, scores, and behavior history.">📄 Export Backup</button>
-            <button class="btn btn-warning btn-sm" onclick="DataHub.open()" data-tip="Safely manage, export, or selectively purge your class data">🗃️ Data Hub</button>
+            <button class="btn btn-ghost btn-sm" onclick="ImportNames.open()" data-tip="Bulk import student names from text or CSV file">📥 Import Names</button>
+            <button class="btn btn-ghost btn-sm" onclick="DemoLoader.load()" data-tip="Add 12 demo students with realistic behavior data">🎭 Load Demo</button>
+            <button class="btn btn-ghost btn-sm" onclick="StorageManager.exportJSON()" data-tip="Export a full backup of all your data">📄 Export Backup</button>
+            <button class="btn btn-warning btn-sm" onclick="DataHub.open()" data-tip="Manage, export, or delete your class data — includes Factory Reset">🗃️ Data Hub</button>
             <button class="btn btn-ghost btn-sm" onclick="YearArchive.open()" data-tip="Archive the school year — full snapshot, nothing deleted">🗂️ Year Archive</button>
+          </div>
+          <div style="margin-top:10px;padding:10px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px">
+            <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">⚠️ Reset & Clear Data</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+              Use <strong>🗃️ Data Hub</strong> above to selectively delete students, events, or do a full factory reset.
+              All resets are permanent and cannot be undone.
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="DataHub.open()" style="font-size:11px">
+              🔥 Open Reset & Data Manager
+            </button>
           </div>
         </div>
 
@@ -10349,6 +10360,7 @@ const AIView = {
     const items = ss.map(s=>{
       const pred = PredictiveEngine.analyze(s.id);
       const barColor = { stable:'var(--green)', warning:'var(--orange)', escalating:'var(--red)' }[pred.state];
+      const needsWA = pred.state !== 'stable';
       return `<div class="pred-card" onclick="AIView.showStudentDetail(${s.id})">
         <div class="pred-avatar" style="background:${s.color}20;color:${s.color}">${s.avatar}</div>
         <div class="pred-info">
@@ -10356,9 +10368,16 @@ const AIView = {
           <div class="pred-state ${pred.state}">${pred.state.toUpperCase()}</div>
           <div style="font-size:9px;color:var(--text-muted);margin-top:1px;line-height:1.3">${pred.prediction}</div>
         </div>
-        <div class="pred-bar-wrap">
-          <div class="pred-bar"><div class="pred-bar-fill" style="width:${pred.riskScore}%;background:${barColor}"></div></div>
-          <div class="pred-risk-num">${pred.riskScore}%</div>
+        <div class="pred-bar-wrap" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <div style="display:flex;align-items:center;gap:4px">
+            <div class="pred-bar" style="width:60px"><div class="pred-bar-fill" style="width:${pred.riskScore}%;background:${barColor}"></div></div>
+            <div class="pred-risk-num">${pred.riskScore}%</div>
+          </div>
+          ${needsWA ? `<button onclick="event.stopPropagation();ReportEngine.sendWhatsApp(${s.id})"
+            style="font-size:9px;padding:3px 7px;border-radius:6px;background:#25d366;color:#fff;
+                   border:none;cursor:pointer;font-weight:700;white-space:nowrap">
+            📱 WhatsApp
+          </button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -14023,32 +14042,36 @@ const StudentCard = {
     const rank = allStudents.findIndex(s => s.id === st.id) + 1;
     const text = this._buildShareText(st, rank, cls, sets);
 
+    const encoded  = encodeURIComponent(text);
+    const phone    = st.parentPhone
+      ? st.parentPhone.replace(/[^\d+]/g,'').replace(/^\+/,'') : '';
+    const deepLink = phone
+      ? `whatsapp://send?phone=${phone}&text=${encoded}`
+      : `whatsapp://send?text=${encoded}`;
+
+    const isNative  = !!(window.Capacitor?.isNativePlatform?.());
+    const isAndroid = /android/i.test(navigator.userAgent);
+
     App.closeModal();
 
-    // On native Capacitor → WhatsApp directly (navigator.share blocked)
-    // On browser → Web Share API with fallback
-    if(window.Capacitor?.isNativePlatform?.()){
-      const encoded  = encodeURIComponent(text);
-      const phone    = st.parentPhone
-        ? st.parentPhone.replace(/[^\d+]/g,'').replace(/^\+/,'') : '';
-      const deepLink = phone
-        ? `whatsapp://send?phone=${phone}&text=${encoded}`
-        : `whatsapp://send?text=${encoded}`;
-      NotificationEngine.info('Opening WhatsApp', 'Select contact to share');
+    if(isNative || isAndroid){
+      // Android/Capacitor: WhatsApp via intent:// (handled by openExternalURL)
+      NotificationEngine.info('Opening WhatsApp', 'Select a contact to share the card');
       setTimeout(() => openExternalURL(deepLink), 250);
     } else if(navigator.share){
+      // Desktop/iOS browser: native Web Share sheet
       navigator.share({ title: `${st.name} — EduPulse`, text })
         .catch(e => {
           if(e.name !== 'AbortError'){
-            navigator.clipboard?.writeText(text)
-              .then(() => NotificationEngine.success('Copied', 'Card text copied to clipboard'))
-              .catch(() => NotificationEngine.warning('Share failed', 'Could not share or copy'));
+            // Share API failed — fall back to WhatsApp web
+            const w = window.open(`https://wa.me/?text=${encoded}`, '_blank');
+            if(!w) window.location.href = `https://wa.me/?text=${encoded}`;
           }
         });
     } else {
-      navigator.clipboard?.writeText(text)
-        .then(() => NotificationEngine.success('📋 Copied', 'Card text copied — paste into WhatsApp'))
-        .catch(() => NotificationEngine.warning('Share', 'Web Share not supported on this browser'));
+      // No share API — open WhatsApp Web directly
+      const w = window.open(`https://wa.me/?text=${encoded}`, '_blank');
+      if(!w) window.location.href = `https://wa.me/?text=${encoded}`;
     }
   },
 
@@ -14516,17 +14539,32 @@ const IdleReminder = {
 // ═══════════════════════════════════════════════════════════════════════════════
 function openExternalURL(url){
   try{
+    const isAndroid  = /android/i.test(navigator.userAgent);
+    const isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+
     if(url.startsWith('whatsapp://')){
-      // Convert to Android intent:// scheme — bypasses Capacitor CSP completely
-      // The intent:// scheme is handled by Android OS directly, never by WebView
-      const path = url.slice('whatsapp://'.length);
-      const intentUrl = 'intent://' + path +
-        '#Intent;scheme=whatsapp;package=com.whatsapp;' +
-        'S.browser_fallback_url=https%3A%2F%2Fwww.whatsapp.com;end';
-      window.location.href = intentUrl;
+      if(isCapacitor || isAndroid){
+        // Android/Capacitor: use intent:// — bypasses WebView CSP completely
+        const path = url.slice('whatsapp://'.length);
+        const intentUrl = 'intent://' + path +
+          '#Intent;scheme=whatsapp;package=com.whatsapp;' +
+          'S.browser_fallback_url=https%3A%2F%2Fwww.whatsapp.com;end';
+        window.location.href = intentUrl;
+      } else {
+        // Desktop/iOS: convert whatsapp:// to https://wa.me/ (works in any browser)
+        // whatsapp://send?phone=971501234&text=Hello → https://wa.me/971501234?text=Hello
+        const params  = new URLSearchParams(url.replace('whatsapp://send?',''));
+        const phone   = params.get('phone') || '';
+        const text    = params.get('text')  || '';
+        const webUrl  = phone
+          ? 'https://wa.me/' + phone + (text ? '?text=' + encodeURIComponent(text) : '')
+          : 'https://wa.me/?text=' + encodeURIComponent(text);
+        const w = window.open(webUrl, '_blank');
+        if(!w) window.location.href = webUrl;
+      }
       return;
     }
-    // For non-whatsapp URLs try window.open first
+    // Non-WhatsApp URL
     const w = window.open(url, '_blank');
     if(!w) window.location.href = url;
   }catch(e){
@@ -15457,6 +15495,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   try{ Drawer.initSwipeGesture(); }catch(e){}
   try{ QuestEngine.render(); }catch(e){}
+  try{ SessionReflection.render(); }catch(e){}
   // ── Mobile native layer ───────────────────────────────────────────────────
   try{
     MobileUI.init();
