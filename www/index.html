@@ -184,7 +184,8 @@ body.day-mode input, body.day-mode .input, body.day-mode select, body.day-mode .
 body.day-mode input::placeholder, body.day-mode .input::placeholder {
   color: var(--text-muted);
 }
-body.day-mode .beh-btn { border-color: var(--border); }
+body.day-mode .beh-btn.pos { background: rgba(34,197,94,.08); }
+body.day-mode .beh-btn.neg { background: rgba(239,68,68,.08); }
 body.day-mode .btn-ghost {
   border-color: var(--border-strong);
   color: var(--text-secondary);
@@ -789,10 +790,16 @@ a{text-decoration:none;color:inherit}
 .bp-score{font-size:12px;color:var(--text-secondary)}
 .bp-score span{font-family:var(--mono);font-weight:600;color:var(--accent)}
 .behavior-section-label{
-  font-size:10px;font-weight:600;letter-spacing:0.5px;
-  text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;
+  font-size:9px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--text-muted);
+  margin-bottom:6px;margin-top:10px;
+  display:flex;align-items:center;gap:6px;
 }
-.behavior-btns{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.behavior-section-label::after{
+  content:'';flex:1;height:1px;
+  background:var(--border);opacity:.6;
+}
+.behavior-btns{display:grid;grid-template-columns:repeat(auto-fill,64px);gap:6px}
 /* Quick card edit button — was 100% inline, now CSS */
 .scard-edit-btn{
   position:absolute;top:2px;right:3px;
@@ -804,22 +811,55 @@ a{text-decoration:none;color:inherit}
   cursor:pointer;
 }
 .student-quick-card:hover .scard-edit-btn{opacity:1}
+/* ── Behavior buttons — square tiles ─────────────────────────── */
 .beh-btn{
-  padding:7px 6px;border-radius:var(--radius-sm);
-  font-size:11px;font-weight:600;
-  text-align:center;transition:all var(--transition);
-  border:1px solid transparent;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  line-height:1.2;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:3px;
+  width:64px;height:64px;
+  border-radius:10px;
+  border:none;cursor:pointer;
+  transition:background .15s,transform .12s,box-shadow .12s;
+  flex-shrink:0;
+  position:relative;
+  overflow:hidden;
 }
-.beh-btn .beh-icon{font-size:16px}
-.beh-btn .beh-pts{font-size:10px;font-family:var(--mono)}
-.beh-btn.pos{background:var(--green-dim);color:var(--success);border-color:var(--green-dim)}
-.beh-btn.pos:hover{background:var(--success);color:#fff;transform:scale(1.04)}
-.beh-btn.pos:active{transform:scale(0.97)}
-.beh-btn.neg{background:var(--red-dim);color:var(--danger);border-color:var(--red-dim)}
-.beh-btn.neg:hover{background:var(--danger);color:#fff;transform:scale(1.04)}
-.beh-btn.neg:active{transform:scale(0.97)}
+.beh-btn .beh-icon{
+  font-size:20px;line-height:1;
+}
+.beh-btn .beh-label{
+  font-size:8px;font-weight:600;
+  text-align:center;line-height:1.2;
+  max-width:58px;
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.beh-btn .beh-pts{
+  font-size:8px;font-family:var(--mono);font-weight:700;
+  opacity:.8;
+}
+.beh-btn.pos{
+  background:rgba(34,197,94,.12);
+  color:var(--green);
+}
+.beh-btn.pos:hover{
+  background:var(--green);color:#fff;
+  transform:scale(1.06);
+  box-shadow:0 4px 12px rgba(34,197,94,.35);
+}
+.beh-btn.pos:active{transform:scale(0.94)}
+.beh-btn.neg{
+  background:rgba(239,68,68,.12);
+  color:var(--red);
+}
+.beh-btn.neg:hover{
+  background:var(--red);color:#fff;
+  transform:scale(1.06);
+  box-shadow:0 4px 12px rgba(239,68,68,.35);
+}
+.beh-btn.neg:active{transform:scale(0.94)}
 .beh-btn.flash-btn{animation:btnFlash 0.3s ease}
 @keyframes btnFlash{0%,100%{transform:scale(1)}50%{transform:scale(0.94)}}
 .bp-note input{
@@ -1917,13 +1957,13 @@ a{text-decoration:none;color:inherit}
   .bp-note-wrap{ padding:6px }
   .behavior-btns{ gap:5px }
   .beh-btn{
-    padding:8px 4px;
-    min-height:52px;
-    border-radius:8px;
-    font-size:9px;
-    flex-direction:column;
-    gap:2px;
+    width:58px;height:58px;
+    border-radius:9px;
   }
+  .beh-btn .beh-icon{ font-size:18px; }
+  .beh-btn .beh-label{ font-size:7.5px; }
+  .beh-btn .beh-pts{ font-size:7.5px; }
+  .behavior-btns{ grid-template-columns:repeat(auto-fill,58px);gap:5px; }
   .beh-icon{ font-size:16px }
   .beh-pts{ font-size:8px }
   .behavior-section-label{ font-size:9px; padding:4px 0 3px }
@@ -4125,6 +4165,7 @@ const CONFIG = {
   },
   BEHAVIORS: {
     positive:[
+      // ── Original behaviors ─────────────────────────────────────────────
       {id:'participation', label:'Participation', icon:'✋', pts:+3, cat:'engagement'},
       {id:'teamwork',      label:'Teamwork',      icon:'🤝', pts:+3, cat:'social'},
       {id:'helping',       label:'Helping',       icon:'💡', pts:+4, cat:'social'},
@@ -4132,13 +4173,30 @@ const CONFIG = {
       {id:'leadership',    label:'Leadership',    icon:'⭐', pts:+5, cat:'conduct'},
       {id:'creativity',    label:'Creativity',    icon:'🎨', pts:+3, cat:'academic'},
       {id:'respectful',    label:'Respectful',    icon:'🌟', pts:+2, cat:'conduct'},
+      // ── New ELT behaviors (injected) ───────────────────────────────────
+      {id:'great_answer',  label:'Great Answer',  icon:'💬', pts:+1, cat:'engagement'},
+      {id:'on_task',       label:'On Task',       icon:'🎯', pts:+1, cat:'engagement'},
+      {id:'extra_effort',  label:'Extra Effort',  icon:'💪', pts:+2, cat:'academic'},
+      {id:'improvement',   label:'Improvement',   icon:'📈', pts:+3, cat:'academic'},
+      {id:'kind_act',      label:'Kind Act',      icon:'🤲', pts:+2, cat:'social'},
+      {id:'good_question', label:'Good Question', icon:'❓', pts:+2, cat:'engagement'},
+      {id:'volunteer',     label:'Volunteer',     icon:'🙋', pts:+2, cat:'social'},
     ],
     negative:[
+      // ── Original behaviors ─────────────────────────────────────────────
       {id:'disruption',    label:'Disruption',    icon:'📢', pts:-4, cat:'conduct'},
       {id:'phone_use',     label:'Phone Use',     icon:'📱', pts:-3, cat:'conduct'},
       {id:'disrespect',    label:'Disrespect',    icon:'🚫', pts:-5, cat:'conduct'},
       {id:'no_homework',   label:'No Homework',   icon:'❌', pts:-3, cat:'academic'},
       {id:'off_task',      label:'Off Task',      icon:'😴', pts:-2, cat:'engagement'},
+      // ── New ELT behaviors (injected) ───────────────────────────────────
+      {id:'conflict',      label:'Conflict',      icon:'⚔️',  pts:-4, cat:'conduct'},
+      {id:'bullying',      label:'Bullying',      icon:'🛑', pts:-5, cat:'conduct'},
+      {id:'sleeping',      label:'Sleeping',      icon:'💤', pts:-2, cat:'engagement'},
+      {id:'absent',        label:'Unexcused Abs', icon:'🚷', pts:-3, cat:'conduct'},
+      {id:'incomplete',    label:'Incomplete Work',icon:'📋', pts:-2, cat:'academic'},
+      {id:'late',          label:'Late/Tardy',    icon:'⏰', pts:-1, cat:'conduct'},
+      {id:'dishonesty',    label:'Dishonesty',    icon:'⚠️',  pts:-5, cat:'conduct'},
     ],
   },
   BADGE_DEFS:[
@@ -5291,16 +5349,74 @@ const InsightEngine = {
   },
 
   _behaviorInsights(){
-    const counts=BehaviorEngine.getBehaviorCounts();
-    const top=[...CONFIG.BEHAVIORS.positive,...CONFIG.BEHAVIORS.negative]
-      .map(b=>({...b,count:counts[b.id]||0}))
-      .sort((a,b)=>b.count-a.count)[0];
-    if(!top||top.count===0) return [];
-    const isPos=top.pts>=0;
-    return [{
-      type:isPos?'success':'warning',icon:top.icon,priority:isPos?1:3,
-      text:`"${top.label}" is the most frequent behavior with ${top.count} events. ${isPos?'Keep reinforcing this positive pattern!':'Address this consistently to improve classroom dynamics.'}`,
-    }];
+    const counts = BehaviorEngine.getBehaviorCounts();
+    const ins    = [];
+
+    // ── DANGER: Bullying — highest priority, immediate escalation ─────────
+    if(counts.bullying > 0){
+      const ss = StudentManager.getAll();
+      const evs = ss.flatMap(s => BehaviorEngine.getStudentEvents(s.id)
+        .filter(e => e.behaviorId === 'bullying'));
+      const names = [...new Set(evs.map(e => StudentManager.getById(e.studentId)?.name).filter(Boolean))];
+      ins.push({
+        type:'danger', icon:'🛑', priority:10,
+        text:`SAFEGUARDING ALERT: Bullying logged (${counts.bullying} event${counts.bullying>1?'s':''}) for ${names.join(', ')||'a student'}. Immediate investigation required — document and contact parents today.`,
+      });
+    }
+
+    // ── DANGER: Dishonesty — high priority ────────────────────────────────
+    if(counts.dishonesty > 0){
+      ins.push({
+        type:'danger', icon:'⚠️', priority:9,
+        text:`Dishonesty recorded ${counts.dishonesty} time${counts.dishonesty>1?'s':''} today. Address privately with the student and flag for counsellor if repeated.`,
+      });
+    }
+
+    // ── WARNING: Conflict ─────────────────────────────────────────────────
+    if(counts.conflict > 0){
+      ins.push({
+        type:'warning', icon:'⚔️', priority:8,
+        text:`${counts.conflict} conflict event${counts.conflict>1?'s':''} logged. Review seating arrangements and consider a restorative conversation between students involved.`,
+      });
+    }
+
+    // ── INFO: Sleeping / Absence pattern ──────────────────────────────────
+    if((counts.sleeping||0) + (counts.absent||0) >= 3){
+      ins.push({
+        type:'warning', icon:'💤', priority:6,
+        text:`${(counts.sleeping||0)+(counts.absent||0)} disengagement/absence events logged. Consider a wellbeing check-in and parent contact.`,
+      });
+    }
+
+    // ── POSITIVE: ELT improvements ────────────────────────────────────────
+    const improvements = counts.improvement||0;
+    if(improvements >= 2){
+      ins.push({
+        type:'success', icon:'📈', priority:4,
+        text:`${improvements} improvement events logged today — excellent! These students deserve recognition. Consider sharing with parents in the next report.`,
+      });
+    }
+    const volunteers = counts.volunteer||0;
+    if(volunteers >= 3){
+      ins.push({
+        type:'success', icon:'🙋', priority:3,
+        text:`High volunteerism today (${volunteers} times). Class participation is strong — build on this momentum with collaborative tasks.`,
+      });
+    }
+
+    // ── GENERAL: Most frequent behavior (existing logic) ──────────────────
+    const top = [...CONFIG.BEHAVIORS.positive, ...CONFIG.BEHAVIORS.negative]
+      .map(b => ({...b, count: counts[b.id]||0}))
+      .sort((a,b) => b.count - a.count)[0];
+    if(top && top.count > 0 && !['bullying','conflict','dishonesty'].includes(top.id)){
+      const isPos = top.pts >= 0;
+      ins.push({
+        type: isPos?'success':'warning', icon: top.icon, priority: isPos?1:3,
+        text: `"${top.label}" is the most frequent behavior today (${top.count} events). ${isPos?'Keep reinforcing this positive pattern!':'Address this pattern consistently to improve classroom dynamics.'}`,
+      });
+    }
+
+    return ins;
   },
 
   _riskInsights(){
@@ -5490,9 +5606,9 @@ const ReportEngine = {
   _lastStudentId: null,
 
   trendLabel(score){
-    if(score>5)  return {label:'Improving',icon:'↗',color:'var(--green)'};
-    if(score<-5) return {label:'Declining',icon:'↘',color:'var(--red)'};
-    return           {label:'Stable',    icon:'→',color:'var(--orange)'};
+    if(score>5)  return {label:'Improving',icon:'📈',color:'var(--green)'};
+    if(score<-5) return {label:'Declining',icon:'📉',color:'var(--red)'};
+    return           {label:'Stable',    icon:'➡️',color:'var(--orange)'};
   },
 
   feedbackText(student){
@@ -5862,33 +5978,33 @@ const ReportEngine = {
     const part  = dna.participation || 50;
     const cons  = dna.consistency   || 50;
 
-    // Trend indicator — threshold driven
-    const trendSym = tr.label==='Improving' ? '🔺'
-                   : tr.label==='Declining' ? '🔻'
-                   : '🔷';   // stable
+    // Trend — Emoji 1.0 only (on every Android since 2015)
+    const trendSym = tr.label==='Improving' ? '📈'
+                   : tr.label==='Declining' ? '📉'
+                   : '>>'; // stable (ASCII fallback)
 
-    // Focus symbol
-    const focusSym = focus > 70 ? '🎯'   // precision / high focus
-                   : focus < 40 ? '⏳'   // time wasted / low focus
-                   : '📌';               // average
+    // Focus — all Emoji 1.0
+    const focusSym = focus > 70 ? '🎯'
+                   : focus < 40 ? '⏳'
+                   : '📌';
 
-    // Participation symbol
-    const partSym  = part > 70  ? '⚡'   // high energy / active
-                   : part < 40  ? '📉'   // low participation
-                   : '📋';               // average
+    // Participation — all Emoji 1.0
+    const partSym  = part > 70  ? '⚡'
+                   : part < 40  ? '📉'
+                   : '📋';
 
-    // Consistency symbol
-    const consSym  = cons > 70  ? '✔'    // ASCII-safe checkmark
-                   : cons < 40  ? '⚠'   // ASCII-safe warning
+    // Consistency — Emoji 1.0 only (removed 🔔 which can render as □)
+    const consSym  = cons > 70  ? '✅'
+                   : cons < 40  ? '⚠️'
                    : '📊';
 
-    // Header symbol based on overall status
+    // Header — Emoji 1.0 only
     const score = st.score;
     const risk  = st.riskLevel;
-    const headerSym = risk==='high' || score<0  ? '⚠'
+    const headerSym = risk==='high' || score<0  ? '🚨'
                     : score>=50                  ? '🏆'
-                    : tr.label==='Improving'     ? '🔺'
-                    : tr.label==='Declining'     ? '🔻'
+                    : tr.label==='Improving'     ? '📈'
+                    : tr.label==='Declining'     ? '📉'
                     : '📋';
 
     return { trend:trendSym, focus:focusSym, part:partSym, cons:consSym, header:headerSym };
@@ -5896,11 +6012,11 @@ const ReportEngine = {
 
   // ── ASCII-safe progress bar — no Unicode box chars (they break on Android) ─
   _bar(value, width=10){
+    // Pure ASCII bar — renders identically on every WhatsApp version and device
     const pct    = Math.max(0, Math.min(100, Math.round(value)));
     const filled = Math.round(pct / 100 * width);
     const empty  = width - filled;
-    // U+2588 FULL BLOCK + U+2591 LIGHT SHADE — both in Noto Sans (Android/WhatsApp safe)
-    return '█'.repeat(filled) + '░'.repeat(empty) + '  ' + pct + '%';
+    return '[' + '='.repeat(filled) + '.'.repeat(empty) + '] ' + pct + '%';
   },
 
   // Grade label for a percentage value
@@ -5928,12 +6044,12 @@ const ReportEngine = {
     const focus    = dna.focus         || 50;
     const part     = dna.participation || 50;
     const cons     = dna.consistency   || 50;
-    const SEP      = '---';
+    const SEP      = '~~~~~~~~~~~~~~~~~~~';
 
-    // ── 7-day progress chart (text-based) ─────────────────────────────────
+    // 7-day progress — ASCII dots only, no emoji
     const evs  = BehaviorEngine.getStudentEvents(st.id);
-    const days = [];
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const chartLines = ['', '📊 *7-Day Activity*', SEP];
     for(let d = 6; d >= 0; d--){
       const dt  = new Date();
       dt.setDate(dt.getDate() - d);
@@ -5942,63 +6058,51 @@ const ReportEngine = {
                      .reduce((a, e) => a + e.scoreChange, 0);
       const neg = evs.filter(e => e.createdAt.startsWith(str) && e.scoreChange < 0)
                      .reduce((a, e) => a + Math.abs(e.scoreChange), 0);
-      days.push({ name: dayNames[dt.getDay()], pos, neg, net: pos - neg });
+      const net = pos - neg;
+      const noData = !pos && !neg;
+      const bar   = noData ? '- no events'
+                  : ('+'.repeat(Math.min(pos,8)) + (neg?'-'.repeat(Math.min(neg,4)):'') + '  ' + (net>0?'+':'')+net);
+      chartLines.push(dayNames[dt.getDay()] + ': ' + bar);
     }
-    const maxVal = Math.max(...days.map(d => Math.max(d.pos, d.neg, 1)), 1);
-    const BAR_MAX = 8;
-    const chartLines = ['📊 *7-Day Progress Chart*', '`' + '─'.repeat(28) + '`'];
-    days.forEach(day => {
-      const posBar = Math.round((day.pos / maxVal) * BAR_MAX);
-      const negBar = Math.round((day.neg / maxVal) * BAR_MAX);
-      const posStr = posBar > 0 ? '█'.repeat(posBar) : '';
-      const negStr = negBar > 0 ? '▒'.repeat(negBar) : '';
-      const netSign = day.net > 0 ? `+${day.net}` : day.net < 0 ? `${day.net}` : '0';
-      const dayPad  = day.name.padEnd(3);
-      const barLine = posStr.padEnd(BAR_MAX) + ' | ' + negStr.padEnd(BAR_MAX);
-      chartLines.push(`\`${dayPad}  ${barLine}  ${netSign}\``);
-    });
-    chartLines.push('\`' + ' '.repeat(4) + '+ positive'.padEnd(BAR_MAX+1) + '  - negative\`');
-    // ──────────────────────────────────────────────────────────────────────
+    chartLines.push(SEP, '  (+) positive  (-) negative', '');
 
     const lines = [
-      `${sym.header} *EduPulse Student Report*`,
+      sym.header + ' *EduPulse Report*',
       SEP,
-      `Student : *${st.name}*`,
-      sets.class   ? `Class   : ${sets.class}`   : '',
-      sets.teacher ? `Teacher : ${sets.teacher}` : '',
-      sets.school  ? `School  : ${sets.school}`  : '',
-      ``,
-      `*PERFORMANCE SUMMARY*`,
+      'Student : *' + st.name + '*',
+      sets.class   ? 'Class   : ' + sets.class   : '',
+      sets.teacher ? 'Teacher : ' + sets.teacher : '',
+      sets.school  ? 'School  : ' + sets.school  : '',
+      '',
+      '*PERFORMANCE*',
       SEP,
-      `Score     : *${st.score} pts*`,
-      `This Week : *${weekSign} pts*`,
-      `Trend     : ${sym.trend} *${tr.label}*`,
-      `Positive  : *${ratio}%*  (${st.posCount}+ / ${st.negCount}-)`,
-      `Streak    : *${st.streak} day${st.streak!==1?'s':''}* 🔥`,
-      ``,
+      'Score     : *' + st.score + ' pts*',
+      'This Week : *' + weekSign + ' pts*',
+      'Trend     : ' + sym.trend + ' *' + tr.label + '*',
+      'Positive  : *' + ratio + '%*  (' + st.posCount + '+ / ' + st.negCount + '-)',
+      'Streak    : *' + st.streak + ' day' + (st.streak!==1?'s':'') + '* 🔥',
       ...chartLines,
-      ``,
-      `*CLASSROOM INDICATORS*`,
+      '*INDICATORS*',
       SEP,
-      `${sym.focus} Focus        ${this._bar(focus)}  ${this._grade(focus)}`,
-      `${sym.part}  Participation ${this._bar(part)}  ${this._grade(part)}`,
-      `${sym.cons} Consistency   ${this._bar(cons)}  ${this._grade(cons)}`,
+      sym.focus + ' Focus         ' + this._bar(focus)  + '  ' + this._grade(focus),
+      sym.part  + ' Participation ' + this._bar(part)   + '  ' + this._grade(part),
+      sym.cons  + ' Consistency   ' + this._bar(cons)   + '  ' + this._grade(cons),
     ];
 
     if(notes.length){
-      lines.push(``, `*TEACHER OBSERVATIONS*`, SEP);
-      notes.forEach(n => lines.push(`- _${n}_`));
+      lines.push('', '*TEACHER NOTES*', SEP);
+      notes.forEach(n => lines.push('> ' + n));
     }
 
     lines.push(
-      ``,
-      `*TEACHER ASSESSMENT*`,
+      '',
+      '*TEACHER ASSESSMENT*',
       SEP,
-      `_${this._adviceEN(st, tr)}_`,
-      ``,
+      this._adviceEN(st, tr),
+      '',
       SEP,
-      `Thank you for your continued support of ${first}.`,
-      `-- ${sets.teacher||'Teacher'}, ${sets.school||'EduPulse'}`
+      'Thank you for supporting ' + first + '.',
+      '-- ' + (sets.teacher||'Teacher') + ', ' + (sets.school||'EduPulse')
     );
 
     return lines.filter(l => l !== null && l !== undefined)
@@ -6037,7 +6141,7 @@ const ReportEngine = {
       ``,
       ``,
       `*مؤشرات الأداء الدراسي*`,
-      `────────────────────`,
+      '---',
       `${sym.focus} *التركيز*`,
       `    ${this._bar(focus)}  ${this._gradeAr(focus)}`,
       ``,
@@ -6160,9 +6264,9 @@ const ReportEngine = {
     const ratio = st.posCount + st.negCount > 0
       ? Math.round(st.posCount / (st.posCount + st.negCount) * 100) : 0;
 
-    const tr = st.trendScore > 5  ? { label:'Improving', icon:'↗', color:'#16a34a' }
-             : st.trendScore < -5 ? { label:'Declining',  icon:'↘', color:'#dc2626' }
-             :                      { label:'Stable',     icon:'→', color:'#d97706' };
+    const tr = st.trendScore > 5  ? { label:'Improving', icon:'📈', color:'#16a34a' }
+             : st.trendScore < -5 ? { label:'Declining',  icon:'📉', color:'#dc2626' }
+             :                      { label:'Stable',     icon:'➡️', color:'#d97706' };
 
     const riskInfo = {
       none:   { label:'On Track',        color:'#16a34a', bg:'#dcfce7' },
@@ -6744,7 +6848,7 @@ const UI = {
               <button class="beh-btn pos" onclick="UI.logBehaviorFromBtn(${id},'${b.id}',this)"
                 data-tip="${b.label}: +${b.pts} pts — ${b.cat}">
                 <span class="beh-icon">${b.icon}</span>
-                <span>${b.label}</span>
+                <span class="beh-label">${b.label}</span>
                 <span class="beh-pts">+${b.pts}</span>
               </button>`).join('')}
           </div>
@@ -6756,7 +6860,7 @@ const UI = {
               <button class="beh-btn neg" onclick="UI.logBehaviorFromBtn(${id},'${b.id}',this)"
                 data-tip="${b.label}: ${b.pts} pts — ${b.cat}">
                 <span class="beh-icon">${b.icon}</span>
-                <span>${b.label}</span>
+                <span class="beh-label">${b.label}</span>
                 <span class="beh-pts">${b.pts}</span>
               </button>`).join('')}
           </div>
@@ -6866,6 +6970,20 @@ const UI = {
       // Risk alert only if risk level changed to high
       if(result.riskChanged&&result.student.riskLevel==='high'){
         NotificationEngine.riskAlert(result.student.name,'high');
+      }
+
+      // ── Instant danger alerts for safeguarding behaviors ──────────────
+      const _DANGER_MAP = {
+        bullying:   ['🛑 Bullying Logged',   `${result.student.name} — safeguarding protocol required. Document immediately and contact parents.`],
+        conflict:   ['⚔️ Conflict Logged',    `${result.student.name} — review seating and monitor. Consider restorative conversation.`],
+        dishonesty: ['⚠️ Dishonesty Logged',  `${result.student.name} — address privately. Flag if repeated.`],
+      };
+      if(_DANGER_MAP[behaviorId]){
+        setTimeout(() => {
+          NotificationEngine.danger(_DANGER_MAP[behaviorId][0], _DANGER_MAP[behaviorId][1]);
+          InsightEngine.invalidate();
+          UI.renderInsights();
+        }, 400);
       }
 
     }catch(e){
@@ -7695,9 +7813,9 @@ const UI = {
 
   // ── Helpers ─────────────────────────────────────────────────────────
   _trendInfo(score){
-    if(score>5)  return {label:'Improving',icon:'↗',color:'var(--green)'};
-    if(score<-5) return {label:'Declining',icon:'↘',color:'var(--red)'};
-    return           {label:'Stable',    icon:'→',color:'var(--orange)'};
+    if(score>5)  return {label:'Improving',icon:'📈',color:'var(--green)'};
+    if(score<-5) return {label:'Declining',icon:'📉',color:'var(--red)'};
+    return           {label:'Stable',    icon:'➡️',color:'var(--orange)'};
   },
 
   _timeAgo(iso){
@@ -9906,6 +10024,7 @@ const StudentDNA = {
   // ── Mapping from behavior ID → axis deltas ───────────────────────────────
   // [focus, participation, disruption, consistency_boost]
   _BEHAVIOR_MAP: {
+    // ── Original behaviors ────────────────────────────────────────────
     participation:   [+4, +7,  0,  +2],
     teamwork:        [+2, +5,  0,  +3],
     helping:         [+2, +6,  0,  +3],
@@ -9918,6 +10037,22 @@ const StudentDNA = {
     disrespect:      [-4, -3, +8,  -6],
     no_homework:     [-3, -2, +3,  -7],
     off_task:        [-6, -4, +4,  -4],
+    // ── New ELT behaviors ─────────────────────────────────────────────
+    // [focus, participation, disruption, consistency]
+    great_answer:    [+3, +6,  0,  +2],   // engaged, vocal — focus & participation boost
+    on_task:         [+6, +2, -2,  +4],   // focused, quiet — high focus + consistency
+    extra_effort:    [+5, +3,  0,  +5],   // academic drive — focus & consistency
+    improvement:     [+4, +4, -1,  +6],   // positive momentum — all axes improve
+    kind_act:        [+1, +5, -3,  +3],   // prosocial — participation & lower disruption
+    good_question:   [+5, +7,  0,  +2],   // curiosity — focus & participation
+    volunteer:       [+2, +8, -2,  +3],   // high participation, less disruptive
+    conflict:        [-3, -2, +8,  -5],   // conduct issue — spikes disruption
+    bullying:        [-2, -1,+12,  -8],   // severe conduct — max disruption penalty
+    sleeping:        [-7, -5, +2,  -6],   // disengaged — tanks focus & participation
+    absent:          [-5, -8,  0,  -8],   // missed class — participation & consistency hit
+    incomplete:      [-4, -2, +1,  -7],   // academic failure — consistency tanks
+    late:            [-2, -3, +2,  -3],   // mild disruption on arrival
+    dishonesty:      [-3, -1, +7,  -9],   // integrity breach — disruption + consistency
   },
 
   _DEFAULT: { focus:50, participation:50, disruption:10, consistency:50, lastComputed:0 },
@@ -14116,9 +14251,9 @@ const StudentCard = {
       ? Math.round(st.posCount / (st.posCount + st.negCount) * 100)
       : 0;
 
-    const trend = st.trendScore > 5  ? '↗ Improving'
-                : st.trendScore < -5 ? '↘ Declining'
-                : '→ Stable';
+    const trend = st.trendScore > 5  ? '📈 Improving'
+                : st.trendScore < -5 ? '📉 Declining'
+                : '➡️ Stable';
 
     const status = {
       none:   '✅ On Track',
@@ -14134,14 +14269,14 @@ const StudentCard = {
 
     const lines = [
       `📋 *EduPulse Student Card*`,
-      `━━━━━━━━━━━━━━━━━━━━━━━`,
+      `---`,
       `👤 *${st.name}*`,
       clsName  ? `🏫 Class: ${clsName}` : '',
       teacher  ? `Teacher: ${teacher}` : '',
       school   ? `🏛 School: ${school}`  : '',
       ``,
       `📊 *Performance Summary*`,
-      `─────────────────────────`,
+      `---`,
       `🏆 Total Score: *${st.score} pts*  (Rank #${rank})`,
       `📅 This Week: *${(st.weeklyScore||0) > 0 ? '+' : ''}${st.weeklyScore||0} pts*`,
       `🔥 Current Streak: *${st.streak || 0} days*`,
@@ -14153,7 +14288,7 @@ const StudentCard = {
       badges.length ? `
 🏅 *Badges:* ${badges.join(' · ')}` : '',
       ``,
-      `━━━━━━━━━━━━━━━━━━━━━━━`,
+      `---`,
       `_Sent via EduPulse · ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}_`,
     ].filter(l => l !== null && l !== undefined);
 
@@ -14161,9 +14296,9 @@ const StudentCard = {
   },
 
   _trendIcon(score){
-    if(score > 5)  return { icon: '↗', label: 'Improving' };
-    if(score < -5) return { icon: '↘', label: 'Declining'  };
-    return           { icon: '→', label: 'Stable'    };
+    if(score > 5)  return { icon: '📈', label: 'Improving' };
+    if(score < -5) return { icon: '📉', label: 'Declining'  };
+    return           { icon: '➡️', label: 'Stable'    };
   },
 
   // ── Open external URL — Android Capacitor compatible ────────────────────────
