@@ -4432,64 +4432,39 @@ const StorageManager = {
   saveSettings(s){ return this.set(this._k(CONFIG.STORAGE_KEYS.SETTINGS),s); },
 
   exportJSON(){
-    // Generate a proper PDF backup report using jsPDF
+    // Export all data as a real JSON backup file
+    // Uses JSON.stringify (not jsPDF) so it works on Android too
     try{
-      const{jsPDF}=window.jspdf;
-      const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-      const sets=this.getSettings();
-      const students=this.getStudents();
-      const now=new Date().toLocaleDateString('en-US',{dateStyle:'long'});
+      const data = {
+        exportedAt:  new Date().toISOString(),
+        appVersion:  'EduPulse v3',
+        settings:    this.getSettings(),
+        students:    this.getStudents(),
+        classes:     JSON.parse(localStorage.getItem('ep_classes')||'[]'),
+      };
+      // Include events for each student
+      const classes = data.classes.length ? data.classes : [{id:'', name:'Default'}];
+      data.events = {};
+      classes.forEach(cls => {
+        const key = 'ep_events' + (cls.id ? '_'+cls.id : '');
+        try{ data.events[cls.id||'default'] = JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
+      });
 
-      // Header
-      doc.setFillColor(7,9,26);doc.rect(0,0,210,36,'F');
-      doc.setFillColor(79,142,247);doc.rect(0,33,210,3,'F');
-      doc.setFontSize(17);doc.setFont('helvetica','bold');doc.setTextColor(255,255,255);
-      doc.text('EduPulse — Data Backup Report',20,13);
-      doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(180,195,230);
-      doc.text(`${sets.school}  ·  ${sets.teacher}  ·  Exported: ${now}`,20,30);
+      const json = JSON.stringify(data, null, 2);
+      const filename = `EduPulse_Backup_${new Date().toISOString().slice(0,10)}.json`;
 
-      let y=48;
-      doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(10,20,55);
-      doc.text(`All Students (${students.length})`,20,y);y+=6;
-
-      if(typeof doc.autoTable==='function'){
-        doc.autoTable({startY:y,margin:{left:20,right:20},
-          head:[['Name','Score','Weekly','Pos','Neg','Risk','Group','Badges','Parent Phone']],
-          body:students.map(s=>[
-            s.name, s.score,
-            CONFIG.fmt.weekly(s.weeklyScore),
-            s.posCount, s.negCount, s.riskLevel||'none',
-            s.group||'—', s.badges.length,
-            s.parentPhone||'—'
-          ]),
-          styles:{fontSize:7.5},
-          headStyles:{fillColor:[10,20,100],textColor:255,fontStyle:'bold'},
-          alternateRowStyles:{fillColor:[245,248,255]},
-          theme:'striped',
-        });
-        y=(doc.lastAutoTable?.finalY||y+60)+12;
-      }
-
-      // Footer
-      const pages=doc.internal.getNumberOfPages();
-      for(let i=1;i<=pages;i++){
-        doc.setPage(i);
-        doc.setFillColor(7,9,26);doc.rect(0,284,210,13,'F');
-        doc.setFontSize(7);doc.setTextColor(180,195,230);
-        doc.text(`EduPulse Backup  ·  ${sets.school}  ·  Page ${i} of ${pages}`,20,291);
-      }
-
-      doc.save(`EduPulse_Backup_${new Date().toISOString().slice(0,10)}.pdf`);
-      if(typeof NotificationEngine!=='undefined')
-        NotificationEngine.success('Backup Downloaded','Full data backup exported as PDF');
+      // data: URI for JSON is allowed on Android WebView (only blob: and PDF data: are blocked)
+      const uri = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+      const a   = document.createElement('a');
+      a.href     = uri;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      NotificationEngine.success('Backup Downloaded', `${data.students.length} students exported`);
     }catch(e){
-      console.error('PDF export error:',e);
-      // Fallback: JSON download if jsPDF unavailable
-      const data={students:this.getStudents(),events:this.getEvents(),settings:this.getSettings(),exported:new Date().toISOString()};
-      const dataUri='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data,null,2));
-      const a=document.createElement('a');
-      a.href=dataUri;a.download=`EduPulse_Backup_${new Date().toISOString().slice(0,10)}.json`;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      NotificationEngine.danger('Export Failed', e.message);
+      Logger.error('exportJSON', e.message);
     }
   },
   clearCurrentClass(){
@@ -6428,16 +6403,105 @@ const ReportEngine = {
   },
 
   generateClassPDF(){
-    try{
-      const {jsPDF}=window.jspdf;
-      const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-      this._buildClassPDF(doc);
-      doc.save(`EduPulse_ClassReport_${new Date().toISOString().slice(0,10)}.pdf`);
-      NotificationEngine.success('Class PDF Downloaded','Full class report saved');
-    }catch(e){
-      console.error(e);
-      NotificationEngine.danger('PDF Error','jsPDF not loaded.');
+    const isNative  = !!(window.Capacitor?.isNativePlatform?.());
+    const isAndroid = /android/i.test(navigator.userAgent);
+
+    if(!isNative && !isAndroid){
+      // ── DESKTOP: generate real PDF file via jsPDF ─────────────────
+      if(!window.jspdf?.jsPDF){
+        NotificationEngine.warning('PDF Library','Connect to internet once so jsPDF can load, then try again.');
+        return;
+      }
+      try{
+        const {jsPDF} = window.jspdf;
+        const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+        this._buildClassPDF(doc);
+        const filename = `EduPulse_ClassReport_${new Date().toISOString().slice(0,10)}.pdf`;
+        doc.save(filename);
+        NotificationEngine.success('PDF Downloaded', filename);
+      }catch(e){
+        NotificationEngine.danger('PDF Error', e.message);
+        Logger.error('generateClassPDF', e.message);
+      }
+      return;
     }
+
+    // ── ANDROID / MOBILE: show full in-app HTML report ─────────────
+    const ss    = StudentManager.sortBy('score','desc');
+    const stats = StudentManager.getStats();
+    const sets  = StorageManager.getSettings();
+    const now   = new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    const cls   = ClassManager.activeClass();
+    const riskColors = {none:'#16a34a',low:'#d97706',medium:'#ea580c',high:'#dc2626'};
+    const trendIcon  = s => s.trendScore>5?'📈':s.trendScore<-5?'📉':'—';
+
+    const rows = ss.map((s,i) => `
+      <tr style="border-bottom:1px solid #f1f5f9;${i%2===0?'background:#f8fafc':''}">
+        <td style="padding:6px 8px;font-weight:700;color:#374151">#${i+1}</td>
+        <td style="padding:6px 8px;font-weight:600">${s.avatar} ${s.name}</td>
+        <td style="padding:6px 8px;font-family:monospace;font-weight:700;color:#2563eb">${s.score}</td>
+        <td style="padding:6px 8px;color:${(s.weeklyScore||0)>=0?'#16a34a':'#dc2626'};font-weight:600">${(s.weeklyScore||0)>=0?'+':''}${s.weeklyScore||0}</td>
+        <td style="padding:6px 8px">${trendIcon(s)}</td>
+        <td style="padding:6px 8px;color:${riskColors[s.riskLevel]||'#16a34a'};font-weight:700;font-size:10px;text-transform:uppercase">${s.riskLevel||'OK'}</td>
+        <td style="padding:6px 8px;color:#16a34a">+${s.posCount||0}</td>
+        <td style="padding:6px 8px;color:#dc2626">-${s.negCount||0}</td>
+        <td style="padding:6px 8px">🔥${s.streak||0}</td>
+        <td style="padding:6px 8px;font-size:10px;color:#6b7280">${s.group||'—'}</td>
+      </tr>`).join('');
+
+    const atRisk = ss.filter(s=>s.riskLevel&&s.riskLevel!=='none');
+    const reportHtml = `
+      <div style="font-family:system-ui,sans-serif;color:#111827">
+        <div style="background:linear-gradient(135deg,#1e40af,#2563eb);padding:18px;border-radius:10px;color:#fff;text-align:center;margin-bottom:14px">
+          <div style="font-size:20px;font-weight:800">${cls?.name||sets.class||'Class Report'}</div>
+          <div style="font-size:12px;opacity:.8;margin-top:3px">${sets.teacher||''} · ${sets.school||''}</div>
+          <div style="font-size:10px;opacity:.6;margin-top:3px">${now}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+          ${[['👨‍🎓','Students',ss.length,''],['📊','Avg Score',stats.avgScore+' pts',''],
+             ['✅','Pos Rate',stats.posRatio+'%','color:#16a34a'],
+             ['🚨','At Risk',atRisk.length,atRisk.length>0?'color:#dc2626':'color:#16a34a']
+          ].map(([icon,label,val,col])=>`
+            <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:18px">${icon}</div>
+              <div style="font-size:16px;font-weight:800;${col}">${val}</div>
+              <div style="font-size:9px;color:#6b7280;margin-top:1px">${label}</div>
+            </div>`).join('')}
+        </div>
+        <div style="overflow-x:auto;margin-bottom:12px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="background:#1e40af;color:#fff">
+                ${['#','Student','Score','Week','Trend','Risk','+','-','🔥','Group']
+                  .map(h=>`<th style="padding:7px 8px;text-align:left;font-size:9px;white-space:nowrap">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${atRisk.length?`
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🚨 Needs Attention</div>
+          ${atRisk.map(s=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0">
+            <span>${s.avatar}</span><span style="flex:1;font-size:11px;font-weight:600">${s.name}</span>
+            <span style="font-size:10px;color:${riskColors[s.riskLevel]};font-weight:700;text-transform:uppercase">${s.riskLevel}</span>
+            <span style="font-size:10px;color:#6b7280">${s.score}pts</span>
+          </div>`).join('')}
+        </div>`:''}
+        <div style="text-align:center;font-size:10px;color:#9ca3af;padding-top:8px">
+          © ALAA BANI SALAMEH — EduPulse AI Classroom Intelligence Platform
+        </div>
+      </div>`;
+
+    UI._openModal({
+      title: `📊 Class Report — ${cls?.name||sets.class||'Class'}`,
+      size:  'lg',
+      body:  reportHtml,
+      actions: [
+        { label:'Close',         class:'btn-ghost',   onclick:'App.closeModal()' },
+        { label:'📥 Export CSV', class:'btn-primary', onclick:'App.closeModal();setTimeout(()=>ReportEngine.exportClassCSV(),100)' },
+      ],
+    });
   },
 
   _pdfHeader(doc,title){
@@ -6575,12 +6639,33 @@ const ReportEngine = {
   },
 
   exportClassCSV(){
-    const csv=StudentManager.exportCSV();
-    const dataUri='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-    const a=document.createElement('a');
-    a.href=dataUri;a.download=`EduPulse_Students_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    NotificationEngine.success('CSV Exported','Student data downloaded');
+    // Export student data as CSV file
+    // text/csv data: URI downloads work on both desktop and Android Chrome
+    try{
+      const csv      = StudentManager.exportCSV();
+      const filename = `EduPulse_Students_${new Date().toISOString().slice(0,10)}.csv`;
+
+      // Use data: URI — works on desktop AND Android Chrome (unlike blob: URLs)
+      const uri = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+      const a   = document.createElement('a');
+      a.setAttribute('href', uri);
+      a.setAttribute('download', filename);
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      NotificationEngine.success('CSV Exported', `${filename} — open in Excel or Google Sheets`);
+    }catch(e){
+      // Fallback: copy to clipboard if download fails
+      try{
+        const csv = StudentManager.exportCSV();
+        navigator.clipboard.writeText(csv).then(()=>{
+          NotificationEngine.info('CSV Copied', 'Data copied to clipboard — paste into Excel or Google Sheets');
+        });
+      }catch(e2){
+        NotificationEngine.danger('Export Failed', 'Could not export CSV');
+      }
+    }
   },
 };
 
