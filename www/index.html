@@ -3749,6 +3749,23 @@ body.privacy-mode .hide-privacy{display:none!important}
               <input class="input" id="setting-year" placeholder="2024–2025"/>
             </div>
           </div>
+          <!-- Country & Phone Settings -->
+          <div style="margin-top:16px;padding:14px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md)">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🌍 Country & Phone Prefix</div>
+                <div id="country-display" style="font-size:13px;color:var(--text-primary);font-weight:600">Loading…</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <select class="select" id="country-manual-select" style="font-size:12px" onchange="CountryManager.set(this.value); Settings._updateCountryDisplay()">
+                  <option value="">Change Country…</option>
+                </select>
+                <button class="btn btn-ghost btn-xs" onclick="CountryManager._cache=null; CountryManager._dial=null; localStorage.removeItem('ep_country'); CountryManager.detect().then(()=>Settings._updateCountryDisplay()); NotificationEngine.info('Detecting…','Re-running location detection')">
+                  ↺ Re-detect
+                </button>
+              </div>
+            </div>
+          </div>
           <button class="btn btn-primary" onclick="Settings.save()">Save Settings</button>
         </div>
         <div class="settings-section">
@@ -5675,6 +5692,188 @@ const NotificationEngine = {
   getHistory(){ return this._history; },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COUNTRY MANAGER — Smart country detection & phone normalization
+// Single source of truth for country codes, phone prefixes, auto-detection.
+// Replaces all scattered phone-stripping code in the project.
+// ═══════════════════════════════════════════════════════════════════════════════
+const CountryManager = {
+
+  // ── Shared country code → dial prefix registry ───────────────────────────────
+  // Format: ISO-alpha2 → { dial, name, flag }
+  // Used by: normalizePhone, Settings panel, flag display, bulk import
+  CODES: {
+    AE:{dial:'971',name:'UAE',flag:'🇦🇪'},        QA:{dial:'974',name:'Qatar',flag:'🇶🇦'},
+    SA:{dial:'966',name:'Saudi Arabia',flag:'🇸🇦'}, KW:{dial:'965',name:'Kuwait',flag:'🇰🇼'},
+    BH:{dial:'973',name:'Bahrain',flag:'🇧🇭'},      OM:{dial:'968',name:'Oman',flag:'🇴🇲'},
+    JO:{dial:'962',name:'Jordan',flag:'🇯🇴'},       LB:{dial:'961',name:'Lebanon',flag:'🇱🇧'},
+    EG:{dial:'20', name:'Egypt',flag:'🇪🇬'},        SY:{dial:'963',name:'Syria',flag:'🇸🇾'},
+    IQ:{dial:'964',name:'Iraq',flag:'🇮🇶'},         YE:{dial:'967',name:'Yemen',flag:'🇾🇪'},
+    PS:{dial:'970',name:'Palestine',flag:'🇵🇸'},     IL:{dial:'972',name:'Israel',flag:'🇮🇱'},
+    TR:{dial:'90', name:'Turkey',flag:'🇹🇷'},        IR:{dial:'98', name:'Iran',flag:'🇮🇷'},
+    IN:{dial:'91', name:'India',flag:'🇮🇳'},         PK:{dial:'92', name:'Pakistan',flag:'🇵🇰'},
+    BD:{dial:'880',name:'Bangladesh',flag:'🇧🇩'},    LK:{dial:'94', name:'Sri Lanka',flag:'🇱🇰'},
+    US:{dial:'1',  name:'USA',flag:'🇺🇸'},           CA:{dial:'1',  name:'Canada',flag:'🇨🇦'},
+    GB:{dial:'44', name:'UK',flag:'🇬🇧'},            DE:{dial:'49', name:'Germany',flag:'🇩🇪'},
+    FR:{dial:'33', name:'France',flag:'🇫🇷'},        IT:{dial:'39', name:'Italy',flag:'🇮🇹'},
+    ES:{dial:'34', name:'Spain',flag:'🇪🇸'},         NL:{dial:'31', name:'Netherlands',flag:'🇳🇱'},
+    AU:{dial:'61', name:'Australia',flag:'🇦🇺'},     NZ:{dial:'64', name:'New Zealand',flag:'🇳🇿'},
+    CN:{dial:'86', name:'China',flag:'🇨🇳'},         JP:{dial:'81', name:'Japan',flag:'🇯🇵'},
+    KR:{dial:'82', name:'South Korea',flag:'🇰🇷'},  SG:{dial:'65', name:'Singapore',flag:'🇸🇬'},
+    MY:{dial:'60', name:'Malaysia',flag:'🇲🇾'},      ID:{dial:'62', name:'Indonesia',flag:'🇮🇩'},
+    NG:{dial:'234',name:'Nigeria',flag:'🇳🇬'},       ZA:{dial:'27', name:'South Africa',flag:'🇿🇦'},
+    MA:{dial:'212',name:'Morocco',flag:'🇲🇦'},       DZ:{dial:'213',name:'Algeria',flag:'🇩🇿'},
+    TN:{dial:'216',name:'Tunisia',flag:'🇹🇳'},       LY:{dial:'218',name:'Libya',flag:'🇱🇾'},
+  },
+
+  // ── Timezone → ISO country map (offline fallback) ───────────────────────────
+  _TZ: {
+    'Asia/Dubai':'AE','Asia/Qatar':'QA','Asia/Riyadh':'SA','Asia/Kuwait':'KW',
+    'Asia/Bahrain':'BH','Asia/Muscat':'OM','Asia/Amman':'JO','Asia/Beirut':'LB',
+    'Africa/Cairo':'EG','Asia/Damascus':'SY','Asia/Baghdad':'IQ','Asia/Aden':'YE',
+    'Asia/Gaza':'PS','Asia/Jerusalem':'IL','Europe/Istanbul':'TR','Asia/Tehran':'IR',
+    'Asia/Kolkata':'IN','Asia/Karachi':'PK','Asia/Dhaka':'BD','Asia/Colombo':'LK',
+    'America/New_York':'US','America/Chicago':'US','America/Los_Angeles':'US',
+    'America/Toronto':'CA','Europe/London':'GB','Europe/Berlin':'DE',
+    'Europe/Paris':'FR','Europe/Rome':'IT','Europe/Madrid':'ES',
+    'Australia/Sydney':'AU','Asia/Tokyo':'JP','Asia/Seoul':'KR','Asia/Singapore':'SG',
+    'UTC':'AE','Etc/UTC':'AE','Europe/Helsinki':'FI','Europe/Amsterdam':'NL',
+    'America/Denver':'US','America/Phoenix':'US','Pacific/Auckland':'NZ',
+    'Asia/Calcutta':'IN','Asia/Bangkok':'TH','Asia/Kuala_Lumpur':'MY',
+    'Asia/Jakarta':'ID','Asia/Manila':'PH','Asia/Shanghai':'CN','Asia/Taipei':'TW',
+    'Africa/Lagos':'NG','Africa/Johannesburg':'ZA','Africa/Nairobi':'KE',
+  },
+
+  // ── Locale → country fallback ─────────────────────────────────────────────────
+  _LOCALE: {
+    'ar-AE':'AE','ar-QA':'QA','ar-SA':'SA','ar-KW':'KW','ar-BH':'BH',
+    'ar-OM':'OM','ar-JO':'JO','ar-LB':'LB','ar-EG':'EG','ar-SY':'SY',
+    'ar-IQ':'IQ','ar-YE':'YE','ar-MA':'MA','ar-DZ':'DZ','ar-TN':'TN',
+    'en-US':'US','en-GB':'GB','en-AU':'AU','en-IN':'IN',
+  },
+
+  _cache: null,           // detected country ISO code
+  _dial:  null,           // detected dial prefix (digits only, no +)
+  _STORE: 'ep_country',   // localStorage key
+
+  // ── Get current country (cached, sync) ───────────────────────────────────────
+  get(){
+    if(this._cache) return this._cache;
+    // 1. Manual override
+    const stored = localStorage.getItem(this._STORE);
+    if(stored && this.CODES[stored]){ this._cache = stored; this._dial = this.CODES[stored].dial; return stored; }
+    // 2. Timezone (instant, offline-safe)
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const fromTz = this._TZ[tz];
+    if(fromTz){ this._cache = fromTz; this._dial = this.CODES[fromTz]?.dial; return fromTz; }
+    // 3. Locale (try full code, then language+region, then language only)
+    const loc = navigator.language || '';
+    const fromLoc = this._LOCALE[loc]
+                 || this._LOCALE[loc.slice(0,5)]
+                 || Object.entries(this._LOCALE).find(([k])=>k.startsWith(loc.slice(0,2)+'-'))?.[1];
+    if(fromLoc){ this._cache = fromLoc; this._dial = this.CODES[fromLoc]?.dial; return fromLoc; }
+    // 4. Default
+    this._cache = '??'; this._dial = null;
+    return '??';
+  },
+
+  getDial(){ this.get(); return this._dial || ''; },
+  getInfo(){ const c=this.get(); return this.CODES[c] || {dial:'',name:'Unknown',flag:'🌍'}; },
+  getFlag(){ return this.getInfo().flag; },
+
+  // ── Manual override ───────────────────────────────────────────────────────────
+  set(iso){
+    const code = iso?.toUpperCase();
+    if(!this.CODES[code]) return;
+    localStorage.setItem(this._STORE, code);
+    this._cache = code;
+    this._dial  = this.CODES[code].dial;
+    this._runMigration();
+    NotificationEngine.success('Country Updated', `${this.CODES[code].flag} ${this.CODES[code].name} (+${this.CODES[code].dial})`);
+  },
+
+  // ── Auto-detect via geolocation (async, runs once) ───────────────────────────
+  async detect(){
+    if(localStorage.getItem(this._STORE)) return; // manual override → skip
+    if(!navigator.geolocation) return;
+    try{
+      const pos = await new Promise((res,rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej, {timeout:6000, maximumAge:86400000})
+      );
+      const {latitude:lat, longitude:lon} = pos.coords;
+      // Try Nominatim (OSM) first
+      try{
+        const r   = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+                                {headers:{'User-Agent':'EduPulse/1.0'}});
+        const d   = await r.json();
+        const iso = d?.address?.country_code?.toUpperCase();
+        if(iso && this.CODES[iso]){ this.set(iso); return; }
+      }catch(_){}
+      // Fallback: ipapi.co
+      try{
+        const r2 = await fetch(`https://ipapi.co/json/`);
+        const d2 = await r2.json();
+        const iso2 = d2?.country_code?.toUpperCase();
+        if(iso2 && this.CODES[iso2]){ this.set(iso2); return; }
+      }catch(_){}
+    }catch(_){}
+  },
+
+  // ── Universal phone normalizer — SINGLE SOURCE OF TRUTH ──────────────────────
+  // Rules: +xxx... → keep; 00xxx → +xxx; local → prepend detected dial code
+  normalizePhone(raw){
+    if(!raw) return '';
+    let s = raw.toString().trim();
+    // Strip common formatting
+    s = s.replace(/[\s\-\(\)\.]/g, '');
+    if(!s) return '';
+    // Already international
+    if(s.startsWith('+')) return s;
+    // 00xxx → +xxx
+    if(s.startsWith('00')) return '+' + s.slice(2);
+    // Pure digits — prepend detected country dial code
+    const dial = this.getDial();
+    if(dial && !s.startsWith(dial)){
+      return '+' + dial + s;
+    }
+    return '+' + s;
+  },
+
+  // ── Digits-only for URL use (WhatsApp deeplink) ───────────────────────────────
+  digitsOnly(raw){
+    const n = this.normalizePhone(raw);
+    return n.replace(/\D/g, '');
+  },
+
+  // ── Background migration: normalize all stored phones without country code ────
+  _runMigration(){
+    if(localStorage.getItem('ep_phone_migration_v1')) return;
+    try{
+      const students = StorageManager.getStudents?.() || [];
+      let changed = 0;
+      students.forEach(st => {
+        if(!st.parentPhone) return;
+        const norm = this.normalizePhone(st.parentPhone);
+        if(norm !== st.parentPhone){
+          StudentManager.update(st.id, {parentPhone: norm});
+          changed++;
+        }
+      });
+      localStorage.setItem('ep_phone_migration_v1', '1');
+      if(changed) console.log(`[CountryManager] Migrated ${changed} phone number(s)`);
+    }catch(e){}
+  },
+
+  // ── Init: run once at boot ────────────────────────────────────────────────────
+  init(){
+    this.get();                              // cache detection immediately (sync)
+    this._runMigration();                    // silent background migration
+    setTimeout(()=>this.detect(), 3000);     // async geolocation (non-blocking, 3s delay)
+    console.log(`[CountryManager] Ready — ${this.getInfo().flag} ${this.getInfo().name} (+${this.getDial()||'?'})`);
+  },
+};
+
+
 // -────────────────────────────────────────────────────────────────────────────
 // MODULE 8: REPORT ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5891,14 +6090,8 @@ ${comment}` : '',
     '993':'🇹🇲','994':'🇦🇿','995':'🇬🇪','996':'🇰🇬','998':'🇺🇿',
   },
 
-  // Normalize any phone string to digits-only (no +, no 00 prefix, no spaces/dashes)
-  // Accepts ALL formats: +971501234567 / 00971501234567 / 971 501 234 567 / (971)501-234-567
-  _norm(raw){
-    let s=(raw||'').trim();
-    if(s.startsWith('00')) s=s.slice(2);     // 00971 → 971
-    if(s.startsWith('+'))  s=s.slice(1);     // +971  → 971
-    return s.replace(/\D/g,'');              // remove all non-digits
-  },
+  // Phone normalizer — delegates to CountryManager (single source of truth)
+  _norm(raw){ return CountryManager.digitsOnly(raw); },
 
   // Detect country flag from digits (tries 3-digit, 2-digit, 1-digit codes)
   _flag(digits){
@@ -6027,7 +6220,7 @@ ${comment}` : '',
   _sendNow(){
     const input=document.getElementById('wa-number-input');
     const raw=(input?.value||'').trim();
-    const digits=this._norm(raw);
+    const digits=CountryManager.digitsOnly(CountryManager.normalizePhone(raw));
 
     if(!digits||digits.length<7){
       NotificationEngine.warning('Invalid Number','Please enter a valid phone number with country code (e.g. +971501234567)');
@@ -7916,7 +8109,11 @@ const UI = {
   },
 
   _saveParentPhone(id){
-    const val=document.getElementById(`prof-parent-phone-${id}`)?.value?.trim()||'';
+    const raw = document.getElementById(`prof-parent-phone-${id}`)?.value?.trim()||'';
+    const val = raw ? CountryManager.normalizePhone(raw) : '';
+    // Update the input to show the normalized value
+    const inp = document.getElementById(`prof-parent-phone-${id}`);
+    if(inp && val) inp.value = val;
     StudentManager.update(id,{parentPhone:val});
     NotificationEngine.success('Contact Saved',`Parent number updated for ${StudentManager.getById(id)?.name}`);
   },
@@ -7988,7 +8185,7 @@ const UI = {
   _saveEditStudent(id){
     const name=document.getElementById('edit-name')?.value?.trim();
     const group=document.getElementById('edit-group')?.value||'';
-    const parentPhone=document.getElementById('edit-phone')?.value?.trim()||'';
+    const parentPhone=CountryManager.normalizePhone(document.getElementById('edit-phone')?.value?.trim()||'');
     if(!name){ NotificationEngine.warning('Name Required','Please enter the student\'s name'); document.getElementById('edit-name')?.focus(); return; }
     StudentManager.update(id,{name,group,parentPhone});
     App.closeModal();
@@ -8304,6 +8501,8 @@ const UI = {
     }catch(e){}
     // Refresh the sync activity log panel
     if(typeof SyncEngine !== 'undefined') SyncEngine._renderSettingsLog();
+    // Init country selector
+    try{ Settings._initCountrySelect(); }catch(e){}
   },
 
   // -─ Modal helpers ──────────────────────────────────────────────────
@@ -8367,6 +8566,34 @@ const UI = {
 // MODULE 10: SETTINGS MODULE
 // ─────────────────────────────────────────────────────────────────────────────
 const Settings = {
+
+  // Country display in settings panel
+  _updateCountryDisplay(){
+    const info = CountryManager.getInfo();
+    const el   = document.getElementById('country-display');
+    if(el) el.textContent = `${info.flag} ${info.name}  (+${info.dial||'?'})`;
+    // Sync select value
+    const sel = document.getElementById('country-manual-select');
+    if(sel) sel.value = CountryManager.get() || '';
+  },
+
+  // Populate country select dropdown
+  _initCountrySelect(){
+    const sel = document.getElementById('country-manual-select');
+    if(!sel) return;
+    const current = CountryManager.get();
+    Object.entries(CountryManager.CODES)
+      .sort((a,b) => a[1].name.localeCompare(b[1].name))
+      .forEach(([iso, c]) => {
+        const opt = document.createElement('option');
+        opt.value = iso;
+        opt.textContent = `${c.flag} ${c.name} (+${c.dial})`;
+        if(iso === current) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    this._updateCountryDisplay();
+  },
+
   save(){
     const s={
       school:document.getElementById('setting-school').value||'Westfield Academy',
@@ -13976,19 +14203,20 @@ const ImportNames = {
       title: '📥 Import Student Names',
       size:  'sm',
       body: `
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.6">
-          Paste names (one per line) or upload a <strong>.txt</strong> / <strong>.csv</strong> file.
-          Students are created with default score and a random colour.
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">
+          Paste or upload a file — one student per line.<br>
+          <strong style="color:var(--text-secondary)">Name only:</strong> <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px">Ahmed Al-Hassan</code><br>
+          <strong style="color:var(--text-secondary)">Name + Phone:</strong> <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px">Ahmed Al-Hassan, +97150012345</code>
         </div>
-        <textarea id="import-names-ta" class="input"
-          style="height:150px;resize:vertical;font-size:12px;font-family:var(--font);line-height:1.6"
-          placeholder="Ahmed Al-Hassan&#10;Sara Martinez&#10;James Wilson&#10;…"></textarea>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <span style="font-size:11px;color:var(--text-muted)">Or upload file:</span>
-          <input type="file" id="import-names-file" accept=".txt,.csv,.xlsx"
-                 style="font-size:10px;color:var(--text-muted)" onchange="ImportNames._onFile(this)">
+        <div style="position:relative">
+          <textarea id="import-names-ta" class="input"
+            style="height:160px;resize:vertical;font-size:12px;font-family:var(--mono);line-height:1.8;padding-right:36px"
+            placeholder="Ahmed Al-Hassan, +97150001001&#10;Sara Mohammed, +97150001002&#10;Khalid Hassan&#10;…"></textarea>
+          <label title="Upload .txt, .csv or .xlsx file" style="position:absolute;top:8px;right:8px;cursor:pointer;font-size:16px;opacity:.55;transition:.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
+            📎<input type="file" accept=".txt,.csv,.tsv" style="display:none" onchange="ImportNames._onFile(this)">
+          </label>
         </div>
-        <div id="import-names-preview" style="margin-top:10px;font-size:11px;color:var(--accent);min-height:16px"></div>
+        <div id="import-names-preview" style="margin-top:8px;font-size:11px;color:var(--accent);min-height:16px"></div>
       `,
       actions: [
         { label:'Cancel',  class:'btn-ghost',   onclick:'App.closeModal()' },
@@ -14003,9 +14231,13 @@ const ImportNames = {
   },
 
   _preview(){
-    const names = this._parseNames(document.getElementById('import-names-ta')?.value || '');
+    const rows  = this._parseRows(document.getElementById('import-names-ta')?.value || '');
+    const phones = rows.filter(r=>r.phone).length;
     const el = document.getElementById('import-names-preview');
-    if(el) el.textContent = names.length > 0 ? `${names.length} student${names.length!==1?'s':''} ready to import` : '';
+    if(!el) return;
+    if(rows.length === 0){ el.textContent = ''; return; }
+    el.textContent = `${rows.length} student${rows.length!==1?'s':''} ready`
+                   + (phones > 0 ? ` · ${phones} with phone` : '');
   },
 
   _onFile(input){
@@ -14014,10 +14246,15 @@ const ImportNames = {
     const reader = new FileReader();
     reader.onload = (e) => {
       let text = e.target.result;
-      // CSV: take first column only
-      if(file.name.endsWith('.csv')){
+      // CSV/TSV: keep all columns (name,phone) — _parseRows will split them
+      if(file.name.endsWith('.csv') || file.name.endsWith('.tsv')){
+        // Remove BOM, normalise CRLF, keep first 2 columns per row
+        text = text.replace(/^\uFEFF/, '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
         text = text.split('\n')
-          .map(line => line.split(',')[0].replace(/^"|"$/g,'').trim())
+          .map(line => {
+            const cols = line.split(',').map(c=>c.replace(/^"|"$/g,'').trim());
+            return cols.slice(0,2).filter(Boolean).join(',');
+          })
           .filter(Boolean)
           .join('\n');
       }
@@ -14027,45 +14264,55 @@ const ImportNames = {
     reader.readAsText(file);
   },
 
-  _parseNames(raw){
+  // Parse rows — handles: name only, name,phone, or name\tphone
+  _parseRows(raw){
     return raw.split('\n')
-      .map(n => n.trim().replace(/^\d+[\.\)\-\s]+/, '')) // strip leading "1. " "1) " etc
-      .filter(n => n.length >= 2 && n.length <= 60);
+      .map(line => {
+        const parts = line.trim().split(/[,\t]+/);
+        const name  = (parts[0]||'').trim().replace(/^\d+[\.\)\-\s]+/, '').replace(/^"|"$/g,'').trim();
+        const phone = (parts[1]||'').trim().replace(/^"|"$/g,'').trim();
+        return { name, phone };
+      })
+      .filter(r => r.name.length >= 2 && r.name.length <= 60);
   },
 
+  _parseNames(raw){ return this._parseRows(raw).map(r=>r.name); },
+
   _execute(){
-    const raw   = document.getElementById('import-names-ta')?.value || '';
-    const names = this._parseNames(raw);
-    if(names.length === 0){
+    const raw  = document.getElementById('import-names-ta')?.value || '';
+    const rows = this._parseRows(raw);
+    if(rows.length === 0){
       NotificationEngine.warning('No Names', 'Add at least one name before importing.');
       return;
     }
-    if(names.length > 200){
+    if(rows.length > 200){
       NotificationEngine.warning('Too Many', 'Max 200 students per import.');
       return;
     }
 
-    let created = 0, skipped = 0;
-    names.forEach(name => {
+    let created = 0, skipped = 0, withPhone = 0;
+    rows.forEach(({name, phone}) => {
       try{
-        StudentManager.create(name);
-        created++;
-      }catch(e){
-        skipped++; // already exists or class full
-      }
+        const normalizedPhone = phone ? CountryManager.normalizePhone(phone) : '';
+        const st = StudentManager.create(name, { parentPhone: normalizedPhone });
+        if(st){
+          created++;
+          if(normalizedPhone) withPhone++;
+        } else { skipped++; }
+      }catch(e){ skipped++; }
     });
 
     App.closeModal();
-    NotificationEngine.success(
-      `✅ Imported ${created} student${created!==1?'s':''}`,
-      skipped > 0 ? `${skipped} skipped (duplicates or class full)` : 'All students created successfully'
-    );
+    const detail = [
+      skipped > 0 ? `${skipped} skipped` : null,
+      withPhone > 0 ? `${withPhone} with phone` : null,
+    ].filter(Boolean).join(' · ') || 'All students created successfully';
+    NotificationEngine.success(`✅ Imported ${created} student${created!==1?'s':''}`, detail);
 
-    // Refresh screens
     try{ UI._renderStudentQuickGrid(); }catch(e){}
     try{ UI.renderStudents(); }catch(e){}
     try{ UI._refreshHeaderStats(); }catch(e){}
-    Logger.info('ImportNames', `Imported ${created}, skipped ${skipped}`);
+    Logger.info('ImportNames', `Imported ${created} (${withPhone} with phone), skipped ${skipped}`);
   },
 };
 
@@ -14730,8 +14977,7 @@ const StudentCard = {
     const text = this._buildShareText(st, rank, cls, sets);
 
     const encoded  = encodeURIComponent(text);
-    const phone    = st.parentPhone
-      ? st.parentPhone.replace(/[^\d+]/g,'').replace(/^\+/,'') : '';
+    const phone    = CountryManager.digitsOnly(st.parentPhone);
     const deepLink = phone
       ? `whatsapp://send?phone=${phone}&text=${encoded}`
       : `whatsapp://send?text=${encoded}`;
@@ -14763,9 +15009,7 @@ const StudentCard = {
 
     const text    = EmojiSystem.normalizeWhatsAppMessage(this._buildShareText(st, rank, cls, sets));
     const encoded = encodeURIComponent(text);
-    const phone   = st.parentPhone
-      ? st.parentPhone.replace(/[^\d+]/g,'').replace(/^\+/,'')
-      : '';
+    const phone   = CountryManager.digitsOnly(st.parentPhone);
 
     // whatsapp:// is a custom URL scheme — Capacitor allows it (not blocked by CSP)
     // https://wa.me is blocked by Capacitor's navigation policy
@@ -16938,6 +17182,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
   // Initialise sync engine BEFORE App.init so the status pill is live from the start
   try{ SyncEngine.init(); }catch(e){ console.error('[EduPulse] SyncEngine.init failed:', e); }
+  CountryManager.init();
   App.init();
   try{ IdleReminder.check(); }catch(e){}
   // Emit system boot complete event (Phase 2: SYSTEM_EVENT)
