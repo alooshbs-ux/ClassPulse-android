@@ -991,8 +991,25 @@ a{text-decoration:none;color:inherit}
   padding-bottom:16px;
 }
 .analytics-grid .span-full{grid-column:1/-1}
-.chart-container{position:relative;height:200px}
-.chart-container canvas{position:absolute;top:0;left:0}
+.chart-container{position:relative;width:100%;box-sizing:border-box;overflow:hidden;height:200px}
+/* -─ Chart layout protection — prevents flex/grid shrink on tablet ──────────── */
+.chart-wrap{min-height:0;width:100%;flex-shrink:0}
+.chart-container{min-height:120px}
+@media(max-width:1024px){
+  .chart-container{height:180px!important}
+}
+@media(max-width:600px){
+  .chart-container{height:150px!important}
+}
+/* ── High-DPI tablet touch targets (Honor Pad 10 and similar) ──────────────── */
+@media(min-resolution:144dpi) and (min-width:601px){
+  .nav-item{ padding:12px 16px; min-height:44px }
+  .btn{ min-height:40px }
+  .student-quick-card{ min-height:80px }
+  .scard-edit-btn{ width:28px; height:28px; font-size:13px }
+  .beh-btn{ padding:10px 8px; font-size:13px; min-height:44px }
+}
+.chart-container canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}
 .heatmap-wrap{overflow-x:auto}
 .heatmap-grid{display:grid;gap:3px;width:max-content}
 .heatmap-cell{
@@ -1674,6 +1691,29 @@ a{text-decoration:none;color:inherit}
 }
 @media(max-width:1024px) and (min-width:601px){
   #lesson-mode-bar .lesson-btn:not(.active){ display:none }
+}
+
+/* ── Honor Pad 10 / Tablet portrait (601–900px wide) ─────────────────────────
+   Slim sidebar to icon-only at this width so main content gets max space.     */
+@media(max-width:900px) and (min-width:601px){
+  :root{ --sidebar-w:62px }
+  .app-shell{
+    grid-template-columns:62px 1fr;
+  }
+  /* Hide text labels, show only icon */
+  .nav-item span:not(.nav-badge){ display:none }
+  .nav-item{ padding:12px; justify-content:center; gap:0 }
+  .sidebar-logo-text,.sidebar-class-name,.sidebar-footer-text{ display:none }
+  .sidebar-logo{ justify-content:center; padding:12px 0 }
+  /* Student quick grid: 3 columns still but more room */
+  .student-quick-grid{ grid-template-columns:repeat(3,1fr) }
+  /* Class switcher: icon only */
+  .class-name-label{ display:none }
+}
+
+/* ── Tablet landscape 901–1280px — give cards 4 columns ───────────────────── */
+@media(min-width:901px) and (max-width:1280px){
+  .student-quick-grid{ grid-template-columns:repeat(4,1fr) }
 }
 
 /* -─ Tablet Portrait (768px and below) ─────────────────────── */
@@ -7111,7 +7151,6 @@ const UI = {
   _createChart(id,config){
     const ctx=document.getElementById(id);
     if(!ctx) return null;
-    // Guard: Chart.js CDN may not have loaded yet (network delay or block)
     if(typeof Chart==='undefined'){
       ctx.style.display='none';
       const msg=document.createElement('div');
@@ -7120,15 +7159,26 @@ const UI = {
       ctx.parentNode.insertBefore(msg,ctx);
       return null;
     }
-    if(this._charts[id]) this._charts[id].destroy();
-    this._charts[id]=new Chart(ctx,{
+    if(this._charts[id]){ try{this._charts[id].destroy();}catch(e){} }
+    const chart=new Chart(ctx,{
       ...config,
       options:{...this._chartDefaults,...config.options,
         scales:config.options?.scales!==false?{...this._chartDefaults.scales,...config.options?.scales}:undefined,
         plugins:{...this._chartDefaults.plugins,...config.options?.plugins},
+        // Tablet-safe: never let Chart.js override container height
+        responsive:true,maintainAspectRatio:false,
       },
     });
-    return this._charts[id];
+    this._charts[id]=chart;
+    // ResizeObserver: force chart update when container size changes (tablet rotation, layout shift)
+    if(window.ResizeObserver && ctx.parentElement){
+      if(ctx._resizeObs) ctx._resizeObs.disconnect();
+      ctx._resizeObs=new ResizeObserver(()=>{
+        if(chart && chart.canvas){ try{chart.resize();}catch(e){} }
+      });
+      ctx._resizeObs.observe(ctx.parentElement);
+    }
+    return chart;
   },
 
   // -─ Dashboard ──────────────────────────────────────────────────────
@@ -7549,8 +7599,8 @@ const UI = {
       data:{
         labels:trend.labels,
         datasets:[
-          {label:'Positive',data:trend.pos,backgroundColor:'rgba(46,204,113,0.7)',borderColor:'var(--green)',borderWidth:1,borderRadius:4},
-          {label:'Negative',data:trend.neg,backgroundColor:'rgba(231,76,60,0.7)',borderColor:'var(--red)',borderWidth:1,borderRadius:4},
+          {label:'Positive',data:trend.pos,backgroundColor:'rgba(46,204,113,0.7)',borderColor:'#2ecc71',borderWidth:1,borderRadius:4},
+          {label:'Negative',data:trend.neg,backgroundColor:'rgba(231,76,60,0.7)',borderColor:'#e74c3c',borderWidth:1,borderRadius:4},
         ],
       },
     });
@@ -8035,8 +8085,8 @@ const UI = {
     this._createChart('analytics-trend-chart',{
       type:'bar',
       data:{labels:td.labels,datasets:[
-        {label:'Positive',data:td.pos,backgroundColor:'rgba(46,204,113,0.7)',borderColor:'var(--green)',borderWidth:1,borderRadius:3},
-        {label:'Negative',data:td.neg,backgroundColor:'rgba(231,76,60,0.7)',borderColor:'var(--red)',borderWidth:1,borderRadius:3},
+        {label:'Positive',data:td.pos,backgroundColor:'rgba(46,204,113,0.7)',borderColor:'#2ecc71',borderWidth:1,borderRadius:3},
+        {label:'Negative',data:td.neg,backgroundColor:'rgba(231,76,60,0.7)',borderColor:'#e74c3c',borderWidth:1,borderRadius:3},
       ]},
     });
 
@@ -8057,7 +8107,7 @@ const UI = {
       type:'line',
       data:{labels:tl.map(d=>d.label),datasets:[{
         label:'Engagement %',data:tl.map(d=>d.engagement),
-        borderColor:'var(--accent)',backgroundColor:'rgba(79,142,247,0.1)',
+        borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,0.1)',
         fill:true,tension:0.4,pointRadius:3,spanGaps:true,
       }]},
       options:{scales:{y:{min:0,max:100}}},
