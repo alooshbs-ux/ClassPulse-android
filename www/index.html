@@ -3262,6 +3262,10 @@ body.privacy-mode .hide-privacy{display:none!important}
          data-title="Cloud Sync" data-description="Click to view the sync activity log, force-push to Firebase, or resolve conflicts." data-tip-text="Green = synced · Yellow = syncing · Red = offline · Purple = conflict">
       <div class="sync-dot" id="sync-dot"></div>
       <span id="sync-label">Local Only</span>
+      <span id="sync-pending-badge"
+            style="display:none;background:var(--orange);color:#fff;font-size:9px;font-weight:800;
+                   padding:1px 5px;border-radius:99px;margin-left:3px;min-width:16px;text-align:center"
+            title="Pending changes waiting to sync"></span>
     </div>
     <!-- Legacy autosave indicator kept for backward-compat (hidden) -->
     <div class="autosave-indicator saved" id="autosave-indicator" style="display:none">
@@ -3842,11 +3846,56 @@ body.privacy-mode .hide-privacy{display:none!important}
                     data-tip="Stop cloud sync — data stays in localStorage">
               Disconnect
             </button>
+            <button class="btn btn-ghost btn-sm" onclick="SyncBrain.pushNow(this)"
+                    data-tip="Flush pending changes — shows Nothing to sync if everything is up to date">
+              ⬆ Push Now
+            </button>
             <button class="btn btn-success btn-sm" onclick="SyncEngine.forcePush(this)"
                     id="settings-force-save"
-                    data-tip="Immediately push all local data to Firestore — bypasses the 400ms debounce">
+                    data-tip="Force-push ALL data immediately — ignores cooldowns and schedules">
               ☁️ Force Push Now
             </button>
+          </div>
+
+          <!-- ── SyncBrain controls ── -->
+          <div style="margin-top:14px;padding:12px;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border)">
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+              🧠 Sync Brain Settings
+            </div>
+
+            <!-- Auto-sync toggle + interval -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600">
+                <input type="checkbox" id="sb-auto-toggle" style="width:15px;height:15px;accent-color:var(--accent)"
+                       onchange="SyncBrain.saveConfig({autoSyncEnabled:this.checked})">
+                Auto-Sync
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)">
+                every
+                <input type="number" id="sb-interval" min="5" max="120" value="15"
+                       style="width:50px;padding:2px 6px;border-radius:5px;border:1px solid var(--border);
+                              background:var(--bg-surface);color:var(--text-primary);font-size:11px;text-align:center"
+                       onchange="SyncBrain.saveConfig({autoSyncIntervalMin:parseInt(this.value)||15})">
+                minutes
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--orange)">
+                <input type="checkbox" id="sb-vacation" style="width:14px;height:14px;accent-color:var(--orange)"
+                       onchange="SyncBrain.setVacationMode(this.checked)">
+                🏖 Vacation Mode
+              </label>
+            </div>
+
+            <!-- Pending count -->
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
+              Pending queue:
+              <strong id="sb-pending-count" style="color:var(--text-primary)">0 items</strong>
+              · Success rate:
+              <span id="sb-success-rate" style="color:var(--green)">—</span>
+            </div>
+
+            <!-- Sync history -->
+            <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Recent Syncs</div>
+            <div id="sb-history" style="max-height:130px;overflow-y:auto"></div>
           </div>
 
           <div style="margin-top:14px">
@@ -8528,6 +8577,12 @@ const UI = {
     if(typeof SyncEngine !== 'undefined') SyncEngine._renderSettingsLog();
     // Init country selector
     try{ Settings._initCountrySelect(); }catch(e){}
+    // Refresh SyncBrain panel
+    try{
+      SyncBrain._refreshSettingsPanel();
+      const pEl = document.getElementById('sb-pending-count');
+      if(pEl){ const n=SyncEngine._pendingQueue.length; pEl.textContent=`${n} item${n!==1?'s':''}`; }
+    }catch(e){}
   },
 
   // -─ Modal helpers ──────────────────────────────────────────────────
@@ -8832,6 +8887,8 @@ const App = {
       if(scr==='leaderboard')ErrSystem.safe(() => UI.renderLeaderboard(), 'interval:leaderboard');
       // Check scheduled dispatch
       try{ DispatchScheduler.check(); }catch(e){}
+      // Recompute sync state accurately
+      try{ SyncEngine._computeRealState(); }catch(e){}
     },60000);
   },
 
@@ -9976,6 +10033,8 @@ const SyncEngine = {
   _isOnline:     true,
   _isSyncing:    false,
   isSyncRunning:  false,   // public lock — UI checks before triggering manual sync
+  _activeWrites:   0,        // count of in-flight Firestore writes (for accurate pill state)
+  _lastSyncTime:   null,     // timestamp of last successful server-confirmed sync
   _pendingQueue: [],       // changes buffered while offline or during retries
   _debounceMap:  {},       // per-key debounce timers
   _retryMap:     {},       // per-key retry counters
@@ -9999,7 +10058,10 @@ const SyncEngine = {
     this._isOnline = navigator.onLine; // sync with actual current state
     this._loadQueue();          // restore any queue that survived a page reload
     this._watchNetwork();       // listen for online/offline
-    this._updatePill('local');  // default pill state
+    // Set accurate initial state — if items were queued in a previous session, show them
+    setTimeout(()=>{
+      try{ this._computeRealState(); }catch(e){ this._updatePill('local'); }
+    }, 500); // delay so SyncBrain is fully initialized first
     SyncLogger.log('info','⚡ SyncEngine initialised (localStorage mode)');
     console.log('[SyncEngine] Ready — localStorage mode. Provide Firebase credentials to enable cloud sync.');
   },
@@ -10064,8 +10126,15 @@ const SyncEngine = {
 
       this._db = firebase.firestore(this._fbApp);
 
+      // Enable offline persistence — writes survive app close
+      this._db.enablePersistence({ synchronizeTabs: false }).catch(err => {
+        if(err.code === 'failed-precondition') SyncLogger.log('info','⚠ Persistence: multiple tabs open — disabled');
+        else if(err.code === 'unimplemented')  SyncLogger.log('info','⚠ Persistence: browser not supported');
+        else SyncLogger.log('error', '⚠ Persistence failed: '+err.message);
+      });
+
       this._updateFbStatusRow('connected', '🟢 Connected to '+creds.projectId);
-      this._updatePill('syncing', 'Syncing…');
+      this._computeRealState();   // show accurate state — not forced 'Syncing…'
       SyncLogger.log('push', `✅ Firebase connected: ${creds.projectId}`);
       NotificationEngine.success('☁️ Cloud Sync', `Connected to Firebase — real-time sync enabled`);
 
@@ -10128,7 +10197,7 @@ const SyncEngine = {
       b.style.opacity = '1';
       b._orig = null;
     });
-    this.runManualSync().finally(restore);
+    this.executeSync(true).finally(restore);
   },
 
   async forceSaveToCloud(){
@@ -10152,7 +10221,7 @@ const SyncEngine = {
 
     const cid  = ClassManager.activeId();
     const keys = [`ep_students_${cid}`, `ep_events_${cid}`, `ep_settings_${cid}`];
-    this._updatePill('syncing', 'Force saving…');
+    this._computeRealState();
     SyncLogger.log('push', `🚀 Manual force-push: class ${cid}, keys: ${keys.join(', ')}`);
 
     const results = await Promise.allSettled(
@@ -10171,9 +10240,12 @@ const SyncEngine = {
     this.isSyncRunning = false;
 
     if(failed.length === 0){
-      this._updatePill('synced', 'Synced');
-      SyncLogger.log('push', `✅ Force-push complete — ${pushed.length} doc(s) pushed`);
-      NotificationEngine.success('☁️ Saved', `All data pushed successfully (${pushed.length} document${pushed.length!==1?'s':''})`);
+      // Wait for server confirmation before marking synced
+      try{ await this._db.waitForPendingWrites(); }catch(e){}
+      this._lastSyncTime = Date.now();
+      this._updatePill('synced', 'Synced ✓');
+      SyncLogger.log('push', `✅ Force-push complete — ${pushed.length} doc(s) pushed · server confirmed`);
+      NotificationEngine.success('☁️ Saved', `${pushed.length} document${pushed.length!==1?'s':''} confirmed by server`);
     } else {
       this._updatePill('conflict', 'Partial failure');
       SyncLogger.log('error', `⚠️ ${failed.length} write(s) failed — retrying via queue`);
@@ -10185,7 +10257,7 @@ const SyncEngine = {
   // ── runManualSync — ONLY public entry point for UI-triggered sync ─────────────
   // All Force Push / Force Now buttons MUST call this, never forceSaveToCloud directly.
   async runManualSync(){
-    return OperationLogger.run('SyncEngine.runManualSync', () => this.forceSaveToCloud());
+    return OperationLogger.run('SyncEngine.runManualSync', () => this.executeSync(false));
   },
 
   // -────────────────────────────────────────────────────────────────────────
@@ -10203,12 +10275,10 @@ const SyncEngine = {
     if(!this._db || !this._isOnline){
       // No cloud connection or offline — queue for later and show local feedback
       this._enqueue(key, payload);
-      // Show brief 'saving'→'saved' animation on the pill even in local mode
+      // Local-only mode: brief 'saving' pulse only when not already shown
       if(!this._db){
-        this._updatePill('syncing', 'Saving…');
-        clearTimeout(this._localSaveTimer);
-        this._localSaveTimer = setTimeout(()=>
-          this._updatePill('local', 'Saved locally'), 700);
+        // No firebase — never show yellow. Show accurate local count.
+        this._computeRealState();
       }
       return;
     }
@@ -10227,7 +10297,8 @@ const SyncEngine = {
       this._writeToFirestore(key, payload);
     }, delay);
 
-    this._updatePill('syncing', 'Syncing…');
+    // Compute real state — debounceMap now has an entry, so this shows accurate count
+    this._computeRealState();
   },
 
   // -────────────────────────────────────────────────────────────────────────
@@ -10238,16 +10309,21 @@ const SyncEngine = {
     if(!this._db) return;
 
     const docPath = `${this._collection}/${key}`;
+    this._activeWrites++;         // count in-flight
+    this._computeRealState();     // show accurate "Uploading N…"
 
     this._db.doc(docPath).set(payload, { merge: false })
       .then(()=>{
         delete this._retryMap[key];
-        this._updatePill('synced', 'Synced');
         SyncLogger.log('push', `↑ Pushed: ${key}`);
         if(typeof onSuccess === 'function') onSuccess();
       })
       .catch(err=>{
         this._handleWriteError(key, payload, err);
+      })
+      .finally(()=>{
+        this._activeWrites = Math.max(0, this._activeWrites - 1);
+        this._computeRealState(); // recompute — may now show green if all done
       });
   },
 
@@ -10446,12 +10522,17 @@ const SyncEngine = {
   // PRIVATE: Pending queue (offline resilience)
   // ─────────────────────────────────────────────────────────────────────────
   _enqueue(key, payload){
-    // Remove any existing entry for this key (keep only latest value)
-    this._pendingQueue = this._pendingQueue.filter(e => e.key !== key);
-    this._pendingQueue.push({ key, payload, queuedAt: Date.now() });
-    this._saveQueue();
-    this._updateOfflineBanner();
-    SyncLogger.log('info', `📥 Queued: ${key} (queue size: ${this._pendingQueue.length})`);
+    // Route through SyncBrain for priority metadata (falls back gracefully if not ready)
+    if(typeof SyncBrain !== 'undefined' && SyncBrain.enqueue){
+      SyncBrain.enqueue(key, payload);
+    } else {
+      // Fallback: plain queue
+      this._pendingQueue = this._pendingQueue.filter(e => e.key !== key);
+      this._pendingQueue.push({ key, payload, queuedAt: Date.now() });
+      this._saveQueue();
+      this._updateOfflineBanner();
+      SyncLogger.log('info', `📥 Queued: ${key} (queue size: ${this._pendingQueue.length})`);
+    }
   },
 
   _saveQueue(){
@@ -10470,16 +10551,22 @@ const SyncEngine = {
 
   _flushQueue(){
     try{
-    if(!this._db || !this._isOnline || !this._pendingQueue.length) return;
+    if(!this._db || !this._isOnline) return;
+    if(!this._pendingQueue.length){
+      this._computeRealState(); // empty queue → ensure green
+      return;
+    }
     const queue = [...this._pendingQueue];
     this._pendingQueue = [];
     this._saveQueue();
 
     SyncLogger.log('push', `🚀 Flushing ${queue.length} queued write(s)…`);
+    this._computeRealState(); // show "Uploading N…"
     queue.forEach(({ key, payload }) => {
       this._writeToFirestore(key, payload);
     });
     this._updateOfflineBanner();
+    SyncBrain._updatePendingBadge();
     }catch(err){
       SyncLogger.log('error',`Flush queue error: ${err.message}`);
     }
@@ -10494,8 +10581,10 @@ const SyncEngine = {
       NotificationEngine.success('Back Online','☁️ Reconnected — syncing queued changes…');
 
       if(this._db){
-        this._updatePill('syncing','Reconnecting…');
-        setTimeout(()=> this._flushQueue(), 500); // small delay for connection to stabilise
+        setTimeout(()=>{
+          this._flushQueue();
+          this._computeRealState(); // accurate — green if nothing pending
+        }, 500);
       } else {
         this._updatePill('local','Local Only');
       }
@@ -10520,6 +10609,48 @@ const SyncEngine = {
   // -────────────────────────────────────────────────────────────────────────
   // PRIVATE: UI helpers
   // ─────────────────────────────────────────────────────────────────────────
+  // -─ Single source of truth for pill state ─────────────────────────────────
+  // Call this INSTEAD of _updatePill('syncing') for any state that depends on queue.
+  // Never shows yellow when there is nothing to sync.
+  _computeRealState(){
+    // Offline always wins
+    if(!this._isOnline){
+      this._updatePill('offline','Offline');
+      return;
+    }
+    // No Firebase connection
+    if(!this._db){
+      const q = this._pendingQueue.length;
+      this._updatePill('local', q > 0 ? `Local · ${q} queued` : 'Saved locally');
+      try{ SyncBrain._updatePendingBadge(); }catch(e){}
+      return;
+    }
+    // Active writes in flight
+    if(this._activeWrites > 0){
+      const q = this._pendingQueue.length;
+      const uploading = this._activeWrites;
+      this._updatePill('syncing',
+        q > 0 ? `Uploading… (${q} queued)` : `Uploading ${uploading}…`);
+      SyncBrain._updatePendingBadge();
+      return;
+    }
+    // Pending queue (debounced but not yet pushed)
+    const debounced = Object.keys(this._debounceMap||{}).length;
+    const pending   = this._pendingQueue.length;
+    if(debounced > 0 || pending > 0){
+      const total = debounced + pending;
+      this._updatePill('syncing', `${total} change${total!==1?'s':''} pending…`);
+      SyncBrain._updatePendingBadge();
+      return;
+    }
+    // All clear
+    const ts = this._lastSyncTime
+      ? new Date(this._lastSyncTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+      : null;
+    this._updatePill('synced', ts ? `Synced ✓ ${ts}` : 'Synced ✓');
+    SyncBrain._updatePendingBadge();
+  },
+
   _updatePill(state, label){
     const pill = document.getElementById('sync-pill');
     const lbl  = document.getElementById('sync-label');
@@ -10611,6 +10742,123 @@ const SyncEngine = {
     console.error('[SyncEngine]', msg);
   },
 
+  // ── Upload one queue item to Firestore with 45s timeout ──────────────────────
+  async _uploadItem(item){
+    if(!this._db) throw new Error('No Firebase connection');
+    const { key, payload } = item;
+    const docPath = `${this._collection}/${key}`;
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Timeout: ${key}`)), 45000);
+      this._db.doc(docPath).set(payload, { merge: false })
+        .then(() => { clearTimeout(timer); resolve(); })
+        .catch(err => { clearTimeout(timer); reject(err); });
+    });
+  },
+
+  // ── executeSync() — drains SyncBrain priority queue item by item ─────────────
+  // This is the SINGLE authoritative sync function. All buttons call this.
+  async executeSync(manual = false){
+    if(!this._db){
+      if(manual) NotificationEngine.warning('Not Connected','Connect Firebase in Settings → Cloud Sync');
+      return;
+    }
+    if(!this._isOnline){
+      if(manual) NotificationEngine.warning('Offline','No internet — changes queued for when you reconnect');
+      return;
+    }
+    if(this.isSyncRunning){
+      if(manual) NotificationEngine.warning('Busy','Sync already running — please wait');
+      return;
+    }
+
+    this.isSyncRunning = true;
+
+    // Cancel all debounces — we're syncing NOW
+    Object.values(this._debounceMap).forEach(t => clearTimeout(t));
+    this._debounceMap = {};
+
+    // Flush debounced items into the queue first
+    const cid  = ClassManager.activeId();
+    const keys = [`ep_students_${cid}`, `ep_events_${cid}`, `ep_settings_${cid}`];
+    keys.forEach(key => {
+      const val = StorageManager.get(key);
+      if(val !== null) this._enqueue(key, { _data: val, _lastUpdated: Date.now(), _device: this._deviceId() });
+    });
+
+    const queue = [...(SyncEngine._pendingQueue || [])];
+
+    if(!queue.length){
+      this.isSyncRunning = false;
+      this._updatePill('synced', 'Synced ✓');
+      SyncBrain._updatePendingBadge();
+      if(manual) NotificationEngine.info('✅ Nothing to Sync','All data is already up to date.');
+      return;
+    }
+
+    const total = queue.length;
+    let uploaded = 0, failed = 0;
+    SyncLogger.log('push', `🚀 executeSync: ${total} item(s) in queue`);
+    this._updatePill('syncing', `Uploading 0/${total}…`);
+
+    // Drain queue item by item — HIGH priority first (already sorted by SyncBrain)
+    for(const item of queue){
+      try{
+        await this._uploadItem(item);
+        // Remove from queue on success
+        SyncEngine._pendingQueue = SyncEngine._pendingQueue.filter(e => e.key !== item.key);
+        SyncEngine._saveQueue();
+        uploaded++;
+        SyncLogger.log('push', `↑ [${uploaded}/${total}] ${item.key}`);
+        this._updatePill('syncing', `Uploading ${uploaded}/${total}…`);
+        SyncBrain._updatePendingBadge();
+      }catch(err){
+        failed++;
+        SyncLogger.log('error', `✗ Failed [${item.key}]: ${err.message}`);
+        // Exponential backoff retry (once)
+        const retries = (item.retries || 0);
+        if(retries < this._MAX_RETRIES){
+          const backoff = Math.pow(2, retries) * 800;
+          SyncLogger.log('info', `↻ Retry in ${backoff}ms`);
+          await new Promise(r => setTimeout(r, backoff));
+          try{
+            await this._uploadItem(item);
+            SyncEngine._pendingQueue = SyncEngine._pendingQueue.filter(e => e.key !== item.key);
+            SyncEngine._saveQueue();
+            uploaded++; failed--;
+          }catch(e2){
+            // Mark retry count
+            const qi = SyncEngine._pendingQueue.findIndex(e => e.key === item.key);
+            if(qi >= 0) SyncEngine._pendingQueue[qi].retries = (retries + 1);
+            SyncEngine._saveQueue();
+          }
+        }
+      }
+    }
+
+    // Wait for Firestore to confirm all writes with the server
+    if(uploaded > 0){
+      try{ await this._db.waitForPendingWrites(); }catch(e){}
+    }
+
+    this.isSyncRunning = false;
+    this._lastSyncTime = Date.now();
+
+    if(failed === 0){
+      this._updatePill('synced', 'Synced ✓');
+      SyncBrain._updatePendingBadge();
+      SyncBrain._recordHistory('sync', 'success', `${uploaded} pushed`);
+      SyncLogger.log('push', `✅ executeSync complete — ${uploaded}/${total} confirmed`);
+      if(manual) NotificationEngine.success('☁️ Synced', `${uploaded} item${uploaded!==1?'s':''} confirmed by server`);
+    } else {
+      this._updatePill('conflict', `${failed} failed`);
+      SyncBrain._recordHistory('sync', 'partial', `${uploaded} ok, ${failed} failed`);
+      SyncLogger.log('error', `⚠️ ${failed} item(s) failed — kept in queue for retry`);
+      if(manual || failed > 0) NotificationEngine.warning('Partial Sync', `${uploaded} pushed, ${failed} queued for retry`);
+    }
+    SyncBrain._refreshSettingsPanel();
+  },
+
   // -────────────────────────────────────────────────────────────────────────
   // PUBLIC: openLogPanel()
   // Opens the sync activity log as a modal (triggered by clicking the pill)
@@ -10628,8 +10876,17 @@ const SyncEngine = {
 
     const queueInfo = this._pendingQueue.length
       ? `<div style="padding:8px 10px;background:var(--orange-dim);border-radius:6px;font-size:11px;color:var(--orange);margin-bottom:10px">
-           📥 ${this._pendingQueue.length} write(s) pending in queue
+           📥 ${this._pendingQueue.length} write(s) queued
+           ${SyncBrain._isVacationMode() ? ' · 🏖 Vacation mode ON' : ''}
          </div>` : '';
+    const brainInfo = (() => {
+      const rate = SyncBrain.getSuccessRate();
+      const cfg  = SyncBrain._getConfig();
+      return `<div style="padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:11px;color:var(--text-muted);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">
+        ${cfg.autoSyncEnabled ? '<span style="color:var(--green)">🤖 Auto-sync ON · every '+cfg.autoSyncIntervalMin+'min</span>' : '<span>🤖 Auto-sync OFF</span>'}
+        ${rate !== null ? '<span style="color:var(--accent)">✅ '+rate+'% success (last 50)</span>' : ''}
+      </div>`;
+    })();
 
     const conflictInfo = Object.keys(this._conflicts).length
       ? `<div style="padding:8px 10px;background:rgba(155,89,182,.12);border-radius:6px;font-size:11px;color:var(--purple);margin-bottom:10px;cursor:pointer" onclick="SyncEngine.openConflictModal(Object.keys(SyncEngine._conflicts)[0])">
@@ -10640,7 +10897,7 @@ const SyncEngine = {
       title:'📡 Sync Activity Log',
       size:'sm',
       body:`
-        ${conflictInfo}${queueInfo}
+        ${conflictInfo}${queueInfo}${brainInfo}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div style="font-size:11px;color:var(--text-muted)">Last ${logs.length} events</div>
           <button class="btn btn-xs btn-ghost" onclick="SyncEngine.clearLog();App.closeModal()">Clear</button>
@@ -10648,7 +10905,7 @@ const SyncEngine = {
         <div class="sync-log-list" style="max-height:300px">${items}</div>`,
       actions:[
         {label:'Close', class:'btn-ghost', onclick:'App.closeModal()'},
-        {label:'☁️ Force Save', class:'btn-primary', onclick:'App.closeModal();SyncEngine.forceSaveToCloud()'},
+        {label:'☁️ Force Save', class:'btn-primary', onclick:'App.closeModal();SyncEngine.executeSync(true)'},
       ],
     });
   },
@@ -10675,6 +10932,252 @@ const SyncEngine = {
       </div>`).join('');
   },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC BRAIN — Intelligent priority queue, auto-scheduler, history memory
+// Extends SyncEngine. Does NOT replace any existing logic.
+// Single responsibility: decide WHAT to sync, WHEN, and HOW urgently.
+// ═══════════════════════════════════════════════════════════════════════════════
+const SyncBrain = {
+
+  // ── Priority constants ────────────────────────────────────────────────────────
+  PRIORITY: { HIGH: 3, MEDIUM: 2, LOW: 1 },
+
+  // ── Change type → priority map ────────────────────────────────────────────────
+  _keyPriority(key){
+    if(/ep_events/.test(key))   return this.PRIORITY.HIGH;    // behavior logs
+    if(/ep_students/.test(key)) return this.PRIORITY.HIGH;    // student edits
+    if(/ep_settings/.test(key)) return this.PRIORITY.MEDIUM;  // settings
+    return this.PRIORITY.LOW;
+  },
+
+  _changeType(key){
+    if(/ep_events/.test(key))   return 'behavior_event';
+    if(/ep_students/.test(key)) return 'student_data';
+    if(/ep_settings/.test(key)) return 'settings';
+    return 'other';
+  },
+
+  // ── Priority queue (extends SyncEngine._pendingQueue entries) ─────────────────
+  // Wraps _enqueue to attach priority metadata
+  enqueue(key, payload){
+    // Remove existing entry for this key — keep latest
+    SyncEngine._pendingQueue = SyncEngine._pendingQueue.filter(e => e.key !== key);
+    SyncEngine._pendingQueue.push({
+      key,
+      payload,
+      queuedAt:  Date.now(),
+      priority:  this._keyPriority(key),
+      changeType:this._changeType(key),
+      retries:   0,
+    });
+    // Sort HIGH → LOW before save so flush always picks most critical first
+    SyncEngine._pendingQueue.sort((a,b) => b.priority - a.priority);
+    SyncEngine._saveQueue();
+    SyncEngine._updateOfflineBanner();
+    this._updatePendingBadge();
+    SyncLogger.log('info', `📥 [${this._changeType(key).toUpperCase()}] queued (priority:${this._keyPriority(key)}) — queue:${SyncEngine._pendingQueue.length}`);
+  },
+
+  // ── Pending count badge ───────────────────────────────────────────────────────
+  _updatePendingBadge(){
+    const n   = SyncEngine._pendingQueue.length;
+    const el  = document.getElementById('sync-pending-badge');
+    if(!el) return;
+    el.textContent  = n > 0 ? n : '';
+    el.style.display= n > 0 ? 'inline-flex' : 'none';
+  },
+
+  // ── "Push Now" — smart flush (only if pending, otherwise informs teacher) ─────
+  async pushNow(btn){
+    const pending = SyncEngine._pendingQueue.length;
+    const hasDebounced = Object.keys(SyncEngine._debounceMap||{}).length;
+    if(pending === 0 && !hasDebounced){
+      NotificationEngine.info('✅ All Synced', 'No pending changes — everything is already up to date.');
+      return;
+    }
+    if(!SyncEngine._db){
+      NotificationEngine.warning('Not Connected', `${pending} change${pending!==1?'s':''} queued — connect Firebase in Settings to sync.`);
+      return;
+    }
+    NotificationEngine.info('⬆ Syncing…', `Flushing ${pending} pending change${pending!==1?'s':''}…`);
+    if(btn){ btn.disabled=true; btn._orig=btn.textContent; btn.textContent='⏳…'; }
+    const restore = () => { if(btn){ btn.disabled=false; btn.textContent=btn._orig||'⬆ Push Now'; } };
+    try{
+      await SyncEngine.executeSync(true);
+    }finally{
+      restore();
+      this._updatePendingBadge();
+      try{ SyncEngine._computeRealState(); }catch(e){}
+    }
+  },
+
+  // ── Auto-Sync scheduler ───────────────────────────────────────────────────────
+  _autoTimer: null,
+
+  startAutoSync(){
+    this.stopAutoSync();
+    const cfg = this._getConfig();
+    if(!cfg.autoSyncEnabled) return;
+    // Interval in minutes (default 15)
+    const ms = (cfg.autoSyncIntervalMin || 15) * 60 * 1000;
+    this._autoTimer = setInterval(async () => {
+      if(document.hidden) return;                    // skip if app backgrounded
+      if(this._isVacationMode()) return;             // skip if vacation
+      if(!SyncEngine._db || !SyncEngine._isOnline) return;
+      if(SyncEngine._pendingQueue.length === 0 && Object.keys(SyncEngine._debounceMap||{}).length === 0) return;
+      SyncLogger.log('info', '🤖 Auto-sync triggered');
+      try{ await SyncEngine.executeSync(false); }catch(e){}
+      this._updatePendingBadge();
+      this._recordHistory('auto', SyncEngine._pendingQueue.length === 0 ? 'success' : 'partial');
+    }, ms);
+    SyncLogger.log('info', `🤖 Auto-sync enabled — every ${cfg.autoSyncIntervalMin||15}min`);
+  },
+
+  stopAutoSync(){
+    if(this._autoTimer){ clearInterval(this._autoTimer); this._autoTimer=null; }
+  },
+
+  // ── Vacation / No-Activity mode ───────────────────────────────────────────────
+  _isVacationMode(){
+    return localStorage.getItem('ep_sync_vacation') === '1';
+  },
+
+  setVacationMode(on){
+    if(on){
+      localStorage.setItem('ep_sync_vacation','1');
+      this.stopAutoSync();
+      SyncLogger.log('info','🏖 Vacation mode ON — auto-sync paused');
+      NotificationEngine.info('Vacation Mode', 'Auto-sync paused. Force Push still works anytime.');
+    } else {
+      localStorage.removeItem('ep_sync_vacation');
+      this.startAutoSync();
+      SyncLogger.log('info','▶ Vacation mode OFF — auto-sync resumed');
+      NotificationEngine.success('Auto-Sync Resumed','Background sync is active again.');
+    }
+    this._refreshSettingsPanel();
+  },
+
+  // ── Config (stored in localStorage) ──────────────────────────────────────────
+  _CFG_KEY: 'ep_sync_brain_cfg',
+
+  _getConfig(){
+    try{ return JSON.parse(localStorage.getItem(this._CFG_KEY)||'{}'); }
+    catch(e){ return {}; }
+  },
+
+  saveConfig(patch){
+    const cfg = { ...this._getConfig(), ...patch };
+    localStorage.setItem(this._CFG_KEY, JSON.stringify(cfg));
+    this.stopAutoSync();
+    this.startAutoSync();
+    SyncLogger.log('info', `⚙ Sync config updated: ${JSON.stringify(patch)}`);
+  },
+
+  // ── Sync history / learning memory ───────────────────────────────────────────
+  _HIST_KEY: 'ep_sync_history',
+  _HIST_MAX: 100,
+
+  _recordHistory(trigger, status, detail=''){
+    try{
+      const hist = JSON.parse(localStorage.getItem(this._HIST_KEY)||'[]');
+      hist.unshift({ trigger, status, detail, ts: Date.now() });
+      if(hist.length > this._HIST_MAX) hist.length = this._HIST_MAX;
+      localStorage.setItem(this._HIST_KEY, JSON.stringify(hist));
+    }catch(e){}
+  },
+
+  getHistory(n=20){
+    try{ return JSON.parse(localStorage.getItem(this._HIST_KEY)||'[]').slice(0,n); }
+    catch(e){ return []; }
+  },
+
+  getSuccessRate(){
+    const h = this.getHistory(50);
+    if(!h.length) return null;
+    const ok = h.filter(e=>e.status==='success').length;
+    return Math.round(ok / h.length * 100);
+  },
+
+  // ── Refresh settings panel controls ──────────────────────────────────────────
+  _refreshSettingsPanel(){
+    const cfg      = this._getConfig();
+    const vacation = this._isVacationMode();
+
+    const toggle = document.getElementById('sb-auto-toggle');
+    const intEl  = document.getElementById('sb-interval');
+    const vacEl  = document.getElementById('sb-vacation');
+    const rateEl = document.getElementById('sb-success-rate');
+    const histEl = document.getElementById('sb-history');
+
+    if(toggle) toggle.checked = !!cfg.autoSyncEnabled;
+    if(intEl)  intEl.value   = cfg.autoSyncIntervalMin || 15;
+    if(vacEl)  vacEl.checked = vacation;
+
+    if(rateEl){
+      const rate = this.getSuccessRate();
+      const lastSync = SyncEngine._lastSyncTime
+        ? 'Last: ' + new Date(SyncEngine._lastSyncTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+        : '';
+      rateEl.textContent = (rate !== null ? `${rate}% success · ` : '') + (lastSync || 'No sync history yet');
+    }
+
+    if(histEl){
+      const hist = this.getHistory(8);
+      if(!hist.length){ histEl.innerHTML='<div style="font-size:10px;color:var(--text-muted)">No history yet</div>'; return; }
+      histEl.innerHTML = hist.map(h=>{
+        const t   = new Date(h.ts);
+        const lbl = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+        const col = h.status==='success'?'var(--green)':h.status==='partial'?'var(--orange)':'var(--red)';
+        const ico = h.status==='success'?'✅':h.status==='partial'?'⚠️':'❌';
+        return `<div style="display:flex;gap:6px;align-items:center;font-size:10px;padding:2px 0;border-bottom:1px solid var(--border)">
+          <span>${ico}</span>
+          <span style="color:var(--text-muted);font-family:var(--mono)">${lbl}</span>
+          <span style="color:${col};font-weight:600">${h.status}</span>
+          <span style="color:var(--text-muted)">${h.trigger}</span>
+          ${h.detail?`<span style="color:var(--text-muted);margin-left:auto">${h.detail}</span>`:''}
+        </div>`;
+      }).join('');
+    }
+  },
+
+  // ── Hook into SyncEngine results to record history ────────────────────────────
+  _hookSyncEngine(){
+    const original = SyncEngine.forceSaveToCloud.bind(SyncEngine);
+    SyncEngine.forceSaveToCloud = async () => {
+      try{
+        await original();
+        const failed = SyncEngine._pendingQueue.length;
+        this._recordHistory('manual', failed===0?'success':'partial', failed?`${failed} queued`:'');
+      }catch(e){
+        this._recordHistory('manual','failed', e.message);
+        throw e;
+      }
+      this._updatePendingBadge();
+      this._refreshSettingsPanel();
+      // Recompute pill — may now be green if all pushed
+      try{ SyncEngine._computeRealState(); }catch(e){}
+    };
+  },
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  init(){
+    this._hookSyncEngine();
+    this.startAutoSync();
+    this._updatePendingBadge();
+    // Check on app focus
+    document.addEventListener('visibilitychange', () => {
+      if(!document.hidden){
+        this._updatePendingBadge();
+        if(SyncEngine._pendingQueue.length > 0 && SyncEngine._db && SyncEngine._isOnline){
+          SyncEngine._flushQueue();
+        }
+      }
+    });
+    SyncLogger.log('info', `🧠 SyncBrain ready — pending: ${SyncEngine._pendingQueue.length}`);
+  },
+};
+
 
 // -══════════════════════════════════════════════════════════════════════════════
 // SYNC LOGGER
@@ -17885,6 +18388,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   try{ SyncEngine.init(); }catch(e){ console.error('[EduPulse] SyncEngine.init failed:', e); }
   CountryManager.init();
   DispatchScheduler.init();
+  SyncBrain.init();
   App.init();
   try{ IdleReminder.check(); }catch(e){}
   // Emit system boot complete event (Phase 2: SYSTEM_EVENT)
