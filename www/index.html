@@ -3649,7 +3649,21 @@ body.privacy-mode .hide-privacy{display:none!important}
     <div class="screen" id="screen-reports">
       <div class="reports-screen">
         <div class="screen-header">
-          <div class="screen-title" data-tip="Generate WhatsApp messages or PDF reports for individual students or the whole class">Reports</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:8px">
+            <div class="screen-title" data-tip="Generate WhatsApp messages or PDF reports for individual students or the whole class">Reports</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="dispatch-schedule-badge"
+                    style="display:none;font-size:10px;font-weight:700;color:var(--accent);
+                           background:var(--accent-dim);border:1px solid var(--accent);
+                           padding:3px 8px;border-radius:99px;cursor:pointer;white-space:nowrap"
+                    title="Scheduled dispatch pending — click to cancel">⏰</span>
+              <button class="btn btn-primary btn-sm" onclick="CommunicationDecisionEngine.openDispatchPanel()"
+                      data-tip="Analyze today's classroom data and intelligently select which parents need a report"
+                      style="font-size:11px;gap:5px">
+                📤 Smart Dispatch
+              </button>
+            </div>
+          </div>
         </div>
         <div class="reports-grid">
           <div>
@@ -4586,6 +4600,7 @@ const StudentManager = {
       notes:      '',
       group:      extra.group||'',
       parentPhone: extra.parentPhone||'',
+      parentCommunication: extra.parentCommunication||{language:'auto'},
       specialAttention: false,
       exemptFromPicker: false,
       privateLogs: [],
@@ -8172,6 +8187,15 @@ const UI = {
                    data-tip="Accepts +971... or 00971... — any country code"/>
           </div>
         </div>
+        <div class="form-group">
+          <label class="label">Report Language for Parent</label>
+          <select class="select" id="edit-report-lang" style="font-size:12px">
+            <option value="auto"     ${(st.parentCommunication?.language||'auto')==='auto'     ?'selected':''}>🌐 Auto (system default)</option>
+            <option value="english"  ${(st.parentCommunication?.language||'auto')==='english'  ?'selected':''}>🇬🇧 English</option>
+            <option value="arabic"   ${(st.parentCommunication?.language||'auto')==='arabic'   ?'selected':''}>🇸🇦 Arabic</option>
+            <option value="bilingual"${(st.parentCommunication?.language||'auto')==='bilingual'?'selected':''}>🌐 Bilingual (EN + AR)</option>
+          </select>
+        </div>
         <div style="padding-top:10px;border-top:1px solid var(--border)">
           <button class="btn btn-danger btn-sm" onclick="UI._confirmDeleteStudent(${id})">🗑 Remove Student</button>
         </div>`,
@@ -8187,7 +8211,8 @@ const UI = {
     const group=document.getElementById('edit-group')?.value||'';
     const parentPhone=CountryManager.normalizePhone(document.getElementById('edit-phone')?.value?.trim()||'');
     if(!name){ NotificationEngine.warning('Name Required','Please enter the student\'s name'); document.getElementById('edit-name')?.focus(); return; }
-    StudentManager.update(id,{name,group,parentPhone});
+    const reportLang = document.getElementById('edit-report-lang')?.value||'auto';
+    StudentManager.update(id,{name,group,parentPhone,parentCommunication:{language:reportLang}});
     App.closeModal();
     this.renderStudents();
     this._renderStudentQuickGrid();
@@ -8805,6 +8830,8 @@ const App = {
       }
       if(scr==='analytics')  ErrSystem.safe(() => Analytics.refresh(),  'interval:analytics');
       if(scr==='leaderboard')ErrSystem.safe(() => UI.renderLeaderboard(), 'interval:leaderboard');
+      // Check scheduled dispatch
+      try{ DispatchScheduler.check(); }catch(e){}
     },60000);
   },
 
@@ -14198,123 +14225,326 @@ const DataHub = {
 // ═══════════════════════════════════════════════════════════════════════════════
 const ImportNames = {
 
-  open(){
-    UI._openModal({
-      title: '📥 Import Student Names',
-      size:  'sm',
-      body: `
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">
-          Paste or upload a file — one student per line.<br>
-          <strong style="color:var(--text-secondary)">Name only:</strong> <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px">Ahmed Al-Hassan</code><br>
-          <strong style="color:var(--text-secondary)">Name + Phone:</strong> <code style="background:var(--bg-elevated);padding:1px 5px;border-radius:3px">Ahmed Al-Hassan, +97150012345</code>
-        </div>
-        <div style="position:relative">
-          <textarea id="import-names-ta" class="input"
-            style="height:160px;resize:vertical;font-size:12px;font-family:var(--mono);line-height:1.8;padding-right:36px"
-            placeholder="Ahmed Al-Hassan, +97150001001&#10;Sara Mohammed, +97150001002&#10;Khalid Hassan&#10;…"></textarea>
-          <label title="Upload .txt, .csv or .xlsx file" style="position:absolute;top:8px;right:8px;cursor:pointer;font-size:16px;opacity:.55;transition:.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">
-            📎<input type="file" accept=".txt,.csv,.tsv" style="display:none" onchange="ImportNames._onFile(this)">
-          </label>
-        </div>
-        <div id="import-names-preview" style="margin-top:8px;font-size:11px;color:var(--accent);min-height:16px"></div>
-      `,
-      actions: [
-        { label:'Cancel',  class:'btn-ghost',   onclick:'App.closeModal()' },
-        { label:'➕ Import', class:'btn-primary', onclick:'ImportNames._execute()' },
-      ],
-    });
+  // ── Lazy-loaded lib handles ─────────────────────────────────────────────────
+  _libs: { xlsx: null, mammoth: null, pdfjsLib: null },
 
-    // Live count preview
-    setTimeout(() => {
-      document.getElementById('import-names-ta')?.addEventListener('input', () => ImportNames._preview());
-    }, 100);
+  // ── CDN URLs ────────────────────────────────────────────────────────────────
+  _CDN: {
+    xlsx:    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+    mammoth: 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js',
+    pdfjs:   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   },
 
-  _preview(){
-    const rows  = this._parseRows(document.getElementById('import-names-ta')?.value || '');
-    const phones = rows.filter(r=>r.phone).length;
+  // ── Load a CDN script once, return Promise ──────────────────────────────────
+  _loadLib(name, url, globalKey){
+    if(this._libs[name]) return Promise.resolve();
+    if(window[globalKey])  { this._libs[name] = window[globalKey]; return Promise.resolve(); }
+    return new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = url; s.async = true;
+      s.onload  = () => { this._libs[name] = window[globalKey]; res(); };
+      s.onerror = () => rej(new Error('Failed to load ' + name));
+      document.head.appendChild(s);
+    });
+  },
+
+  // ── STEP 2: Detect file type ─────────────────────────────────────────────────
+  detectFileType(file){
+    const ext = (file.name||'').split('.').pop().toLowerCase();
+    const mime = file.type || '';
+    if(ext==='xlsx' || mime.includes('spreadsheet') || mime.includes('excel')) return 'xlsx';
+    if(ext==='csv'  || mime==='text/csv')                                       return 'csv';
+    if(ext==='pdf'  || mime==='application/pdf')                                return 'pdf';
+    if(ext==='docx' || mime.includes('wordprocessingml'))                       return 'docx';
+    if(ext==='txt'  || mime.startsWith('text/'))                                return 'txt';
+    if(ext==='tsv')                                                              return 'csv';
+    return 'unknown';
+  },
+
+  // ── STEP 3+4: Universal text extraction (async) ──────────────────────────────
+  async extractText(file){
+    const type = this.detectFileType(file);
+
+    if(type === 'xlsx'){
+      await this._loadLib('xlsx', this._CDN.xlsx, 'XLSX');
+      return new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try{
+            const wb   = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+            const rows = [];
+            wb.SheetNames.forEach(name => {
+              const ws   = wb.Sheets[name];
+              const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+              data.forEach(row => {
+                // Take first 2 non-empty cells as name, phone
+                const cells = (row||[]).map(c=>String(c).trim()).filter(Boolean);
+                if(cells.length) rows.push(cells.slice(0,3).join('\t'));
+              });
+            });
+            res(rows.join('\n'));
+          }catch(err){ rej(err); }
+        };
+        reader.onerror = rej;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    if(type === 'docx'){
+      await this._loadLib('mammoth', this._CDN.mammoth, 'mammoth');
+      return new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          try{
+            const result = await mammoth.extractRawText({arrayBuffer: e.target.result});
+            res(result.value || '');
+          }catch(err){ rej(err); }
+        };
+        reader.onerror = rej;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    if(type === 'pdf'){
+      await this._loadLib('pdfjsLib', this._CDN.pdfjs, 'pdfjsLib');
+      return new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          try{
+            if(window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc)
+              window.pdfjsLib.GlobalWorkerOptions.workerSrc = this._CDN.pdfjs.replace('pdf.min.js','pdf.worker.min.js');
+            const pdf   = await pdfjsLib.getDocument({data: new Uint8Array(e.target.result)}).promise;
+            const pages = [];
+            for(let p=1; p<=pdf.numPages; p++){
+              const page  = await pdf.getPage(p);
+              const tc    = await page.getTextContent();
+              pages.push(tc.items.map(it=>it.str).join(' '));
+            }
+            res(pages.join('\n'));
+          }catch(err){ rej(err); }
+        };
+        reader.onerror = rej;
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    // CSV / TXT / unknown — encoding-aware read
+    return new Promise((res, rej) => {
+      // Try UTF-8 first; if Arabic looks broken, retry with Windows-1256
+      const tryDecode = (buffer, encoding) => {
+        try{
+          return new TextDecoder(encoding, {fatal:true}).decode(buffer);
+        }catch(e){ return null; }
+      };
+      const reader = new FileReader();
+      reader.onload = e => {
+        const buf  = e.target.result;
+        let   text = tryDecode(buf, 'utf-8')
+                  || tryDecode(buf, 'windows-1256')
+                  || tryDecode(buf, 'iso-8859-6')
+                  || new TextDecoder('utf-8', {fatal:false}).decode(buf);
+        // Normalise BOM + line endings
+        text = text.replace(/^\uFEFF/, '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+        res(text);
+      };
+      reader.onerror = rej;
+      reader.readAsArrayBuffer(file);
+    });
+  },
+
+  // ── STEP 5: Smart student parser ─────────────────────────────────────────────
+  // Handles: Arabic, English, mixed, any separator, any column order
+  _PHONE_RE: /(?:\+|00)?[\d][\d\s\-\(\)\.]{6,18}[\d]/,
+  _NAME_MIN: 2,
+  _NAME_MAX: 70,
+
+  parseRows(rawText){
+    const rows   = [];
+    const seen   = new Set();
+    const lines  = rawText.split('\n').map(l=>l.trim()).filter(Boolean);
+
+    // Detect if first line is a header (contains "name"/"phone"/Arabic equiv)
+    const HEADER_RE = /name|phone|رقم|اسم|student|طالب|هاتف/i;
+    const startIdx  = (lines.length > 1 && HEADER_RE.test(lines[0])) ? 1 : 0;
+
+    for(let li = startIdx; li < lines.length; li++){
+      const line = lines[li];
+      if(!line || line.length < 2) continue;
+
+      // Try to extract a phone from the line
+      const phoneMatch = line.match(this._PHONE_RE);
+      let   phone = '';
+      let   nameRaw = line;
+
+      if(phoneMatch){
+        phone   = phoneMatch[0].trim();
+        nameRaw = (line.slice(0, phoneMatch.index) + line.slice(phoneMatch.index + phone.length)).trim();
+      }
+
+      // Clean name: strip separators, numbering, punctuation noise
+      const name = nameRaw
+        .replace(/^[\d]+[\.\)\-\:\s]+/, '')   // leading numbering  "1. "
+        .replace(/[\:\-\|,،]+$/, '')           // trailing separators
+        .replace(/^[\:\-\|,،]+/, '')           // leading separators
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      // Validate name: must be 2–70 chars, contain at least one letter
+      if(name.length < this._NAME_MIN || name.length > this._NAME_MAX) continue;
+      if(!/[\u0600-\u06FFa-zA-Z]/.test(name)) continue; // must have a real letter
+
+      // Deduplicate
+      const key = name.toLowerCase().replace(/\s/g,'');
+      if(seen.has(key)) continue;
+      seen.add(key);
+
+      rows.push({ name, phone: phone.replace(/[\s\-\(\)\.]/g,'') });
+    }
+    return rows;
+  },
+
+  // ── STEP 8: Show preview in modal ────────────────────────────────────────────
+  _showPreview(rows){
     const el = document.getElementById('import-names-preview');
     if(!el) return;
-    if(rows.length === 0){ el.textContent = ''; return; }
-    el.textContent = `${rows.length} student${rows.length!==1?'s':''} ready`
-                   + (phones > 0 ? ` · ${phones} with phone` : '');
+    if(!rows.length){ el.innerHTML = ''; return; }
+
+    const withPhone = rows.filter(r=>r.phone).length;
+    const sample    = rows.slice(0, 4);
+    const more      = rows.length > 4 ? `<span style="color:var(--text-muted)"> +${rows.length-4} more…</span>` : '';
+
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">
+        ✅ ${rows.length} student${rows.length!==1?'s':''} detected
+        ${withPhone ? `· <span style="color:var(--green)">${withPhone} with phone</span>` : ''}
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:6px 8px;max-height:120px;overflow-y:auto">
+        ${sample.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:2px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-primary);font-weight:500">${r.name}</span>
+            <span style="color:var(--text-muted);font-family:var(--mono);font-size:10px">${r.phone||'—'}</span>
+          </div>`).join('')}
+        ${more ? `<div style="padding:3px 0;font-size:10px">${more}</div>` : ''}
+      </div>`;
   },
 
-  _onFile(input){
-    const file = input.files?.[0];
+  // ── File handler ─────────────────────────────────────────────────────────────
+  async _onFile(input){
+    const file = input?.files?.[0];
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let text = e.target.result;
-      // CSV/TSV: keep all columns (name,phone) — _parseRows will split them
-      if(file.name.endsWith('.csv') || file.name.endsWith('.tsv')){
-        // Remove BOM, normalise CRLF, keep first 2 columns per row
-        text = text.replace(/^\uFEFF/, '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-        text = text.split('\n')
-          .map(line => {
-            const cols = line.split(',').map(c=>c.replace(/^"|"$/g,'').trim());
-            return cols.slice(0,2).filter(Boolean).join(',');
-          })
-          .filter(Boolean)
-          .join('\n');
-      }
+
+    // Show loading state
+    const prev = document.getElementById('import-names-preview');
+    if(prev) prev.innerHTML = '<span style="color:var(--text-muted);font-size:11px">⏳ Reading file…</span>';
+
+    try{
+      const rawText = await this.extractText(file);
+      // Put rawText into textarea so teacher can see/edit it
       const ta = document.getElementById('import-names-ta');
-      if(ta){ ta.value = text; this._preview(); }
-    };
-    reader.readAsText(file);
+      if(ta){
+        ta.value = rawText.slice(0, 8000); // cap textarea display
+        ta.style.fontFamily = /[\u0600-\u06FF]/.test(rawText) ? 'var(--font)' : 'var(--mono)';
+        ta.dir = /[\u0600-\u06FF]/.test(rawText) ? 'rtl' : 'ltr';
+      }
+      const rows = this.parseRows(rawText);
+      this._showPreview(rows);
+    }catch(err){
+      console.error('[UniversalImport]', err);
+      if(prev) prev.innerHTML = `<span style="color:var(--red);font-size:11px">❌ Could not read file: ${err.message||'Unknown error'}</span>`;
+    }
   },
 
-  // Parse rows — handles: name only, name,phone, or name\tphone
-  _parseRows(raw){
-    return raw.split('\n')
-      .map(line => {
-        const parts = line.trim().split(/[,\t]+/);
-        const name  = (parts[0]||'').trim().replace(/^\d+[\.\)\-\s]+/, '').replace(/^"|"$/g,'').trim();
-        const phone = (parts[1]||'').trim().replace(/^"|"$/g,'').trim();
-        return { name, phone };
-      })
-      .filter(r => r.name.length >= 2 && r.name.length <= 60);
+  // ── Live textarea preview ─────────────────────────────────────────────────────
+  _preview(){
+    const raw  = document.getElementById('import-names-ta')?.value || '';
+    const rows = this.parseRows(raw);
+    this._showPreview(rows);
   },
 
-  _parseNames(raw){ return this._parseRows(raw).map(r=>r.name); },
-
+  // ── Execute import ────────────────────────────────────────────────────────────
   _execute(){
     const raw  = document.getElementById('import-names-ta')?.value || '';
-    const rows = this._parseRows(raw);
-    if(rows.length === 0){
-      NotificationEngine.warning('No Names', 'Add at least one name before importing.');
+    const rows = this.parseRows(raw);
+
+    if(!rows.length){
+      NotificationEngine.warning('Nothing to Import', 'Paste names or upload a file first.');
       return;
     }
-    if(rows.length > 200){
-      NotificationEngine.warning('Too Many', 'Max 200 students per import.');
+    if(rows.length > 300){
+      NotificationEngine.warning('Too Many', 'Maximum 300 students per import. Split your file.');
       return;
     }
 
-    let created = 0, skipped = 0, withPhone = 0;
-    rows.forEach(({name, phone}) => {
+    let created=0, skipped=0, withPhone=0;
+    rows.forEach(({name, phone})=>{
       try{
         const normalizedPhone = phone ? CountryManager.normalizePhone(phone) : '';
-        const st = StudentManager.create(name, { parentPhone: normalizedPhone });
-        if(st){
-          created++;
-          if(normalizedPhone) withPhone++;
-        } else { skipped++; }
+        const st = StudentManager.create(name, {parentPhone: normalizedPhone});
+        if(st){ created++; if(normalizedPhone) withPhone++; }
+        else skipped++;
       }catch(e){ skipped++; }
     });
 
     App.closeModal();
     const detail = [
-      skipped > 0 ? `${skipped} skipped` : null,
-      withPhone > 0 ? `${withPhone} with phone` : null,
+      withPhone  ? `${withPhone} with phone`           : null,
+      skipped    ? `${skipped} skipped (duplicates)`   : null,
     ].filter(Boolean).join(' · ') || 'All students created successfully';
     NotificationEngine.success(`✅ Imported ${created} student${created!==1?'s':''}`, detail);
 
     try{ UI._renderStudentQuickGrid(); }catch(e){}
-    try{ UI.renderStudents(); }catch(e){}
-    try{ UI._refreshHeaderStats(); }catch(e){}
-    Logger.info('ImportNames', `Imported ${created} (${withPhone} with phone), skipped ${skipped}`);
+    try{ UI.renderStudents();          }catch(e){}
+    try{ UI._refreshHeaderStats();     }catch(e){}
+    OperationLogger.record('UniversalImport', 'SUCCESS',
+      `${created} imported, ${withPhone} with phone, ${skipped} skipped`);
   },
+
+  // ── Open modal ───────────────────────────────────────────────────────────────
+  open(){
+    UI._openModal({
+      title: '📥 Import Students',
+      size:  'sm',
+      body: `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.8">
+          Upload <strong style="color:var(--text-secondary)">.xlsx · .csv · .pdf · .docx · .txt</strong>
+          or paste names directly.<br>
+          Supports <strong style="color:var(--text-secondary)">Arabic &amp; English</strong>.
+          One student per line — phone number optional.
+        </div>
+
+        <div style="position:relative">
+          <textarea id="import-names-ta" class="input"
+            style="height:155px;resize:vertical;font-size:12px;font-family:var(--mono);line-height:1.8;padding-right:38px"
+            placeholder="Ahmed Al-Hassan, +97150001001&#10;سارة محمد، 55667788&#10;Khalid Hassan&#10;…"
+            oninput="ImportNames._preview()" dir="auto"></textarea>
+
+          <label title="Upload any file (.xlsx, .csv, .pdf, .docx, .txt)"
+                 style="position:absolute;top:8px;right:9px;cursor:pointer;font-size:17px;
+                        opacity:.5;transition:.15s;line-height:1"
+                 onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.5">
+            📎
+            <input type="file"
+                   accept=".xlsx,.xls,.csv,.tsv,.pdf,.docx,.doc,.txt"
+                   style="display:none"
+                   onchange="ImportNames._onFile(this)">
+          </label>
+        </div>
+
+        <div id="import-names-preview" style="margin-top:9px;min-height:20px"></div>`,
+
+      actions:[
+        {label:'Cancel',   class:'btn-ghost',   onclick:'App.closeModal()'},
+        {label:'⬆ Import', class:'btn-primary',  onclick:'ImportNames._execute()'},
+      ],
+    });
+    setTimeout(()=>document.getElementById('import-names-ta')?.focus(), 100);
+  },
+
+  // Keep backward-compatible aliases
+  _parseNames(raw){ return this.parseRows(raw).map(r=>r.name); },
+  _parseRows(raw) { return this.parseRows(raw); },
 };
+
 
 // -══════════════════════════════════════════════════════════════════════════════
 // THEME MANAGER — Light / Night mode toggle
@@ -16993,6 +17223,477 @@ const OperationLogger = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DISPATCH SCHEDULER — store a timed dispatch, fire when time arrives
+// Persists in localStorage so it survives app close (checked on every 60s tick
+// and on every app focus / visibility change).
+// ═══════════════════════════════════════════════════════════════════════════════
+const DispatchScheduler = {
+
+  _KEY: 'ep_dispatch_schedule',
+
+  // ── Save a scheduled dispatch ─────────────────────────────────────────────
+  // items: array from window._EP_DISPATCH (filtered to approved)
+  schedule(items, fireAtMs){
+    const payload = {
+      items:   items.map(it=>({
+        studentId: it.studentId || it.student?.id,
+        language:  it.language,
+        type:      it.type?.id || it.type,
+      })).filter(it=>it.studentId),
+      fireAt:  fireAtMs,
+      created: Date.now(),
+    };
+    localStorage.setItem(this._KEY, JSON.stringify(payload));
+    this._updateBadge();
+    console.log('[DispatchScheduler] Scheduled for', new Date(fireAtMs).toLocaleTimeString());
+  },
+
+  // ── Cancel ────────────────────────────────────────────────────────────────
+  cancel(){
+    localStorage.removeItem(this._KEY);
+    this._updateBadge();
+    NotificationEngine.info('Cancelled', 'Scheduled dispatch removed.');
+  },
+
+  // ── Check — called every 60s by heartbeat + on app focus ─────────────────
+  check(){
+    const raw = localStorage.getItem(this._KEY);
+    if(!raw) return;
+    let payload;
+    try{ payload = JSON.parse(raw); }catch(e){ localStorage.removeItem(this._KEY); return; }
+
+    if(Date.now() < payload.fireAt) return;  // not yet
+
+    // Time has arrived — fire
+    localStorage.removeItem(this._KEY);
+    this._updateBadge();
+    this._fire(payload);
+  },
+
+  // ── Fire the scheduled dispatch ───────────────────────────────────────────
+  async _fire(payload){
+    const students = payload.items
+      .map(it => {
+        const st = StudentManager.getById(it.studentId);
+        return st ? { student: st, language: it.language, type: { id: it.type } } : null;
+      })
+      .filter(Boolean)
+      .filter(it => CommunicationDecisionEngine.isSafeToSend(it.student));
+
+    if(!students.length){
+      NotificationEngine.warning('Scheduled Dispatch', 'No valid students to send (phones may have been removed).');
+      return;
+    }
+
+    NotificationEngine.success(
+      '⏰ Sending Scheduled Reports',
+      `Dispatching ${students.length} report${students.length!==1?'s':''}…`
+    );
+
+    // Reuse CDE dispatch logic
+    window._EP_DISPATCH = students;
+    await CommunicationDecisionEngine._dispatchApproved();
+  },
+
+  // ── Get pending info (null if none) ──────────────────────────────────────
+  getPending(){
+    const raw = localStorage.getItem(this._KEY);
+    if(!raw) return null;
+    try{ return JSON.parse(raw); }catch(e){ return null; }
+  },
+
+  // ── Update badge on Reports screen header ────────────────────────────────
+  _updateBadge(){
+    const pending = this.getPending();
+    const badge   = document.getElementById('dispatch-schedule-badge');
+    if(!badge) return;
+    if(pending){
+      const t = new Date(pending.fireAt);
+      const hh = String(t.getHours()).padStart(2,'0');
+      const mm = String(t.getMinutes()).padStart(2,'0');
+      badge.textContent  = `⏰ ${hh}:${mm}`;
+      badge.style.display = 'inline-flex';
+      badge.title         = `Scheduled dispatch at ${hh}:${mm} — click to cancel`;
+      badge.onclick       = () => { if(confirm('Cancel scheduled dispatch?')) DispatchScheduler.cancel(); };
+    } else {
+      badge.style.display = 'none';
+    }
+  },
+
+  // ── Init — add visibilitychange listener ─────────────────────────────────
+  init(){
+    document.addEventListener('visibilitychange', () => {
+      if(!document.hidden) this.check();
+    });
+    // Also check immediately in case app was closed and reopened after fire time
+    this.check();
+    this._updateBadge();
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMMUNICATION DECISION ENGINE
+// Analyzes classroom data and decides WHICH students need reports, WHAT type,
+// and in WHICH language — then presents a smart dispatch panel to the teacher.
+// Wraps existing engines (PredictiveEngine, BehaviorEngine, ReportEngine).
+// ═══════════════════════════════════════════════════════════════════════════════
+const CommunicationDecisionEngine = {
+
+  // ── Report type constants ────────────────────────────────────────────────────
+  TYPE: {
+    INTERVENTION:   { id:'INTERVENTION',   icon:'🚨', label:'Intervention',         color:'var(--red)'    },
+    POSITIVE:       { id:'POSITIVE',       icon:'⭐', label:'Positive Reinforcement', color:'var(--green)'  },
+    PATTERN_ALERT:  { id:'PATTERN_ALERT',  icon:'📊', label:'Pattern Alert',          color:'var(--orange)' },
+  },
+
+  // ── Score thresholds ─────────────────────────────────────────────────────────
+  THRESHOLD: { SKIP: 20, OPTIONAL: 50 },  // 0-20 skip, 21-50 optional, 51-100 recommended
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 1: Compute communicationScore (0–100) for one student
+  // Reuses PredictiveEngine risk score + today's events — no duplication
+  // ─────────────────────────────────────────────────────────────────────────────
+  scoreStudent(st){
+    try{
+      const today     = new Date(); today.setHours(0,0,0,0);
+      const todayTs   = today.getTime();
+      const evs       = BehaviorEngine.getStudentEvents(st.id);
+      const todayEvs  = evs.filter(e => new Date(e.createdAt).getTime() >= todayTs && !e.corrected);
+      const todayPos  = todayEvs.filter(e => e.scoreChange > 0);
+      const todayNeg  = todayEvs.filter(e => e.scoreChange < 0);
+
+      // Yesterday's events for delta comparison
+      const yesterdayTs = todayTs - 86400000;
+      const yestEvs = evs.filter(e => {
+        const t = new Date(e.createdAt).getTime();
+        return t >= yesterdayTs && t < todayTs;
+      });
+
+      // Reuse existing risk score from PredictiveEngine
+      const pred = PredictiveEngine.analyze(st.id);
+      const riskBase = pred.riskScore || 0;  // 0-100
+
+      // Signal A: today's activity (25 pts max)
+      const activityScore = Math.min(25, todayEvs.length * 5);
+
+      // Signal B: negative severity today (30 pts max)
+      const negScore = Math.min(30, todayNeg.length * 15);
+
+      // Signal C: positive-only day with no negatives (20 pts if meaningful)
+      const purePositive = todayPos.length >= 2 && todayNeg.length === 0 ? 20 : 0;
+
+      // Signal D: sudden change vs yesterday (25 pts)
+      const todayDelta = todayEvs.reduce((a,e)=>a+e.scoreChange,0);
+      const yestDelta  = yestEvs.reduce((a,e)=>a+e.scoreChange,0);
+      const deltaShift = Math.abs(todayDelta - yestDelta);
+      const changeScore = Math.min(25, deltaShift * 2);
+
+      const raw = negScore + purePositive + activityScore * 0.4 + changeScore * 0.6 + riskBase * 0.3;
+      return Math.min(100, Math.round(raw));
+    }catch(e){
+      return 0;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 2: Classify report type from events + risk
+  // ─────────────────────────────────────────────────────────────────────────────
+  classifyType(st){
+    try{
+      const today   = new Date(); today.setHours(0,0,0,0);
+      const evs     = BehaviorEngine.getStudentEvents(st.id);
+      const todayEvs= evs.filter(e => new Date(e.createdAt).getTime() >= today.getTime() && !e.corrected);
+      const todayPos= todayEvs.filter(e => e.scoreChange > 0);
+      const todayNeg= todayEvs.filter(e => e.scoreChange < 0);
+
+      if(st.riskLevel === 'high' || todayNeg.length >= 3)         return this.TYPE.INTERVENTION;
+      if(todayPos.length >= 3 && todayNeg.length === 0)           return this.TYPE.POSITIVE;
+      if(todayNeg.length >= 1 || st.riskLevel === 'medium')       return this.TYPE.PATTERN_ALERT;
+      if(todayPos.length >= 2)                                     return this.TYPE.POSITIVE;
+      return this.TYPE.PATTERN_ALERT;
+    }catch(e){ return this.TYPE.PATTERN_ALERT; }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 4: Language priority system
+  // 1. Student parentCommunication.language
+  // 2. Class default (settings)
+  // 3. ReportEngine._lang
+  // 4. 'en' fallback
+  // ─────────────────────────────────────────────────────────────────────────────
+  resolveLanguage(st){
+    const pref = st.parentCommunication?.language;
+    if(pref && pref !== 'auto') return pref;
+    const settings = StorageManager.getSettings();
+    if(settings?.defaultReportLang && settings.defaultReportLang !== 'auto')
+      return settings.defaultReportLang;
+    return ReportEngine._lang || 'en';
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 9: Safety gate — never dispatch when unsafe
+  // ─────────────────────────────────────────────────────────────────────────────
+  isSafeToSend(st){
+    if(!st.parentPhone || st.parentPhone.trim().length < 7) return false;  // no phone
+    if(st.exemptFromPicker) return false;                                   // teacher excluded
+    return true;
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Main analysis: returns sorted dispatch list
+  // ─────────────────────────────────────────────────────────────────────────────
+  analyze(){
+    const students = StudentManager.getAll();
+    const results  = [];
+
+    students.forEach(st => {
+      if(!this.isSafeToSend(st)) return;
+      const score = this.scoreStudent(st);
+      if(score <= this.THRESHOLD.SKIP) return;
+      results.push({
+        student:    st,
+        score,
+        priority:   score > this.THRESHOLD.OPTIONAL ? 'recommended' : 'optional',
+        type:       this.classifyType(st),
+        language:   this.resolveLanguage(st),
+        approved:   score > this.THRESHOLD.OPTIONAL,  // auto-approve recommended
+      });
+    });
+
+    return results.sort((a,b) => b.score - a.score);
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 5: Generate report for one student in correct language
+  // Delegates to existing ReportEngine — zero duplication
+  // ─────────────────────────────────────────────────────────────────────────────
+  generateReport(st, language){
+    const prev = ReportEngine._lang;
+    ReportEngine._lang = language === 'arabic' ? 'ar' : 'en';
+    try{
+      return ReportEngine.generateWhatsApp(st.id);
+    }finally{
+      ReportEngine._lang = prev;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 6+7: Open the Smart Dispatch Panel
+  // ─────────────────────────────────────────────────────────────────────────────
+  openDispatchPanel(){
+    const items = this.analyze();
+
+    if(!items.length){
+      NotificationEngine.info(
+        '💬 No Reports Needed',
+        'All students are performing within normal range today, or no phone numbers are saved.'
+      );
+      return;
+    }
+
+    // Store items on window for panel actions
+    window._EP_DISPATCH = items.map((item,i) => ({...item, _idx:i}));
+
+    const renderRows = () => window._EP_DISPATCH.map((item, i) => {
+      const st = item.student;
+      const langLabel = item.language === 'arabic' ? '🇸🇦 AR'
+                      : item.language === 'bilingual' ? '🌐 BI'
+                      : '🇬🇧 EN';
+      const prioColor = item.priority === 'recommended' ? 'var(--red)' : 'var(--orange)';
+      return `
+        <div id="dispatch-row-${i}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+             border-radius:8px;background:${item.approved?'var(--bg-elevated)':'var(--bg-surface)'};
+             border:1px solid ${item.approved?'var(--border-strong)':'var(--border)'};margin-bottom:6px;
+             opacity:${item.approved?'1':'0.55'};transition:.2s">
+
+          <input type="checkbox" ${item.approved?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"
+                 onchange="window._EP_DISPATCH[${i}].approved=this.checked; document.getElementById('dispatch-row-${i}').style.opacity=this.checked?'1':'0.55'">
+
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${st.avatar} ${st.name}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">
+              ${item.type.icon} ${item.type.label}
+              · <span style="color:${prioColor};font-weight:600">${item.priority}</span>
+              · Score ${item.score}
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <select style="font-size:10px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);
+                           background:var(--bg-elevated);color:var(--text-secondary);cursor:pointer"
+                    onchange="window._EP_DISPATCH[${i}].language=this.value">
+              <option value="english"  ${item.language==='english' ?'selected':''}>🇬🇧 EN</option>
+              <option value="arabic"   ${item.language==='arabic'  ?'selected':''}>🇸🇦 AR</option>
+              <option value="bilingual"${item.language==='bilingual'?'selected':''}>🌐 BI</option>
+            </select>
+            <div style="display:flex;gap:3px">
+              <button style="flex:1;font-size:9px;padding:2px 4px;border-radius:4px;border:1px solid var(--accent);
+                             background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap"
+                      onclick="CommunicationDecisionEngine._sendOne(${i})"
+                      title="Send only this student now">▶ Send</button>
+              <button style="flex:1;font-size:9px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);
+                             background:transparent;color:var(--text-muted);cursor:pointer"
+                      onclick="window._EP_DISPATCH.splice(${i},1); document.getElementById('dispatch-row-${i}').remove()"
+                      title="Remove from dispatch list">✕</button>
+            </div>
+          </div>
+
+        </div>`;
+    }).join('');
+
+    const recommended = items.filter(i=>i.priority==='recommended').length;
+    const optional    = items.filter(i=>i.priority==='optional').length;
+
+    UI._openModal({
+      title: '📤 Smart Dispatch',
+      size:  'sm',
+      body: `
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">
+          <span style="color:var(--red);font-weight:700">${recommended} recommended</span>
+          ${optional?` · <span style="color:var(--orange)">${optional} optional</span>`:''}
+          — pre-selected students that need communication today.<br>
+          Uncheck to skip · change language per student · then send all.
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="btn btn-xs btn-ghost" style="font-size:10px"
+                  onclick="window._EP_DISPATCH.forEach((_,i)=>{window._EP_DISPATCH[i].approved=true; const cb=document.querySelector('#dispatch-row-'+i+' input');if(cb){cb.checked=true;document.getElementById('dispatch-row-'+i).style.opacity='1'}})">
+            ✅ Select All
+          </button>
+          <button class="btn btn-xs btn-ghost" style="font-size:10px"
+                  onclick="window._EP_DISPATCH.forEach((_,i)=>{window._EP_DISPATCH[i].approved=false; const cb=document.querySelector('#dispatch-row-'+i+' input');if(cb){cb.checked=false;document.getElementById('dispatch-row-'+i).style.opacity='0.55'}})">
+            ☐ Clear All
+          </button>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;color:var(--text-muted)">⏰ Schedule for:</span>
+            <input type="time" id="dispatch-time-picker"
+                   style="font-size:11px;padding:3px 6px;border-radius:5px;border:1px solid var(--border);
+                          background:var(--bg-elevated);color:var(--text-primary);cursor:pointer"
+                   title="Pick a time to auto-send approved reports">
+          </div>
+        </div>
+        <div id="dispatch-rows" style="max-height:320px;overflow-y:auto">
+          ${renderRows()}
+        </div>`,
+      actions:[
+        {label:'Cancel', class:'btn-ghost', onclick:'App.closeModal()'},
+        {label:'⏰ Schedule', class:'btn-ghost', onclick:`(()=>{
+          const tp = document.getElementById('dispatch-time-picker');
+          if(!tp || !tp.value){ NotificationEngine.warning('No Time Set','Pick a time first using the ⏰ clock picker above.'); return; }
+          const [hh,mm] = tp.value.split(':').map(Number);
+          const fire = new Date(); fire.setHours(hh,mm,0,0);
+          if(fire <= Date.now()) fire.setDate(fire.getDate()+1); // next day if past
+          const approved = (window._EP_DISPATCH||[]).filter(it=>it.approved);
+          if(!approved.length){ NotificationEngine.warning('Nothing Selected','Check at least one student.'); return; }
+          DispatchScheduler.schedule(approved, fire.getTime());
+          App.closeModal();
+          const label = fire.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+          NotificationEngine.success('⏰ Scheduled', \`\${approved.length} report\${approved.length!==1?'s':''} will send at \${label}\`);
+        })()`},
+        {label:`📤 Send Now`, class:'btn-primary', onclick:'CommunicationDecisionEngine._dispatchApproved()'},
+      ],
+    });
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 7: Dispatch approved students one by one
+  // ─────────────────────────────────────────────────────────────────────────────
+  async _dispatchApproved(){
+    const approved = (window._EP_DISPATCH||[]).filter(item => item.approved);
+    App.closeModal();
+
+    if(!approved.length){
+      NotificationEngine.warning('Nothing Selected', 'Check at least one student to send.');
+      return;
+    }
+
+    // Learn language preferences for future sessions (Step 8)
+    approved.forEach(item => {
+      try{
+        const pref = item.student.parentCommunication || {};
+        if(pref.language !== item.language){
+          StudentManager.update(item.student.id, {
+            parentCommunication: { ...pref, language: item.language }
+          });
+        }
+      }catch(e){}
+    });
+
+    NotificationEngine.info(
+      '📤 Sending Reports',
+      `Opening WhatsApp for ${approved.length} student${approved.length!==1?'s':''}…`
+    );
+
+    // Send sequentially with delay so WA has time to switch back
+    for(let idx=0; idx<approved.length; idx++){
+      const item = approved[idx];
+      const st   = item.student;
+      const lang = item.language === 'bilingual' ? null : item.language; // null = bilingual handled below
+      await new Promise(res => setTimeout(res, idx === 0 ? 400 : 2200));
+
+      try{
+        if(item.language === 'bilingual'){
+          const prevLang = ReportEngine._lang;
+          ReportEngine._lang = 'en';
+          const en = ReportEngine.generateWhatsApp(st.id);
+          ReportEngine._lang = 'ar';
+          const ar = ReportEngine.generateWhatsApp(st.id);
+          ReportEngine._lang = prevLang;
+          const combined = en + '\n\n---\n\n' + ar;
+          const phone    = CountryManager.digitsOnly(st.parentPhone);
+          const safe     = EmojiSystem.normalizeWhatsAppMessage(combined);
+          PlatformService.openWhatsApp(phone, safe);
+        } else {
+          const prevLang = ReportEngine._lang;
+          ReportEngine._lang = item.language === 'arabic' ? 'ar' : 'en';
+          const msg   = ReportEngine.generateWhatsApp(st.id);
+          ReportEngine._lang = prevLang;
+          const phone = CountryManager.digitsOnly(st.parentPhone);
+          const safe  = EmojiSystem.normalizeWhatsAppMessage(msg);
+          PlatformService.openWhatsApp(phone, safe);
+        }
+        OperationLogger.record(`Dispatch:${st.name}`, 'SUCCESS', item.type.label + ' · ' + item.language);
+      }catch(err){
+        OperationLogger.record(`Dispatch:${st.name}`, 'FAILED', err.message);
+        NotificationEngine.danger('Send Failed', `Could not send report for ${st.name}`);
+      }
+    }
+
+    window._EP_DISPATCH = null;
+  },
+
+  // ── Send Individually — one student, immediate dispatch ─────────────────────
+  async _sendOne(idx){
+    const item = (window._EP_DISPATCH||[])[idx];
+    if(!item){ NotificationEngine.warning('Error','Student not in dispatch queue.'); return; }
+    App.closeModal();
+    const st = item.student;
+    try{
+      const prev = ReportEngine._lang;
+      let msg;
+      if(item.language === 'bilingual'){
+        ReportEngine._lang='en'; const en = ReportEngine.generateWhatsApp(st.id);
+        ReportEngine._lang='ar'; const ar = ReportEngine.generateWhatsApp(st.id);
+        ReportEngine._lang = prev;
+        msg = EmojiSystem.normalizeWhatsAppMessage(en+'\n\n---\n\n'+ar);
+      } else {
+        ReportEngine._lang = item.language==='arabic' ? 'ar' : 'en';
+        msg = EmojiSystem.normalizeWhatsAppMessage(ReportEngine.generateWhatsApp(st.id));
+        ReportEngine._lang = prev;
+      }
+      PlatformService.openWhatsApp(CountryManager.digitsOnly(st.parentPhone), msg);
+      StudentManager.update(st.id,{parentCommunication:{language:item.language}});
+      OperationLogger.record('SendOne:'+st.name,'SUCCESS',item.language);
+      NotificationEngine.success('Opening WhatsApp',`Report ready for ${st.name}`);
+    }catch(err){
+      OperationLogger.record('SendOne:'+st.name,'FAILED',err.message);
+      NotificationEngine.danger('Send Failed',err.message);
+    }
+  },
+
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CLASSROOM INTELLIGENCE ENGINE
 // Aggregates PredictiveEngine + InsightEngine into structured Insight objects.
 // Architecture: Data → Intelligence → Report (Step 5–8 of the migration plan)
@@ -17183,6 +17884,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Initialise sync engine BEFORE App.init so the status pill is live from the start
   try{ SyncEngine.init(); }catch(e){ console.error('[EduPulse] SyncEngine.init failed:', e); }
   CountryManager.init();
+  DispatchScheduler.init();
   App.init();
   try{ IdleReminder.check(); }catch(e){}
   // Emit system boot complete event (Phase 2: SYSTEM_EVENT)
