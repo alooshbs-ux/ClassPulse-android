@@ -1616,6 +1616,13 @@ a{text-decoration:none;color:inherit}
 .sync-pill.conflict  .sync-dot{background:var(--purple);animation:syncPulse .5s ease infinite}
 .sync-pill.local     {border-color:var(--border)}
 .sync-pill.local     .sync-dot{background:var(--accent)}
+.realtime-conn-status{
+  font-size:10px;font-weight:600;margin-left:8px;white-space:nowrap;color:var(--text-muted);
+  user-select:none;align-self:center;
+}
+.realtime-conn-status.connected{color:var(--green)}
+.realtime-conn-status.connecting{color:var(--orange)}
+.realtime-conn-status.offline{color:var(--text-muted)}
 @keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* ── Force Save Button ────────────────────────────────────────── */
@@ -1711,7 +1718,7 @@ a{text-decoration:none;color:inherit}
 .offline-banner.visible{transform:translateY(0)}
 .offline-banner .ob-queue{color:var(--orange)}
 
-/* ── PocketBase config in settings ─────────────────────────── */
+/* ── Supabase cloud sync status row in settings ─────────────── */
 .firebase-status-row{
   display:flex;align-items:center;gap:8px;
   padding:8px 10px;border-radius:6px;
@@ -3198,6 +3205,9 @@ body.privacy-mode .hide-privacy{display:none!important}
 </style>
 </head>
 <body>
+<script src="dataService.js"></script>
+<script src="realtimeService.js"></script>
+<script src="syncBrain.js"></script>
 
 <!-- -══════════════════════ PORTAL ROOTS ════════════════════════════════════ -->
 <div id="global-dropdown-root"></div>
@@ -3330,7 +3340,7 @@ body.privacy-mode .hide-privacy{display:none!important}
     <!-- -─ SYNC STATUS PILL — powered by SyncEngine ── -->
     <div id="sync-pill" class="sync-pill local"
          onclick="SyncEngine.openLogPanel()"
-         data-title="Cloud Sync" data-description="Click to view the sync activity log, sync to PocketBase, or check status." data-tip-text="Green = synced · Yellow = syncing · Red = offline · Purple = conflict">
+         data-title="Cloud Sync" data-description="Opens the activity log. Sync is realtime — no manual upload." data-tip-text="Green = live · Red = offline · Badge = queued offline ops">
       <div class="sync-dot" id="sync-dot"></div>
       <span id="sync-label">Local Only</span>
       <span id="sync-pending-badge"
@@ -3338,18 +3348,12 @@ body.privacy-mode .hide-privacy{display:none!important}
                    padding:1px 5px;border-radius:99px;margin-left:3px;min-width:16px;text-align:center"
             title="Pending changes waiting to sync"></span>
     </div>
+    <span id="realtime-conn-status" class="realtime-conn-status offline" title="Supabase Realtime">🔴 Offline</span>
     <!-- Legacy autosave indicator kept for backward-compat (hidden) -->
     <div class="autosave-indicator saved" id="autosave-indicator" style="display:none">
       <div class="as-dot"></div>
       <span id="autosave-label">Saved</span>
     </div>
-    <!-- Force Save button — bypasses debounce, pushes to Firestore immediately -->
-    <button class="sync-save-btn" id="sync-save-btn"
-            onclick="SyncEngine.forcePush(this)"
-            data-title="Force Save ☁️" data-description="Immediately pushes all local changes to PocketBase — forces immediate sync."
-            style="display:none">
-      ☁️ Save Now
-    </button>
     <div class="header-center" class="ep-row">
       <!-- Mood Tracker -->
       <div class="mood-bar" data-title="Class Mood" data-description="Record today's classroom atmosphere. The AI Insight Engine uses this to adjust predictions and risk scores." data-tip-text="Restless mood increases risk multipliers by 40%.">
@@ -3452,7 +3456,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <span class="nav-icon">🎲</span> Cold Call
     </div>
     <div class="nav-item" data-screen="settings" onclick="App.navigate('settings')"
-      data-title="Settings" data-description="Configure school name, teacher info, behavior point values, and connect PocketBase for cloud sync.">
+      data-title="Settings" data-description="Configure school name, teacher info, behavior point values, and connect Supabase for cloud sync.">
       <span class="nav-icon">⚙️</span> Settings
     </div>
     <div class="nav-item" onclick="DataHub.open()" style="color:var(--orange)"
@@ -3932,91 +3936,51 @@ body.privacy-mode .hide-privacy{display:none!important}
           </div>
         </div>
 
-        <!-- -─ CLOUD SYNC SETTINGS (new — non-breaking) ──────────────── -->
+        <!-- -─ CLOUD SYNC SETTINGS — Supabase Offline-First ──────────────── -->
         <div class="settings-section" id="sync-settings-section">
-          <h3>☁️ Cloud Sync (PocketBase)</h3>
+          <h3>☁️ Cloud Sync (Supabase)</h3>
 
           <!-- Connection status row -->
           <div class="firebase-status-row disconnected" id="firebase-status-row">
             <div class="fs-dot"></div>
-            <span id="firebase-status-label">غير متصل — أدخل بيانات الخادم أدناه</span>
+            <span id="firebase-status-label">Not connected — enter your Supabase credentials below</span>
+          </div>
+
+          <div style="padding:8px 10px;background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:6px;font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6">
+            <strong style="color:var(--accent)">Realtime + offline-safe:</strong>
+            Changes save locally first, sync to Supabase automatically, and other devices update live via Realtime (<code style="font-size:10px">students</code> + <code style="font-size:10px">behaviors</code> tables). No manual upload.
           </div>
 
           <div class="form-group">
-            <label class="label">رابط خادم PocketBase</label>
-            <input class="input" id="pb-url" placeholder="https://your-server.pockethost.io"
-                   data-tip="رابط خادم PocketBase — مثال: https://myschool.pockethost.io"/>
+            <label class="label">Supabase Project URL</label>
+            <input class="input" id="sb-url" placeholder="https://xxxx.supabase.co"
+                   data-tip="Your Supabase project URL — found in Project Settings → API"/>
           </div>
           <div class="form-group">
-            <label class="label">البريد الإلكتروني (اختياري)</label>
-            <input class="input" type="email" id="pb-email" placeholder="admin@school.com"
-                   data-tip="بريد المسؤول — اتركه فارغاً إذا كان الخادم مفتوح القراءة"/>
-          </div>
-          <div class="form-group">
-            <label class="label">كلمة المرور (اختياري)</label>
-            <input class="input" type="password" id="pb-password" placeholder="••••••••"
-                   data-tip="كلمة مرور المسؤول"/>
+            <label class="label">Supabase Anon Key</label>
+            <input class="input" id="sb-anon-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
+                   data-tip="Your Supabase anon/public key — found in Project Settings → API"/>
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-            <button class="btn btn-primary btn-sm" onclick="SyncEngine.connectPocketBase()"
-                    data-tip="الاتصال بـ PocketBase وبدء المزامنة">
-              🔌 اتصال
+            <button class="btn btn-primary btn-sm" onclick="SyncEngine.connectSupabase()"
+                    data-tip="Connect to Supabase and activate auto-sync">
+              🔌 Connect
             </button>
             <button class="btn btn-ghost btn-sm" onclick="SyncEngine.disconnect()"
-                    data-tip="إيقاف المزامنة — البيانات تبقى محلياً">
-              قطع الاتصال
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="SyncBrain.pushNow(this)"
-                    data-tip="مزامنة التغييرات المعلّقة">
-              ⬆ مزامنة الآن
-            </button>
-            <button class="btn btn-success btn-sm" onclick="SyncEngine.forcePush(this)"
-                    id="settings-force-save"
-                    data-tip="رفع كل البيانات فوراً — تجاهل الجداول الزمنية">
-              ☁️ رفع فوري
+                    data-tip="Stop syncing — data stays saved locally">
+              Disconnect
             </button>
           </div>
 
-          <!-- ── SyncBrain controls ── -->
           <div style="margin-top:14px;padding:12px;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border)">
-            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-              🧠 Sync Brain Settings
+            <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+              Offline queue
             </div>
-
-            <!-- Auto-sync toggle + interval -->
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600">
-                <input type="checkbox" id="sb-auto-toggle" style="width:15px;height:15px;accent-color:var(--accent)"
-                       onchange="SyncBrain.saveConfig({autoSyncEnabled:this.checked})">
-                Auto-Sync
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)">
-                every
-                <input type="number" id="sb-interval" min="5" max="120" value="15"
-                       style="width:50px;padding:2px 6px;border-radius:5px;border:1px solid var(--border);
-                              background:var(--bg-surface);color:var(--text-primary);font-size:11px;text-align:center"
-                       onchange="SyncBrain.saveConfig({autoSyncIntervalMin:parseInt(this.value)||15})">
-                minutes
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--orange)">
-                <input type="checkbox" id="sb-vacation" style="width:14px;height:14px;accent-color:var(--orange)"
-                       onchange="SyncBrain.setVacationMode(this.checked)">
-                🏖 Vacation Mode
-              </label>
+            <div style="font-size:11px;color:var(--text-muted)">
+              Pending ops (auto-flush when online):
+              <strong id="sb-pending-count" style="color:var(--text-primary)">0</strong>
             </div>
-
-            <!-- Pending count -->
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">
-              Pending queue:
-              <strong id="sb-pending-count" style="color:var(--text-primary)">0 items</strong>
-              · Success rate:
-              <span id="sb-success-rate" style="color:var(--green)">—</span>
-            </div>
-
-            <!-- Sync history -->
-            <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Recent Syncs</div>
-            <div id="sb-history" style="max-height:130px;overflow-y:auto"></div>
           </div>
 
           <div style="margin-top:14px">
@@ -9294,15 +9258,15 @@ const UI = {
           onchange="CONFIG.BEHAVIORS.${b.pts>=0?'positive':'negative'}.find(x=>x.id==='${b.id}').pts=parseInt(this.value)||${b.pts}"/>
       </div>`).join('');
 
-    // Restore Firebase credentials to input fields if previously saved
+    // Restore Supabase credentials to input fields if previously saved
     try{
-      const saved = localStorage.getItem('ep_pb_creds');
+      const saved = localStorage.getItem('ep_sb_creds');
       if(saved){
         const c = JSON.parse(saved);
-        const uEl = document.getElementById('pb-url');
-        const eEl = document.getElementById('pb-email');
-        if(uEl && !uEl.value) uEl.value = c.url   || '';
-        if(eEl && !eEl.value) eEl.value = c.email || '';
+        const uEl = document.getElementById('sb-url');
+        const kEl = document.getElementById('sb-anon-key');
+        if(uEl && !uEl.value) uEl.value = c.url || '';
+        if(kEl && !kEl.value) kEl.value = c.key || '';
       }
     }catch(e){}
     // Refresh the sync activity log panel
@@ -9313,7 +9277,11 @@ const UI = {
     try{
       SyncBrain._refreshSettingsPanel();
       const pEl = document.getElementById('sb-pending-count');
-      if(pEl){ const n=SyncEngine._pendingQueue.length; pEl.textContent=`${n} item${n!==1?'s':''}`; }
+      if(pEl){
+        let n = 0;
+        try{ if(typeof DataService !== 'undefined') n = DataService.getQueueLength(); }catch(e){}
+        pEl.textContent = String(n);
+      }
     }catch(e){}
   },
 
@@ -10471,8 +10439,8 @@ const ClassManager = {
     EventCache.invalidate();
 
     // Queue a sync for the newly-active class data
-    if(typeof SyncEngine !== 'undefined' && SyncEngine._ready && (SyncEngine._pb || SyncEngine._db)){
-      SyncEngine._flushQueue();
+    if(typeof SyncEngine !== 'undefined' && SyncEngine._ready && SyncEngine._supabase){
+      SyncEngine.flushSyncQueue();
       SyncLogger.log('info', `🔄 Class switched — flushing queue for: ${classId}`);
     }
 
@@ -10772,427 +10740,218 @@ const ClassManager = {
 };
 
 // -══════════════════════════════════════════════════════════════════════════════
-// SYNC ENGINE v1.0 — Production-grade cloud sync layer
-// -──────────────────────────────────────────────────────────────────────────────
-// Architecture:
-//   localStorage  ←→  SyncEngine  ←→  Firebase Firestore
-//
-// Design principles:
-//   • Zero breaking changes — hooks into StorageManager.set() non-destructively
-//   • Firebase is OPTIONAL — if no credentials, runs in "Local Only" mode
-//   • Conflict resolution: lastUpdated timestamp comparison + UI chooser
-//   • Pending queue survives offline/page refresh via localStorage
-// -════════════════════════════════════════════════════════════════════════════════
-// MODULE: SYNC ENGINE — PocketBase Edition
-// استبدل Firebase بـ PocketBase: أبسط، مجاني، تحت سيطرتك الكاملة.
-// PocketBase SDK يُحمَّل تلقائياً عند الاتصال الأول.
-// API العام لم يتغير — كل الأزرار والـ SyncBrain تعمل كما كانت.
+// SYNC ENGINE — Supabase Realtime + dataService.js (students / behaviors tables)
+//   • window.supabase = Supabase client after connect (per app convention)
+//   • Realtime + debounced UI refresh: syncBrain.js + realtimeService.js
+//   • Offline: DataService queues ops in localStorage (ep_rt_pending_ops)
 // ════════════════════════════════════════════════════════════════════════════════
 const SyncEngine = {
 
-  // ─── State ───────────────────────────────────────────────────────────────────
   _ready:          false,
   _pullInProgress: false,
-  _localSaveTimer: null,
-  _collection:     'edupulse',    // PocketBase collection name
-  _pbUrl:          null,          // e.g. https://your-server.pockethost.io
-  _pb:             null,          // PocketBase SDK instance
+  _supabaseUrl:    null,
+  _supabaseKey:    null,
+  _supabase:       null,
   _isOnline:       true,
-  _isSyncing:      false,
   isSyncRunning:   false,
-  _activeWrites:   0,
   _lastSyncTime:   null,
-  _pendingQueue:   [],
+  pendingSyncQueue: [],
+  _activeWrites:   0,
   _debounceMap:    {},
-  _retryMap:       {},
-  _MAX_RETRIES:    3,
-  _DEBOUNCE_CRITICAL: 400,
-  _DEBOUNCE_NORMAL:   1200,
-  _CRITICAL_KEYS: ['ep_events', 'ep_students'],
 
-  // ─── Init ────────────────────────────────────────────────────────────────────
+  get _pendingQueue(){ return this.pendingSyncQueue; },
+  set _pendingQueue(v){ this.pendingSyncQueue = v; },
+
   init(){
     this._ready    = true;
     this._isOnline = navigator.onLine;
-    this._loadQueue();
+    this.pendingSyncQueue = [];
     this._watchNetwork();
     this._computeRealState();
-    // استعادة بيانات الاتصال المحفوظة تلقائياً
     try{
-      const saved = localStorage.getItem('ep_pb_creds');
+      const saved = localStorage.getItem('ep_sb_creds');
       if(saved){
         const c = JSON.parse(saved);
-        setTimeout(() => this._bootPocketBase(c), 800);
+        setTimeout(() => this._bootSupabase(c), 800);
       }
     }catch(e){}
-    SyncLogger.log('info','⚡ SyncEngine (PocketBase) جاهز');
+    SyncLogger.log('info','⚡ SyncEngine (Supabase Realtime) ready');
   },
 
-  // ─── الاتصال بـ PocketBase ────────────────────────────────────────────────────
-  connectPocketBase(url, email, password){
-    const u = url    || document.getElementById('pb-url')?.value?.trim();
-    const e = email  || document.getElementById('pb-email')?.value?.trim();
-    const p = password || document.getElementById('pb-password')?.value?.trim();
-
-    if(!u){ NotificationEngine.warning('PocketBase','أدخل رابط الخادم أولاً'); return; }
-
-    const creds = { url: u.replace(/\/$/, ''), email: e || '', password: p || '' };
-    localStorage.setItem('ep_pb_creds', JSON.stringify(creds));
-    SyncLogger.log('info', `🔌 جارٍ الاتصال بـ ${u}`);
-    this._bootPocketBase(creds);
+  connectSupabase(url, key){
+    const u = url || document.getElementById('sb-url')?.value?.trim();
+    const k = key || document.getElementById('sb-anon-key')?.value?.trim();
+    if(!u){ NotificationEngine.warning('Supabase','Enter the Project URL first'); return; }
+    if(!k){ NotificationEngine.warning('Supabase','Enter the Anon Key first'); return; }
+    const creds = { url: u.replace(/\/$/, ''), key: k };
+    localStorage.setItem('ep_sb_creds', JSON.stringify(creds));
+    SyncLogger.log('info', `🔌 Connecting to Supabase: ${u}`);
+    this._bootSupabase(creds);
   },
 
-  // ─── تحميل SDK وبدء الاتصال ──────────────────────────────────────────────────
-  _bootPocketBase(creds){
-    const SDK_URL = 'https://cdn.jsdelivr.net/npm/pocketbase@0.21.5/dist/pocketbase.umd.js';
+  _bootSupabase(creds){
+    const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
 
-    const boot = () => {
+    const finish = (createClientFn) => {
       try{
-        this._pb     = new PocketBase(creds.url);
-        this._pbUrl  = creds.url;
-        this._collection = 'sync_data';
-
-        // تسجيل الدخول إذا تم تقديم بيانات
-        const doAuth = creds.email && creds.password
-          ? this._pb.collection('_superusers').authWithPassword(creds.email, creds.password)
-          : Promise.resolve();
-
-        doAuth.then(() => {
-          this._updateFbStatusRow('connected', `🟢 متصل بـ ${creds.url}`);
-          this._computeRealState();
-          SyncLogger.log('push', `✅ PocketBase متصل: ${creds.url}`);
-          NotificationEngine.success('☁️ Cloud Sync', 'متصل بـ PocketBase — المزامنة نشطة');
-          const btn = document.getElementById('sync-save-btn');
-          if(btn) btn.style.display = 'inline-flex';
-          this._flushQueue();
-        }).catch(err => {
-          this._pbError('فشل تسجيل الدخول: ' + (err.message || err));
+        const client = createClientFn(creds.url, creds.key, {
+          realtime: { params: { eventsPerSecond: 10 } },
         });
-
+        window.supabase = client;
+        this._supabase    = client;
+        this._supabaseUrl = creds.url;
+        this._supabaseKey = creds.key;
+        this._updateFbStatusRow('connected', '🟢 Connected to Supabase');
+        SyncLogger.log('push', `✅ Supabase client ready: ${creds.url}`);
+        NotificationEngine.success('☁️ Realtime','Connected — live sync active');
+        try{
+          if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.init(client);
+        }catch(e){ console.warn('[SyncEngine] EduPulseSyncBrain.init', e); }
+        const cid = ClassManager.activeId();
+        if(typeof DataService !== 'undefined'){
+          DataService.pushLocalSnapshot(cid).then(() => DataService.flushOfflineQueue()).catch(()=>{});
+        }
+        this._lastSyncTime = Date.now();
+        this._computeRealState();
       }catch(err){
-        this._pbError('فشل تهيئة PocketBase: ' + err.message);
+        this._sbError('Failed to init Supabase: ' + err.message);
       }
     };
 
-    if(window.PocketBase){ boot(); return; }
+    if(window.__supabaseSdk && typeof window.__supabaseSdk.createClient === 'function'){
+      finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
+      return;
+    }
+    if(window.supabase && typeof window.supabase.createClient === 'function'){
+      window.__supabaseSdk = window.supabase;
+      finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
+      return;
+    }
 
-    this._updatePill('syncing','جارٍ تحميل SDK…');
-    const s   = document.createElement('script');
+    this._updatePill('syncing','Loading SDK…');
+    const s = document.createElement('script');
     s.src     = SDK_URL;
     s.async   = true;
-    s.onload  = boot;
-    s.onerror = () => this._pbError('فشل تحميل PocketBase SDK');
+    s.onload  = () => {
+      try{
+        window.__supabaseSdk = window.supabase;
+        finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
+      }catch(e){
+        this._sbError('Failed to init Supabase: ' + e.message);
+      }
+    };
+    s.onerror = () => this._sbError('Failed to load Supabase SDK — check your internet connection');
     document.head.appendChild(s);
   },
 
-  // ─── قطع الاتصال ──────────────────────────────────────────────────────────────
   disconnect(){
-    this._pb  = null;
-    this._pbUrl = null;
-    localStorage.removeItem('ep_pb_creds');
-    const btn = document.getElementById('sync-save-btn');
-    if(btn) btn.style.display = 'none';
-    this._updatePill('local','Local Only');
-    this._updateFbStatusRow('disconnected','غير متصل');
-    SyncLogger.log('info','🔌 تم قطع الاتصال بـ PocketBase');
-    NotificationEngine.info('Sync Stopped','تم إيقاف المزامنة — البيانات محفوظة محلياً');
+    try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.destroy(); }catch(e){}
+    this._supabase    = null;
+    this._supabaseUrl = null;
+    this._supabaseKey = null;
+    try{ window.supabase = null; }catch(e){}
+    localStorage.removeItem('ep_sb_creds');
+    this._updatePill('local','Local only');
+    this._updateFbStatusRow('disconnected','Disconnected — data stays on device');
+    SyncLogger.log('info','🔌 Disconnected from Supabase');
+    NotificationEngine.info('Disconnected','Realtime stopped — local data unchanged');
   },
 
-  // ─── رفع عنصر واحد بـ timeout 45 ثانية ──────────────────────────────────────
-  // ROOT CAUSE OF 400 FIXED:
-  //   1. data field → send the actual JS value (not JSON.stringify) so PocketBase JSON field accepts it
-  //   2. updated_at → send Date.now() (Number) not ISO string, to match the Number field type
-  //   3. err.data is logged so PocketBase validation details appear in the console
-  async _uploadItem(item){
-    if(!this._pb) throw new Error('لا يوجد اتصال بـ PocketBase');
-    const { key, payload } = item;
-
-    return new Promise(async (resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Timeout: ${key}`)), 45000);
-      try{
-        // Extract the actual app data from the payload wrapper
-        // payload = { _data: <students/events/settings>, _lastUpdated: number, _device: string }
-        const appData = (payload && payload._data !== undefined) ? payload._data : payload;
-
-        const recordData = {
-          key,
-          data:       appData,          // JSON field in PocketBase — must be an object/array, NOT a string
-          device:     this._deviceId(),
-          updated_at: Date.now(),       // Number field in PocketBase — Unix milliseconds, NOT ISO string
-        };
-
-        // Search for existing record by the `key` field to decide create vs update
-        let existing = null;
-        try{
-          existing = await this._pb.collection(this._collection)
-            .getFirstListItem(`key="${key}"`);
-        }catch(e){
-          // 404 = not found — will create below. Any other error is also safe to ignore here.
-        }
-
-        if(existing){
-          await this._pb.collection(this._collection).update(existing.id, recordData);
-        } else {
-          await this._pb.collection(this._collection).create(recordData);
-        }
-
-        clearTimeout(timer);
-        resolve();
-      }catch(err){
-        clearTimeout(timer);
-        // Log PocketBase's detailed validation errors (err.data contains field-level errors)
-        if(err.data && Object.keys(err.data).length){
-          console.error('[SyncEngine] PocketBase validation errors:', JSON.stringify(err.data));
-        }
-        reject(err);
-      }
-    });
-  },
-
-  // ─── executeSync — المدخل الوحيد للمزامنة ────────────────────────────────────
-  async executeSync(manual = false){
-    if(!this._pb){
-      if(manual) NotificationEngine.warning('غير متصل','أدخل بيانات PocketBase في الإعدادات أولاً');
-      return;
-    }
-    if(!this._isOnline){
-      if(manual) NotificationEngine.warning('غير متصل بالإنترنت','التغييرات محفوظة وستُزامَن عند الاتصال');
-      return;
-    }
-    if(this.isSyncRunning){
-      if(manual) NotificationEngine.warning('جارٍ المزامنة','انتظر انتهاء العملية الحالية');
-      return;
-    }
-
+  async executeSync(){
+    if(!this._supabase || typeof DataService === 'undefined') return;
+    const cid = ClassManager.activeId();
     this.isSyncRunning = true;
-
-    // إلغاء كل الـ debounces — نزامن الآن فوراً
-    Object.values(this._debounceMap).forEach(t => clearTimeout(t));
-    this._debounceMap = {};
-
-    // أضف آخر snapshot للبيانات إلى القائمة
-    const cid  = ClassManager.activeId();
-    ['ep_students_'+cid, 'ep_events_'+cid, 'ep_settings_'+cid].forEach(key => {
-      const val = StorageManager.get(key);
-      if(val !== null) this._enqueue(key, { _data: val, _lastUpdated: Date.now(), _device: this._deviceId() });
-    });
-
-    const queue = [...this._pendingQueue];
-
-    if(!queue.length){
-      this.isSyncRunning = false;
+    try{
+      await DataService.pushLocalSnapshot(cid);
+      await DataService.flushOfflineQueue();
+      await DataService.pullClassData(cid);
+      if(typeof EduPulseSyncBrain !== 'undefined') await EduPulseSyncBrain._runRefresh();
       this._lastSyncTime = Date.now();
+      SyncBrain._recordHistory('sync','success','snapshot');
+    }catch(e){
+      SyncLogger.log('error', String(e?.message||e));
+    }finally{
+      this.isSyncRunning = false;
       this._computeRealState();
       SyncBrain._updatePendingBadge();
-      if(manual) NotificationEngine.info('✅ لا يوجد جديد','كل البيانات مُزامَنة بالفعل');
-      return;
+      SyncBrain._refreshSettingsPanel();
     }
-
-    const total = queue.length;
-    let uploaded = 0, failed = 0;
-    SyncLogger.log('push', `🚀 executeSync: ${total} عنصر`);
-    this._updatePill('syncing', `جارٍ الرفع 0/${total}…`);
-
-    for(const item of queue){
-      try{
-        await this._uploadItem(item);
-        this._pendingQueue = this._pendingQueue.filter(e => e.key !== item.key);
-        this._saveQueue();
-        uploaded++;
-        SyncLogger.log('push', `↑ [${uploaded}/${total}] ${item.key}`);
-        this._updatePill('syncing', `جارٍ الرفع ${uploaded}/${total}…`);
-        SyncBrain._updatePendingBadge();
-      }catch(err){
-        failed++;
-        SyncLogger.log('error', `✗ فشل [${item.key}]: ${err.message}`);
-        const retries = item.retries || 0;
-        if(retries < this._MAX_RETRIES){
-          const backoff = Math.pow(2, retries) * 800;
-          await new Promise(r => setTimeout(r, backoff));
-          try{
-            await this._uploadItem(item);
-            this._pendingQueue = this._pendingQueue.filter(e => e.key !== item.key);
-            this._saveQueue();
-            uploaded++; failed--;
-          }catch(e2){
-            const qi = this._pendingQueue.findIndex(e => e.key === item.key);
-            if(qi >= 0) this._pendingQueue[qi].retries = retries + 1;
-            this._saveQueue();
-          }
-        }
-      }
-    }
-
-    this.isSyncRunning  = false;
-    this._lastSyncTime  = Date.now();
-
-    if(failed === 0){
-      this._updatePill('synced','Synced ✓');
-      SyncBrain._recordHistory('sync','success',`${uploaded} عنصر`);
-      SyncLogger.log('push',`✅ اكتملت المزامنة — ${uploaded}/${total}`);
-      if(manual) NotificationEngine.success('☁️ تمت المزامنة',`${uploaded} عنصر تم تأكيده`);
-    } else {
-      this._updatePill('conflict',`${failed} فشل`);
-      SyncBrain._recordHistory('sync','partial',`${uploaded} نجح، ${failed} فشل`);
-      if(manual) NotificationEngine.warning('مزامنة جزئية',`${uploaded} نجح، ${failed} في قائمة الانتظار`);
-    }
-    SyncBrain._updatePendingBadge();
-    SyncBrain._refreshSettingsPanel();
   },
 
-  // ─── forceSaveToCloud — يستدعي executeSync (للتوافق مع الأزرار القديمة) ──────
-  async forceSaveToCloud(){ return this.executeSync(true); },
+  async forceSaveToCloud(){ return this.executeSync(); },
+  forcePush(){ this.executeSync(); },
+  async runManualSync(){ return OperationLogger.run('SyncEngine.runManualSync', () => this.executeSync()); },
 
-  // ─── forcePush — يُستخدَم من أزرار الإعدادات ─────────────────────────────────
-  forcePush(btn){
-    if(this.isSyncRunning){
-      NotificationEngine.warning('جارٍ المزامنة','انتظر انتهاء العملية الحالية');
-      return;
-    }
-    const allBtns = document.querySelectorAll('#sync-save-btn, #settings-force-save');
-    allBtns.forEach(b => { b.disabled=true; b._orig=b.textContent; b.textContent='⏳…'; b.style.opacity='0.7'; });
-    const restore = () => allBtns.forEach(b => { b.disabled=false; b.textContent=b._orig||'☁️ Force Push'; b.style.opacity='1'; b._orig=null; });
-    this.executeSync(true).finally(restore);
+  flushSyncQueue(){
+    if(typeof DataService === 'undefined'){ this._computeRealState(); return; }
+    const cid = ClassManager.activeId();
+    DataService.pushLocalSnapshot(cid)
+      .then(() => DataService.flushOfflineQueue())
+      .then(() => { if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.scheduleRefresh(); })
+      .finally(() => {
+        try{ SyncBrain._updatePendingBadge(); }catch(e){}
+        this._computeRealState();
+      });
   },
 
-  // ─── runManualSync — wrapper للتوافق مع SyncBrain ────────────────────────────
-  async runManualSync(){
-    return OperationLogger.run('SyncEngine.runManualSync', () => this.executeSync(false));
-  },
-
-  // ─── _computeRealState — المصدر الوحيد لحالة الـ pill ────────────────────────
   _computeRealState(){
     try{ if(typeof SyncBrain==='undefined') return; }catch(e){ return; }
-    if(!this._isOnline){ this._updatePill('offline','Offline'); SyncBrain._updatePendingBadge(); return; }
-    const hasCloud = !!(this._pb || this._db);
-    if(!hasCloud){
-      const q = this._pendingQueue.length;
-      this._updatePill('local', q > 0 ? `Local · ${q} queued` : 'Saved locally');
-      try{ SyncBrain._updatePendingBadge(); }catch(e){}
+    let pending = 0;
+    try{ if(typeof DataService !== 'undefined') pending = DataService.getQueueLength(); }catch(e){}
+    if(!this._isOnline){
+      this._updatePill('offline', pending ? `Offline · ${pending} queued` : 'Offline');
+      SyncBrain._updatePendingBadge();
       return;
     }
-    if(this._activeWrites > 0){
-      const q = this._pendingQueue.length;
-      this._updatePill('syncing', q > 0 ? `Uploading… (${q} queued)` : `Uploading ${this._activeWrites}…`);
-      SyncBrain._updatePendingBadge(); return;
+    if(!this._supabase){
+      this._updatePill('local', pending ? `Local · ${pending} queued` : 'Saved locally');
+      SyncBrain._updatePendingBadge();
+      return;
     }
-    const debounced = Object.keys(this._debounceMap||{}).length;
-    const pending   = this._pendingQueue.length;
-    if(debounced > 0 || pending > 0){
-      this._updatePill('syncing', `${debounced+pending} change${(debounced+pending)!==1?'s':''} pending…`);
-      SyncBrain._updatePendingBadge(); return;
+    if(this.isSyncRunning){
+      this._updatePill('synced','Realtime…');
+      SyncBrain._updatePendingBadge();
+      return;
     }
-    const ts  = this._lastSyncTime
+    const ts = this._lastSyncTime
       ? new Date(this._lastSyncTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
       : null;
-    this._updatePill('synced', ts ? `Synced ✓ ${ts}` : 'Synced ✓');
+    this._updatePill('synced', pending ? `Realtime · ${pending} queued` : (ts ? `Realtime ${ts}` : 'Realtime'));
     SyncBrain._updatePendingBadge();
   },
 
-  // ─── _onLocalWrite — يُستدعى من StorageManager عند كل تغيير ─────────────────
   _onLocalWrite(key, val){
     if(this._pullInProgress) return;
-    const payload = { _data: val, _lastUpdated: Date.now(), _device: this._deviceId() };
-    if(!this._pb || !this._isOnline){ this._enqueue(key, payload); this._computeRealState(); return; }
-    const delay = this._CRITICAL_KEYS.some(ck => key.startsWith(ck)) ? this._DEBOUNCE_CRITICAL : this._DEBOUNCE_NORMAL;
-    this._storeLocalTimestamp(key, payload._lastUpdated);
-    clearTimeout(this._debounceMap[key]);
-    this._debounceMap[key] = setTimeout(() => { delete this._debounceMap[key]; this._directWrite(key, payload); }, delay);
+    if(typeof DataService !== 'undefined' && DataService.onLocalStorageWrite){
+      DataService.onLocalStorageWrite(key, val);
+    }
+    this._lastSyncTime = Date.now();
     this._computeRealState();
   },
 
-  // ─── _directWrite — كتابة مباشرة إلى PocketBase (بعد الـ debounce) ───────────
-  async _directWrite(key, payload){
-    if(!this._pb) return;
-    this._activeWrites++;
-    this._computeRealState();
-    try{
-      // Extract actual app data — payload = { _data: value, _lastUpdated, _device }
-      const appData = (payload && payload._data !== undefined) ? payload._data : payload;
-      const data = {
-        key,
-        data:       appData,        // JSON field — send object/array, NOT JSON.stringify
-        device:     this._deviceId(),
-        updated_at: Date.now(),     // Number field — Unix ms, NOT ISO string
-      };
-      // Filter-based upsert — never use key as PocketBase record ID
-      let existing = null;
-      try{ existing = await this._pb.collection(this._collection).getFirstListItem(`key="${key}"`); }catch(_){}
-      if(existing){ await this._pb.collection(this._collection).update(existing.id, data); }
-      else { await this._pb.collection(this._collection).create(data); }
-      delete this._retryMap[key];
-      SyncLogger.log('push',`↑ ${key}`);
-    }catch(err){
-      // Log PocketBase field-level validation details if available
-      if(err.data && Object.keys(err.data).length){
-        console.error('[SyncEngine] PocketBase field errors:', JSON.stringify(err.data));
-      }
-      SyncLogger.log('error',`✗ ${key}: ${err.message}`);
-      this._handleWriteError(key, payload, err);
-    }finally{
-      this._activeWrites = Math.max(0, this._activeWrites-1);
-      this._computeRealState();
-    }
-  },
-
-  // ─── _handleWriteError — retry مع exponential backoff ────────────────────────
-  _handleWriteError(key, payload, err){
-    const retries = this._retryMap[key] || 0;
-    SyncLogger.log('error',`✗ فشل (${key}) — محاولة ${retries+1}: ${err.message}`);
-    if(retries < this._MAX_RETRIES){
-      this._retryMap[key] = retries+1;
-      const backoff = Math.pow(2, retries)*800;
-      setTimeout(() => this._directWrite(key, payload), backoff);
-    } else {
-      delete this._retryMap[key];
-      this._enqueue(key, payload);
-      this._updatePill('conflict','Sync error');
-      NotificationEngine.danger('Sync Error',`تعذّر رفع ${key} — أُضيف إلى قائمة الانتظار`);
-    }
-  },
-
-  // ─── _enqueue — إضافة للقائمة عبر SyncBrain (للأولوية) ──────────────────────
-  _enqueue(key, payload){
-    if(typeof SyncBrain !== 'undefined' && SyncBrain.enqueue){ SyncBrain.enqueue(key, payload); }
-    else {
-      this._pendingQueue = this._pendingQueue.filter(e => e.key !== key);
-      this._pendingQueue.push({ key, payload, queuedAt: Date.now() });
-      this._saveQueue();
-    }
-  },
-
-  _saveQueue(){ try{ localStorage.setItem('ep_sync_queue', JSON.stringify(this._pendingQueue)); }catch(e){} },
-  _loadQueue(){
-    try{
-      const q = JSON.parse(localStorage.getItem('ep_sync_queue')||'[]');
-      this._pendingQueue = Array.isArray(q) ? q : [];
-      if(this._pendingQueue.length) SyncLogger.log('info',`📦 ${this._pendingQueue.length} عنصر في قائمة الانتظار`);
-    }catch(e){ this._pendingQueue=[]; }
-  },
-
-  _flushQueue(){
-    if(!this._pb || !this._isOnline || !this._pendingQueue.length){ this._computeRealState(); return; }
-    SyncLogger.log('push',`🚀 تفريغ القائمة — ${this._pendingQueue.length} عنصر`);
-    this.executeSync(false);
-  },
-
-  // ─── مراقبة الشبكة ────────────────────────────────────────────────────────────
   _watchNetwork(){
     window.addEventListener('online', () => {
       this._isOnline = true;
-      SyncLogger.log('info','🌐 عاد الاتصال بالإنترنت');
-      NotificationEngine.success('Back Online','☁️ جارٍ مزامنة التغييرات المعلّقة…');
+      SyncLogger.log('info','🌐 Back online');
+      NotificationEngine.success('Back online','Syncing pending changes…');
       document.getElementById('offline-banner')?.classList.remove('visible');
-      if(this._pb) setTimeout(() => this.executeSync(false), 500);
-      else this._computeRealState();
+      try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain._setConnStatus('connecting','🟡 Connecting…'); }catch(e){}
+      if(typeof DataService !== 'undefined'){
+        DataService.flushOfflineQueue().then(() => {
+          if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.scheduleRefresh();
+        }).catch(()=>{});
+      }
+      this.flushSyncQueue();
+      this._computeRealState();
     });
     window.addEventListener('offline', () => {
       this._isOnline = false;
-      SyncLogger.log('info','🔴 انقطع الاتصال بالإنترنت');
-      NotificationEngine.warning('Offline','التغييرات محفوظة وستُزامَن عند عودة الاتصال');
+      SyncLogger.log('info','🔴 Offline');
+      NotificationEngine.warning('Offline','Edits saved locally');
       this._updatePill('offline','Offline');
+      try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain._setConnStatus('offline','🔴 Offline'); }catch(e){}
       document.getElementById('offline-banner')?.classList.add('visible');
-      Object.keys(this._debounceMap).forEach(k => { clearTimeout(this._debounceMap[k]); delete this._debounceMap[k]; });
+      this._computeRealState();
     });
   },
 
@@ -11213,7 +10972,9 @@ const SyncEngine = {
   },
   _updateOfflineBanner(){
     const el = document.getElementById('offline-queue-count');
-    if(el){ el.textContent = this._pendingQueue.length > 0 ? `(${this._pendingQueue.length} في الانتظار)` : ''; }
+    let n = 0;
+    try{ if(typeof DataService !== 'undefined') n = DataService.getQueueLength(); }catch(e){}
+    if(el) el.textContent = n > 0 ? `(${n} queued)` : '';
   },
   _refreshAffectedUI(key){
     if(!key.startsWith('ep_students')&&!key.startsWith('ep_events')) return;
@@ -11226,18 +10987,18 @@ const SyncEngine = {
     try{UI.renderInsights();UI.renderMiniLeaderboard();UI._refreshHeaderStats();}catch(e){}
   },
 
-  // ─── Timestamps وDeviceId ──────────────────────────────────────────────────────
+  // ─── Timestamps and DeviceId ──────────────────────────────────────────────────
   _TS_KEY: 'ep_sync_timestamps',
   _storeLocalTimestamp(key, ts){ try{ const m=JSON.parse(localStorage.getItem(this._TS_KEY)||'{}'); m[key]=ts||Date.now(); localStorage.setItem(this._TS_KEY,JSON.stringify(m)); }catch(e){} },
   _getLocalTimestamp(key){ try{ return JSON.parse(localStorage.getItem(this._TS_KEY)||'{}')[key]||0; }catch(e){return 0;} },
   _deviceId(){ let id=localStorage.getItem('ep_device_id'); if(!id){id='dev_'+Math.random().toString(36).slice(2,10);localStorage.setItem('ep_device_id',id);} return id; },
 
-  // ─── خطأ الاتصال ──────────────────────────────────────────────────────────────
-  _pbError(msg){
+  // ─── Error handler ────────────────────────────────────────────────────────────
+  _sbError(msg){
     this._updatePill('conflict','Error');
     this._updateFbStatusRow('error','❌ '+msg);
     SyncLogger.log('error','🚨 '+msg);
-    NotificationEngine.danger('PocketBase Error', msg);
+    NotificationEngine.danger('Supabase Error', msg);
     console.error('[SyncEngine]', msg);
   },
 
@@ -11250,33 +11011,29 @@ const SyncEngine = {
           <span class="sl-msg">${l.msg}</span>
           <span class="sl-time">${new Date(l.ts).toLocaleTimeString()}</span>
         </div>`).join('')
-      : '<div class="sync-log-empty">لا توجد سجلات بعد</div>';
+      : '<div class="sync-log-empty">No logs yet</div>';
 
-    const queueInfo = this._pendingQueue.length
+    let qn = 0;
+    try{ if(typeof DataService !== 'undefined') qn = DataService.getQueueLength(); }catch(e){}
+    const queueInfo = qn
       ? `<div style="padding:8px 10px;background:var(--orange-dim);border-radius:6px;font-size:11px;color:var(--orange);margin-bottom:10px">
-           📥 ${this._pendingQueue.length} في قائمة الانتظار ${SyncBrain._isVacationMode()?' · 🏖 وضع الإجازة':''}
+           📥 ${qn} operation(s) queued for next online flush
          </div>` : '';
 
-    const brainInfo = (()=>{
-      const rate=SyncBrain.getSuccessRate(); const cfg=SyncBrain._getConfig();
-      return `<div style="padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:11px;color:var(--text-muted);margin-bottom:10px;display:flex;gap:12px;flex-wrap:wrap">
-        ${cfg.autoSyncEnabled?'<span style="color:var(--green)">🤖 Auto-sync ON · كل '+cfg.autoSyncIntervalMin+'د</span>':'<span>🤖 Auto-sync OFF</span>'}
-        ${rate!==null?'<span style="color:var(--accent)">✅ '+rate+'% نجاح</span>':''}
-        ${this._pb?'<span style="color:var(--green)">🌐 PocketBase متصل</span>':'<span style="color:var(--text-muted)">🌐 غير متصل</span>'}
+    const brainInfo = `<div style="padding:8px 10px;background:var(--bg-elevated);border-radius:6px;font-size:11px;color:var(--text-muted);margin-bottom:10px">
+        ${this._supabase?'<span style="color:var(--green)">🛰 Realtime channel <code>edupulse-sync</code></span>':'<span>Not connected — enter Supabase credentials in Settings</span>'}
       </div>`;
-    })();
 
     UI._openModal({
-      title:'📡 سجل المزامنة',size:'sm',
+      title:'📡 Sync Log',size:'sm',
       body:`${queueInfo}${brainInfo}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:11px;color:var(--text-muted)">آخر ${logs.length} سجل</div>
-          <button class="btn btn-xs btn-ghost" onclick="SyncEngine.clearLog();App.closeModal()">مسح</button>
+          <div style="font-size:11px;color:var(--text-muted)">Last ${logs.length} entries</div>
+          <button class="btn btn-xs btn-ghost" onclick="SyncEngine.clearLog();App.closeModal()">Clear</button>
         </div>
         <div class="sync-log-list" style="max-height:300px">${items}</div>`,
       actions:[
-        {label:'إغلاق',class:'btn-ghost',onclick:'App.closeModal()'},
-        {label:'⬆ مزامنة الآن',class:'btn-primary',onclick:"App.closeModal();SyncEngine.executeSync(true)"},
+        {label:'Close',class:'btn-ghost',onclick:'App.closeModal()'},
       ],
     });
   },
@@ -11285,7 +11042,7 @@ const SyncEngine = {
     const el=document.getElementById('sync-log-list-settings');
     if(!el) return;
     const logs=SyncLogger.getLogs();
-    if(!logs.length){el.innerHTML='<div class="sync-log-empty">لا توجد سجلات بعد</div>';return;}
+    if(!logs.length){el.innerHTML='<div class="sync-log-empty">No sync activity yet</div>';return;}
     el.innerHTML=logs.map(l=>`<div class="sync-log-item ${l.type}">
       <span class="sl-icon">${{push:'↑',pull:'↓',conflict:'⚔️',error:'✗',info:'ℹ'}[l.type]||'·'}</span>
       <span class="sl-msg">${l.msg}</span>
@@ -11319,83 +11076,28 @@ const SyncBrain = {
     return 'other';
   },
 
-  // ── Priority queue (extends SyncEngine._pendingQueue entries) ─────────────────
-  // Wraps _enqueue to attach priority metadata
-  enqueue(key, payload){
-    // Remove existing entry for this key — keep latest
-    SyncEngine._pendingQueue = SyncEngine._pendingQueue.filter(e => e.key !== key);
-    SyncEngine._pendingQueue.push({
-      key,
-      payload,
-      queuedAt:  Date.now(),
-      priority:  this._keyPriority(key),
-      changeType:this._changeType(key),
-      retries:   0,
-    });
-    // Sort HIGH → LOW before save so flush always picks most critical first
-    SyncEngine._pendingQueue.sort((a,b) => b.priority - a.priority);
-    SyncEngine._saveQueue();
-    SyncEngine._updateOfflineBanner();
-    this._updatePendingBadge();
-    SyncLogger.log('info', `📥 [${this._changeType(key).toUpperCase()}] queued (priority:${this._keyPriority(key)}) — queue:${SyncEngine._pendingQueue.length}`);
+  enqueue(){
+    /* Legacy: offline queue is DataService (ep_rt_pending_ops) */
   },
 
   // ── Pending count badge ───────────────────────────────────────────────────────
   _updatePendingBadge(){
-    const n   = SyncEngine._pendingQueue.length;
+    let n = 0;
+    try{ if(typeof DataService !== 'undefined') n = DataService.getQueueLength(); }catch(e){}
     const el  = document.getElementById('sync-pending-badge');
     if(!el) return;
     el.textContent  = n > 0 ? n : '';
     el.style.display= n > 0 ? 'inline-flex' : 'none';
   },
 
-  // ── "Push Now" — smart flush (only if pending, otherwise informs teacher) ─────
-  async pushNow(btn){
-    const pending      = SyncEngine._pendingQueue.length;
-    const hasDebounced = Object.keys(SyncEngine._debounceMap||{}).length;
-    const hasCloud     = !!(SyncEngine._pb || SyncEngine._db);
-
-    if(pending === 0 && !hasDebounced){
-      NotificationEngine.info('✅ All Synced', 'No pending changes — everything is already up to date.');
-      return;
-    }
-    if(!hasCloud){
-      NotificationEngine.warning('Not Connected',
-        `${pending} change${pending!==1?'s':''} queued — connect PocketBase in Settings to sync.`);
-      return;
-    }
-    NotificationEngine.info('⬆ Syncing…', `Flushing ${pending} pending change${pending!==1?'s':''}…`);
-    if(btn){ btn.disabled=true; btn._orig=btn.textContent; btn.textContent='⏳…'; }
-    const restore = () => { if(btn){ btn.disabled=false; btn.textContent=btn._orig||'⬆ Push Now'; } };
-    try{
-      await SyncEngine.executeSync(true);
-    }finally{
-      restore();
-      this._updatePendingBadge();
-      try{ SyncEngine._computeRealState(); }catch(e){}
-    }
+  pushNow(){
+    /* Realtime mode: no manual push — kept for legacy callers */
   },
 
-  // ── Auto-Sync scheduler ───────────────────────────────────────────────────────
   _autoTimer: null,
 
   startAutoSync(){
-    this.stopAutoSync();
-    const cfg = this._getConfig();
-    if(!cfg.autoSyncEnabled) return;
-    const ms = Math.max(60000, (cfg.autoSyncIntervalMin || 15) * 60 * 1000); // minimum 1 min
-    this._autoTimer = setInterval(async () => {
-      if(document.hidden) return;
-      if(this._isVacationMode()) return;
-      const hasCloud = !!(SyncEngine._pb || SyncEngine._db);
-      if(!hasCloud || !SyncEngine._isOnline) return;
-      if(SyncEngine._pendingQueue.length === 0 && Object.keys(SyncEngine._debounceMap||{}).length === 0) return;
-      SyncLogger.log('info', '🤖 Auto-sync triggered');
-      try{ await SyncEngine.executeSync(false); }catch(e){ SyncLogger.log('error','Auto-sync error: '+e.message); }
-      this._updatePendingBadge();
-      this._recordHistory('auto', SyncEngine._pendingQueue.length === 0 ? 'success' : 'partial');
-    }, ms);
-    SyncLogger.log('info', `🤖 Auto-sync enabled — every ${cfg.autoSyncIntervalMin||15}min`);
+    /* Disabled: sync is event-driven (Supabase Realtime + DataService debounce) */
   },
 
   stopAutoSync(){
@@ -11410,14 +11112,11 @@ const SyncBrain = {
   setVacationMode(on){
     if(on){
       localStorage.setItem('ep_sync_vacation','1');
-      this.stopAutoSync();
-      SyncLogger.log('info','🏖 Vacation mode ON — auto-sync paused');
-      NotificationEngine.info('Vacation Mode', 'Auto-sync paused. Force Push still works anytime.');
+      SyncLogger.log('info','🏖 Vacation flag set (legacy)');
+      NotificationEngine.info('Note','Realtime remains on; this flag is legacy only.');
     } else {
       localStorage.removeItem('ep_sync_vacation');
-      this.startAutoSync();
-      SyncLogger.log('info','▶ Vacation mode OFF — auto-sync resumed');
-      NotificationEngine.success('Auto-Sync Resumed','Background sync is active again.');
+      SyncLogger.log('info','▶ Vacation flag cleared');
     }
     this._refreshSettingsPanel();
   },
@@ -11433,9 +11132,7 @@ const SyncBrain = {
   saveConfig(patch){
     const cfg = { ...this._getConfig(), ...patch };
     localStorage.setItem(this._CFG_KEY, JSON.stringify(cfg));
-    this.stopAutoSync();
-    this.startAutoSync();
-    SyncLogger.log('info', `⚙ Sync config updated: ${JSON.stringify(patch)}`);
+    SyncLogger.log('info', `⚙ Sync config (legacy): ${JSON.stringify(patch)}`);
   },
 
   // ── Sync history / learning memory ───────────────────────────────────────────
@@ -11465,43 +11162,11 @@ const SyncBrain = {
 
   // ── Refresh settings panel controls ──────────────────────────────────────────
   _refreshSettingsPanel(){
-    const cfg      = this._getConfig();
-    const vacation = this._isVacationMode();
-
-    const toggle = document.getElementById('sb-auto-toggle');
-    const intEl  = document.getElementById('sb-interval');
-    const vacEl  = document.getElementById('sb-vacation');
-    const rateEl = document.getElementById('sb-success-rate');
-    const histEl = document.getElementById('sb-history');
-
-    if(toggle) toggle.checked = !!cfg.autoSyncEnabled;
-    if(intEl)  intEl.value   = cfg.autoSyncIntervalMin || 15;
-    if(vacEl)  vacEl.checked = vacation;
-
-    if(rateEl){
-      const rate = this.getSuccessRate();
-      const lastSync = SyncEngine._lastSyncTime
-        ? 'Last: ' + new Date(SyncEngine._lastSyncTime).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
-        : '';
-      rateEl.textContent = (rate !== null ? `${rate}% success · ` : '') + (lastSync || 'No sync history yet');
-    }
-
-    if(histEl){
-      const hist = this.getHistory(8);
-      if(!hist.length){ histEl.innerHTML='<div style="font-size:10px;color:var(--text-muted)">No history yet</div>'; return; }
-      histEl.innerHTML = hist.map(h=>{
-        const t   = new Date(h.ts);
-        const lbl = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-        const col = h.status==='success'?'var(--green)':h.status==='partial'?'var(--orange)':'var(--red)';
-        const ico = h.status==='success'?'✅':h.status==='partial'?'⚠️':'❌';
-        return `<div style="display:flex;gap:6px;align-items:center;font-size:10px;padding:2px 0;border-bottom:1px solid var(--border)">
-          <span>${ico}</span>
-          <span style="color:var(--text-muted);font-family:var(--mono)">${lbl}</span>
-          <span style="color:${col};font-weight:600">${h.status}</span>
-          <span style="color:var(--text-muted)">${h.trigger}</span>
-          ${h.detail?`<span style="color:var(--text-muted);margin-left:auto">${h.detail}</span>`:''}
-        </div>`;
-      }).join('');
+    const pc = document.getElementById('sb-pending-count');
+    if(pc){
+      let n = 0;
+      try{ if(typeof DataService !== 'undefined') n = DataService.getQueueLength(); }catch(e){}
+      pc.textContent = String(n);
     }
   },
 
@@ -11514,18 +11179,17 @@ const SyncBrain = {
   // ── Init ──────────────────────────────────────────────────────────────────────
   init(){
     this._hookSyncEngine();
-    this.startAutoSync();
     this._updatePendingBadge();
-    // Check on app focus
+    this._refreshSettingsPanel();
     document.addEventListener('visibilitychange', () => {
       if(!document.hidden){
         this._updatePendingBadge();
-        if(SyncEngine._pendingQueue.length > 0 && (SyncEngine._pb || SyncEngine._db) && SyncEngine._isOnline){
-          SyncEngine._flushQueue();
+        if(typeof DataService !== 'undefined' && DataService.getQueueLength() > 0 && SyncEngine._supabase && SyncEngine._isOnline){
+          SyncEngine.flushSyncQueue();
         }
       }
     });
-    SyncLogger.log('info', `🧠 SyncBrain ready — pending: ${SyncEngine._pendingQueue.length}`);
+    SyncLogger.log('info', '🧠 SyncBrain (realtime) ready');
   },
 };
 
@@ -11603,8 +11267,9 @@ const EduPulseGuardian = {
         if(!this._pillStuckSince) this._pillStuckSince = now;
         if(now - this._pillStuckSince > this._PILL_STUCK_MAX){
           this._pillStuckSince = 0;
-          const q = SyncEngine._pendingQueue.length;
-          const hasCloud = !!(SyncEngine._pb || SyncEngine._db);
+          let q = 0;
+          try{ if(typeof DataService !== 'undefined') q = DataService.getQueueLength(); }catch(e){}
+          const hasCloud = !!SyncEngine._supabase;
           if(hasCloud && SyncEngine._isOnline){
             try{ SyncEngine._computeRealState(); }catch(e){}
           } else {
@@ -11621,7 +11286,7 @@ const EduPulseGuardian = {
 
     // ── 4. Corrupted localStorage JSON entries ─────────────────────────
     // Only scan known app keys to stay lightweight
-    const keysToScan = ['ep_sync_queue','ep_sync_log','ep_sync_brain_cfg','ep_pb_creds'];
+    const keysToScan = ['ep_sync_queue','ep_rt_pending_ops','ep_sync_log','ep_sync_brain_cfg','ep_sb_creds'];
     keysToScan.forEach(k => {
       try{
         const raw = localStorage.getItem(k);
@@ -11707,35 +11372,7 @@ const SyncLogger = {
 };
 
 // -─ Auto-restore Firebase connection if credentials are saved ─────────────────
-// This runs after all modules are defined but before App.init()
-(()=>{
-  try{
-    const saved = localStorage.getItem('ep_pb_creds');
-    if(saved){
-      const creds = JSON.parse(saved);
-      if(creds.projectId && creds.apiKey){
-        // Restore input field values immediately (script runs after DOM is built)
-        // Use requestAnimationFrame to ensure the settings screen inputs exist in DOM
-        const restoreFields = () => {
-          const pEl = document.getElementById('fb-project-id');
-          const kEl = document.getElementById('fb-api-key');
-          const cEl = document.getElementById('fb-collection');
-          if(pEl) pEl.value = creds.projectId;
-          if(kEl) kEl.value = creds.apiKey;
-          if(cEl) cEl.value = creds.collection || 'edupulse';
-        };
-        // Fields may not exist yet if Settings screen hasn't rendered — try on DOMContentLoaded
-        if(document.readyState === 'loading'){
-          document.addEventListener('DOMContentLoaded', restoreFields, { once: true });
-        } else {
-          restoreFields();
-        }
-        // Auto-reconnect after app fully initialises (1.4s gives App.init() time to complete)
-        setTimeout(()=> SyncEngine.connectFirebase(creds.projectId, creds.apiKey, creds.collection), 1400);
-      }
-    }
-  }catch(e){}
-})();
+// Supabase credentials are auto-restored by SyncEngine.init() via ep_sb_creds.
 
 // -══════════════════════════════════════════════════════════════════════════════
 // ██████╗ ███╗   ██╗    ██╗      █████╗ ██╗   ██╗███████╗██████╗
@@ -15211,9 +14848,9 @@ const DataHub = {
 
       if(doSettings){
         ['ep_settings','ep_settings_class_default',`ep_settings_${cid}`,
-         'ep_pb_creds','ep_lesson_mode','ep_moods','ep_theme',
+         'ep_sb_creds','ep_lesson_mode','ep_moods','ep_theme',
          'ep_onboard_done','ep_pwa_dismissed','ep_nav_stack','ep_nav_ui_state',
-         'ep_weekly_reset','ep_sync_log','ep_sync_queue','ep_sync_timestamps',
+         'ep_weekly_reset','ep_sync_log','ep_sync_queue','ep_rt_pending_ops','ep_sync_timestamps',
         ].forEach(k => localStorage.removeItem(k));
         purged.push('settings');
       }
