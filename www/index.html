@@ -2556,7 +2556,10 @@ body.privacy-mode .hide-privacy{display:none!important}
 .mood-btn.active{opacity:1;background:rgba(255,255,255,.08);transform:scale(1.14)}
 
 /* ── QUICK EDIT DROPDOWN ────────────────────────────────── */
-.qe-dropdown{position:absolute;top:26px;right:0;z-index:var(--z-header);background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:5px;min-width:190px;box-shadow:0 16px 48px rgba(0,0,0,.75);animation:qeIn .15s cubic-bezier(.175,.885,.32,1.275)}
+/* Portal-mode: JS overrides position/top/left via inline style */
+.qe-dropdown{position:fixed;z-index:999999;background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:5px;min-width:190px;box-shadow:0 16px 48px rgba(0,0,0,.75);animation:qeIn .15s cubic-bezier(.175,.885,.32,1.275)}
+#global-dropdown-root{position:fixed;top:0;left:0;z-index:999998;pointer-events:none}
+#global-dropdown-root .qe-dropdown{pointer-events:all}
 @keyframes qeIn{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
 .qe-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:6px;font-size:11px;color:var(--text-secondary);cursor:pointer;transition:all var(--transition);white-space:nowrap}
 .qe-item:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -2687,10 +2690,9 @@ body.privacy-mode .hide-privacy{display:none!important}
 .tt-arrow-left   { right: -5px;  border-top: none; border-right: none; }
 .tt-arrow-right  { left: -5px;   border-bottom: none; border-left: none; }
 
-/* Mobile: no hover events, no tooltip needed */
-@media (max-width: 600px) {
-  #ep-tooltip { display: none; }
-}
+/* Tooltip always in render tree — JS controls visibility via .tt-visible class.
+   On touch devices the engine uses tap events, not hover.
+   pointer-events:none ensures it NEVER blocks buttons underneath. */
 
 /* ═══════════════════════════════════════════════════════════════
    ONBOARDING ENGINE — CSS
@@ -3196,6 +3198,9 @@ body.privacy-mode .hide-privacy{display:none!important}
 </style>
 </head>
 <body>
+
+<!-- -══════════════════════ PORTAL ROOTS ════════════════════════════════════ -->
+<div id="global-dropdown-root"></div>
 
 <!-- -══════════════════════ TOOLTIP ENGINE DOM ══════════════════════════════ -->
 <div id="ep-tooltip" role="tooltip" aria-live="polite">
@@ -9314,6 +9319,9 @@ const UI = {
 
   // -─ Modal helpers ──────────────────────────────────────────────────
   _openModal({title,body,size='',actions=[]}){
+    // Force-destroy tooltip and dropdown whenever a modal opens
+    TooltipEngine.forceHide();
+    QuickEdit.close();
     let existing=document.getElementById('app-modal-overlay');
     if(existing) existing.remove();
 
@@ -9972,6 +9980,7 @@ const MoodTracker = {
 const QuickEdit = {
   open(studentId, anchorEl, e){
     e.stopPropagation();
+    TooltipEngine.forceHide();
     this.close();
     const st = StudentManager.getById(studentId);
     if(!st) return;
@@ -10005,16 +10014,45 @@ const QuickEdit = {
       <div class="qe-item danger" onclick="QuickEdit._remove(${studentId})">
         <span style="font-size:13px">🗑</span> Remove Student
       </div>`;
-    anchorEl.style.position = 'relative';
-    anchorEl.appendChild(dd);
-    setTimeout(() => document.addEventListener('click', QuickEdit._outside, {once:true}), 10);
+
+    // ── PORTAL SYSTEM: append to global root, position with fixed coords ──
+    const portal = document.getElementById('global-dropdown-root') || document.body;
+    portal.appendChild(dd);
+
+    // Use the button element (trigger) to calculate position
+    const btn = e.currentTarget || e.target;
+    const rect = btn.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.zIndex   = '999999';
+    dd.style.top      = (rect.bottom + 4) + 'px';
+    dd.style.left     = rect.left + 'px';
+
+    // After render: prevent viewport overflow
+    requestAnimationFrame(() => {
+      const ddR = dd.getBoundingClientRect();
+      const vw  = window.innerWidth;
+      const vh  = window.innerHeight;
+      // Shift left if right edge overflows
+      if(ddR.right > vw - 8){
+        dd.style.left = Math.max(8, vw - ddR.width - 8) + 'px';
+      }
+      // Flip above button if bottom overflows
+      if(ddR.bottom > vh - 8){
+        dd.style.top = Math.max(8, rect.top - ddR.height - 4) + 'px';
+      }
+    });
+
+    setTimeout(() => document.addEventListener('click',  QuickEdit._outside, {once:true}), 10);
+    window.addEventListener('scroll', QuickEdit._onScroll, {once:true, capture:true, passive:true});
   },
 
   _outside(){ QuickEdit.close(); },
+  _onScroll(){ QuickEdit.close(); },
 
   close(){
     document.getElementById('qe-dd')?.remove();
-    document.removeEventListener('click', QuickEdit._outside);
+    document.removeEventListener('click',  QuickEdit._outside);
+    window.removeEventListener('scroll', QuickEdit._onScroll, {capture:true});
   },
 
   _editPhone(id){
@@ -12630,20 +12668,24 @@ const AIView = {
 // ─────────────────────────────────────────────────────────────────────────────
 const TooltipEngine = {
   // ── Private state ──────────────────────────────────────────────────────────
-  _el:        null,   // #ep-tooltip
-  _titleEl:   null,
-  _descEl:    null,
-  _tipEl:     null,
-  _arrowEl:   null,
-  _target:    null,   // element currently being hovered
-  _showTimer: null,
-  _hideTimer: null,
-  _active:    false,
-  DELAY:      180,    // ms before tooltip appears
-  GAP:        10,     // px gap between tooltip and element
-  PAD:        8,      // px minimum distance from viewport edge
+  _el:         null,   // #ep-tooltip
+  _titleEl:    null,
+  _descEl:     null,
+  _tipEl:      null,
+  _arrowEl:    null,
+  _target:     null,   // element currently being hovered / tapped
+  _showTimer:  null,
+  _hideTimer:  null,
+  _killTimer:  null,   // auto-kill safety timer (2500 ms)
+  _touchTimer: null,   // tap-show delay
+  _active:     false,
+  _isTouch:    false,  // true when device has touch input
+  DELAY:       180,    // ms before tooltip appears (hover)
+  TOUCH_DELAY: 50,     // ms before tooltip appears (tap)
+  GAP:         10,     // px gap between tooltip and element
+  PAD:         8,      // px minimum distance from viewport edge
 
-  // ── Init: attach single delegated listener to document.body ───────────────
+  // ── Init: attach delegated listeners; touch vs hover strategy ─────────────
   init(){
     this._el      = document.getElementById('ep-tooltip');
     this._titleEl = document.getElementById('ep-tt-title');
@@ -12656,30 +12698,63 @@ const TooltipEngine = {
       return;
     }
 
-    // Single global listener — handles all elements, static and dynamic
-    document.body.addEventListener('mouseover', e => {
-      const target = this._findTarget(e.target);
-      if(target){
-        if(target !== this._target) this._schedule(target);
-      } else {
-        if(this._target) this._cancelAndHide();
-      }
-    }, { passive: true });
+    this._isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-    document.body.addEventListener('mouseout', e => {
-      if(!this._target) return;
-      // Only hide if leaving to something outside the current target
-      const to = e.relatedTarget;
-      if(!to || (!this._target.contains(to) && to !== this._target)){
-        this._cancelAndHide();
-      }
-    }, { passive: true });
+    if(this._isTouch){
+      // ── TOUCH STRATEGY: tap to show, any-move/scroll/tap-elsewhere to hide ──
+      document.body.addEventListener('touchstart', e => {
+        const target = this._findTarget(e.target);
+        // Any touch destroys the current tooltip immediately
+        this.forceHide();
+        if(target){
+          this._target = target;
+          clearTimeout(this._touchTimer);
+          this._touchTimer = setTimeout(() => this._show(target), this.TOUCH_DELAY);
+        }
+      }, { passive: true });
 
-    window.addEventListener('scroll',   () => this._hide(), { passive: true, capture: true });
-    window.addEventListener('resize',   () => this._hide(), { passive: true });
-    document.addEventListener('mouseleave', () => this._hide());
+      document.body.addEventListener('touchend', () => {
+        clearTimeout(this._touchTimer);
+        // Short grace period so user can read the label, then auto-hide
+        this._hideTimer = setTimeout(() => this._hide(), 800);
+      }, { passive: true });
 
-    Logger.info('TooltipEngine', 'Initialized with event delegation');
+      document.body.addEventListener('touchcancel', () => {
+        clearTimeout(this._touchTimer);
+        this.forceHide();
+      }, { passive: true });
+
+    } else {
+      // ── HOVER STRATEGY (mouse / trackpad) ────────────────────────────────
+      document.body.addEventListener('mouseover', e => {
+        const target = this._findTarget(e.target);
+        if(target){
+          if(target !== this._target) this._schedule(target);
+        } else {
+          if(this._target) this._cancelAndHide();
+        }
+      }, { passive: true });
+
+      document.body.addEventListener('mouseout', e => {
+        if(!this._target) return;
+        const to = e.relatedTarget;
+        if(!to || (!this._target.contains(to) && to !== this._target)){
+          this._cancelAndHide();
+        }
+      }, { passive: true });
+
+      document.addEventListener('mouseleave', () => this._hide());
+    }
+
+    // ── GLOBAL FORCE-HIDE triggers (both touch and mouse) ──────────────────
+    // scroll anywhere → destroy tooltip immediately
+    window.addEventListener('scroll',  () => this.forceHide(), { passive: true, capture: true });
+    // window resize → destroy
+    window.addEventListener('resize',  () => this.forceHide(), { passive: true });
+    // any click anywhere → destroy (covers dropdown open, modal open, button tap)
+    document.addEventListener('click', () => this.forceHide(), { passive: true, capture: true });
+
+    Logger.info('TooltipEngine', `Initialized — mode: ${this._isTouch ? 'touch/tap' : 'hover'}`);
   },
 
   // Walk up from event.target to find a tooltip-enabled ancestor
@@ -12713,30 +12788,33 @@ const TooltipEngine = {
     const data = this._read(el);
     if(!data.desc && !data.title) return;
 
+    // Destroy any existing tooltip before creating the new one
+    this._el.classList.remove('tt-visible');
+    clearTimeout(this._killTimer);
+
     // Populate content
     if(data.title){
-      this._titleEl.textContent  = data.title;
+      this._titleEl.textContent   = data.title;
       this._titleEl.style.display = '';
     } else {
       this._titleEl.style.display = 'none';
     }
 
     if(data.desc){
-      this._descEl.textContent   = data.desc;
+      this._descEl.textContent    = data.desc;
       this._descEl.style.display  = '';
     } else {
       this._descEl.style.display  = 'none';
     }
 
     if(data.tip){
-      this._tipEl.textContent    = data.tip;
+      this._tipEl.textContent     = data.tip;
       this._tipEl.style.display   = '';
     } else {
       this._tipEl.style.display   = 'none';
     }
 
     // Move off-screen so it can be measured, remove visible class
-    this._el.classList.remove('tt-visible');
     this._el.style.top  = '-9999px';
     this._el.style.left = '-9999px';
 
@@ -12745,12 +12823,16 @@ const TooltipEngine = {
       this._position(el);
       this._el.classList.add('tt-visible');
       this._active = true;
+
+      // AUTO-KILL SAFETY TIMER — tooltip never stays longer than 2.5 s
+      this._killTimer = setTimeout(() => this.forceHide(), 2500);
     });
   },
 
   // Hide the tooltip
   _hide(){
     if(!this._el) return;
+    clearTimeout(this._killTimer);
     this._el.classList.remove('tt-visible');
     this._active = false;
     clearTimeout(this._showTimer);
@@ -12844,7 +12926,14 @@ const TooltipEngine = {
   },
 
   // -─ Public API ─────────────────────────────────────────────────────────────
-  forceHide(){ clearTimeout(this._showTimer); this._target = null; this._hide(); },
+  forceHide(){
+    clearTimeout(this._showTimer);
+    clearTimeout(this._touchTimer);
+    clearTimeout(this._killTimer);
+    clearTimeout(this._hideTimer);
+    this._target = null;
+    this._hide();
+  },
   showForOnboarding(el, data){ if(el && data) this._show(el); },
 
   // Kept for backward compat — no-ops since delegation handles everything
