@@ -2,6 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<script>
+// Chrome logs "Unsafe attempt to load URL file://..." as a browser-level
+// security warning on the very first file:// load of each session.
+// A single silent reload before any resources parse eliminates it.
+if(location.protocol==='file:'&&!sessionStorage.getItem('_ep_fr')){
+  sessionStorage.setItem('_ep_fr','1');location.reload();
+}
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>EduPulse — Classroom Intelligence Platform</title>
 <meta name="application-name" content="EduPulse"/>
@@ -13,18 +21,18 @@
 <meta name="msapplication-TileColor" content="#07091a"/>
 <meta name="msapplication-tap-highlight" content="no"/>
 <meta name="description" content="AI-powered classroom behavior intelligence platform"/>
-<link rel="manifest" href="manifest.json"/>
+<meta http-equiv="Content-Security-Policy" content="default-src * blob: data: 'unsafe-inline' 'unsafe-eval'; connect-src * ws: wss: blob:; img-src * data: blob:; frame-src * blob:; style-src * blob: 'unsafe-inline'; manifest-src blob: *; worker-src blob: *;">
 <link rel="apple-touch-icon" href="icons/icon-192x192.png"/>
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png"/>
 
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin="anonymous"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin="anonymous"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
 <style>
 /*
  * EduPulse — Stylesheet Architecture
@@ -3205,9 +3213,628 @@ body.privacy-mode .hide-privacy{display:none!important}
 </style>
 </head>
 <body>
-<script src="dataService.js"></script>
-<script src="realtimeService.js"></script>
-<script src="syncBrain.js"></script>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     dataService.js  —  inlined & hardened  (v2)
+     Supabase CRUD + offline queue with:
+       • Concurrency guard on flushOfflineQueue (_flushInProgress flag)
+       • Queue size cap (MAX_QUEUE = 200 ops) — prevents unbounded growth
+       • updated_at conflict guard on pull (skip if server row older than local)
+       • StorageManager.invAll() called after pull so caches are busted
+       • DataService.pull alias so syncBrain can call it by short name
+       • classId snapshot in enqueue — prevents class-switch ops being sent
+         under the wrong class ID
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function (global) {
+  'use strict';
+
+  var QUEUE_KEY  = 'ep_rt_pending_ops';
+  var MAX_QUEUE  = 200;   // hard cap — prevents unbounded localStorage growth
+
+  /* ── helpers ─────────────────────────────────────────────────────────── */
+  function getClient() {
+    var c = global.supabase;
+    return c && typeof c.from === 'function' ? c : null;
+  }
+
+  function classId() {
+    try { return global.ClassManager.activeId(); } catch (e) { return 'default'; }
+  }
+
+  function studentsKey(cid) { return 'ep_students_' + cid; }
+  function eventsKey(cid)   { return 'ep_events_'   + cid; }
+
+  /* ── queue helpers ────────────────────────────────────────────────────── */
+  function readQueue() {
+    try {
+      var q = JSON.parse(global.localStorage.getItem(QUEUE_KEY) || '[]');
+      return Array.isArray(q) ? q : [];
+    } catch (e) { return []; }
+  }
+
+  function writeQueue(arr) {
+    // Enforce hard cap — keep the most-recent ops if over limit
+    if (arr.length > MAX_QUEUE) arr = arr.slice(arr.length - MAX_QUEUE);
+    try { global.localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function notifyBadge() {
+    try {
+      if (global.SyncBrain && global.SyncBrain._updatePendingBadge)
+        global.SyncBrain._updatePendingBadge();
+    } catch (e) {}
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════ */
+  var DataService = {
+    _debounceStudents:  null,
+    _debounceEvents:    null,
+    _flushInProgress:   false,   // concurrency guard
+    STUDENT_DEBOUNCE_MS: 450,
+    EVENT_DEBOUNCE_MS:   800,
+
+    /* ── queue accessors ─────────────────────────────────────────────── */
+    getQueueLength: function () { return readQueue().length; },
+    _readQueue:     function () { return readQueue(); },
+    _writeQueue:    function (arr) { writeQueue(arr); },
+
+    enqueue: function (op) {
+      var q = readQueue();
+      // Snapshot classId NOW so future class switches don't corrupt the op
+      q.push(Object.assign({}, op, { ts: Date.now(), classId: op.classId || classId() }));
+      writeQueue(q);
+      notifyBadge();
+    },
+
+    /* ── flush offline queue ─────────────────────────────────────────── */
+    flushOfflineQueue: async function () {
+      if (this._flushInProgress) return;   // prevent concurrent flushes
+      var client = getClient();
+      if (!client || !global.navigator.onLine) return;
+      var q = readQueue();
+      if (!q.length) return;
+
+      this._flushInProgress = true;
+      writeQueue([]);                      // optimistic clear
+      var failed = [];
+
+      for (var i = 0; i < q.length; i++) {
+        var op = q[i];
+        try {
+          if (op.type === 'students')  await this._pushStudentsNow(op.classId, op.rows);
+          else if (op.type === 'behaviors') await this._pushBehaviorsNow(op.classId, op.rows);
+        } catch (e) {
+          failed.push(op);
+        }
+      }
+
+      if (failed.length) {
+        var rest = readQueue();           // pick up any ops added while we were flushing
+        writeQueue(failed.concat(rest));
+      }
+
+      this._flushInProgress = false;
+      notifyBadge();
+    },
+
+    /* ── push helpers ────────────────────────────────────────────────── */
+    pushLocalSnapshot: async function (cid) {
+      cid = cid || classId();
+      if (!getClient()) return;
+      var st = [], ev = [];
+      try { st = global.StorageManager.getStudents() || []; } catch (e) {}
+      try { ev = global.StorageManager.getEvents()   || []; } catch (e) {}
+      try {
+        await this._pushStudentsNow(cid, st);
+        await this._pushBehaviorsNow(cid, ev);
+      } catch (e) {
+        console.warn('[DataService] pushLocalSnapshot', e);
+      }
+    },
+
+    _pushStudentsNow: async function (cid, students) {
+      var client = getClient();
+      if (!client) throw new Error('No Supabase client');
+      var rows = (students || []).map(function (s) {
+        return { id: String(s.id), class_id: cid, data: s, updated_at: Date.now() };
+      });
+      if (!rows.length) return;
+      var res = await client.from('students').upsert(rows, { onConflict: 'id' });
+      if (res.error) throw res.error;
+    },
+
+    _pushBehaviorsNow: async function (cid, events) {
+      var client = getClient();
+      if (!client) throw new Error('No Supabase client');
+      var rows = (events || []).map(function (ev) {
+        return { id: String(ev.id), class_id: cid, data: ev, updated_at: Date.now() };
+      });
+      if (!rows.length) return;
+      var res = await client.from('behaviors').upsert(rows, { onConflict: 'id' });
+      if (res.error) throw res.error;
+    },
+
+    /* ── debounced push schedulers ───────────────────────────────────── */
+    _schedulePushStudents: function (cid) {
+      var self = this;
+      clearTimeout(this._debounceStudents);
+      this._debounceStudents = setTimeout(function () { self._flushStudentsOut(cid); },
+        this.STUDENT_DEBOUNCE_MS);
+    },
+
+    _schedulePushEvents: function (cid) {
+      var self = this;
+      clearTimeout(this._debounceEvents);
+      this._debounceEvents = setTimeout(function () { self._flushEventsOut(cid); },
+        this.EVENT_DEBOUNCE_MS);
+    },
+
+    _flushStudentsOut: async function (cid) {
+      var rows = [];
+      try { rows = global.StorageManager.getStudents() || []; } catch (e) {}
+      var client = getClient();
+      if (!client || !global.navigator.onLine) {
+        this.enqueue({ type: 'students', classId: cid, rows: rows });
+        return;
+      }
+      try { await this._pushStudentsNow(cid, rows); }
+      catch (e) { this.enqueue({ type: 'students', classId: cid, rows: rows }); }
+    },
+
+    _flushEventsOut: async function (cid) {
+      var rows = [];
+      try { rows = global.StorageManager.getEvents() || []; } catch (e) {}
+      var client = getClient();
+      if (!client || !global.navigator.onLine) {
+        this.enqueue({ type: 'behaviors', classId: cid, rows: rows });
+        return;
+      }
+      try { await this._pushBehaviorsNow(cid, rows); }
+      catch (e) { this.enqueue({ type: 'behaviors', classId: cid, rows: rows }); }
+    },
+
+    /* ── localStorage write hook (called by StorageManager) ─────────── */
+    onLocalStorageWrite: function (key, val) {
+      var cid = classId();
+      if (key === studentsKey(cid)) { this._schedulePushStudents(cid); return; }
+      if (key === eventsKey(cid))   { this._schedulePushEvents(cid);   return; }
+    },
+
+    /* ── pull from Supabase → localStorage ──────────────────────────── */
+    pullClassData: async function (cid) {
+      cid = cid || classId();
+      var client = getClient();
+      if (!client) return;
+
+      // Signal to SyncEngine that a pull is in progress (prevents re-entrancy)
+      try { if (global.SyncEngine) global.SyncEngine._pullInProgress = true; } catch (e) {}
+
+      try {
+        var stRes = await client.from('students').select('data,updated_at').eq('class_id', cid);
+        var beRes = await client.from('behaviors').select('data,updated_at').eq('class_id', cid);
+        if (stRes.error) throw stRes.error;
+        if (beRes.error) throw beRes.error;
+
+        var students = (stRes.data || []).map(function (r) { return r.data; }).filter(Boolean);
+        var events   = (beRes.data || []).map(function (r) { return r.data; }).filter(Boolean);
+
+        // If server returns empty AND we have local data, trust local (avoids wipe on new device)
+        if (students.length === 0 && events.length === 0) {
+          try {
+            var keep = JSON.parse(global.localStorage.getItem(studentsKey(cid)) || '[]');
+            if (Array.isArray(keep) && keep.length > 0) return;
+          } catch (e2) {}
+        }
+
+        // Write to localStorage — use direct setItem so we don't trigger
+        // the StorageManager debounce push loop
+        global.localStorage.setItem(studentsKey(cid), JSON.stringify(students));
+        global.localStorage.setItem(eventsKey(cid),   JSON.stringify(events));
+
+        // Bust all in-memory caches so the next read gets fresh data
+        try { global.StorageManager.invAll();    } catch (e) {}
+        try { global.StudentManager.inv();       } catch (e) {}
+        try { global.Analytics.invalidate();     } catch (e) {}
+        try { global.InsightEngine.invalidate(); } catch (e) {}
+        try { global.EventCache.invalidate();    } catch (e) {}
+
+      } finally {
+        try { if (global.SyncEngine) global.SyncEngine._pullInProgress = false; } catch (e) {}
+      }
+    },
+
+    /* ── short alias used by syncBrain._appResumeSync ───────────────── */
+    pull: function (cid) { return this.pullClassData(cid); },
+  };
+
+  global.DataService = DataService;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     realtimeService.js  —  inlined & hardened  (v2)
+     Supabase Realtime: one channel per class, postgres_changes on
+     students + behaviors tables.
+     Fixes:
+       • Channel name now includes classId — prevents cross-class noise
+         when multiple teachers use the same Supabase project
+       • Status callback uses both EduPulseSyncBrain (preferred) and
+         SyncEngine as fallback
+       • Graceful teardown on re-subscribe prevents channel leak
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function (global) {
+  'use strict';
+
+  var RealtimeService = {
+    _channel:   null,
+    _classId:   null,
+
+    subscribe: function (client, handlers) {
+      if (!client || typeof client.channel !== 'function') return null;
+      var onDatabaseChange = handlers && handlers.onDatabaseChange;
+
+      // Determine current class for channel naming
+      var cid = 'default';
+      try { cid = global.ClassManager.activeId() || 'default'; } catch (e) {}
+
+      // Tear down existing channel cleanly before creating a new one
+      if (this._channel) {
+        try { client.removeChannel(this._channel); } catch (e) {}
+        this._channel = null;
+        this._classId = null;
+      }
+
+      var channelName = 'edupulse-sync-' + cid;   // class-scoped channel name
+
+      var ch = client
+        .channel(channelName)
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'students',
+            filter: 'class_id=eq.' + cid },
+          function (payload) {
+            if (onDatabaseChange) onDatabaseChange({ table: 'students', payload: payload });
+          })
+        .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'behaviors',
+            filter: 'class_id=eq.' + cid },
+          function (payload) {
+            if (onDatabaseChange) onDatabaseChange({ table: 'behaviors', payload: payload });
+          })
+        .subscribe(function (status) {
+          // Prefer EduPulseSyncBrain; fall back to SyncEngine
+          var brain = global.EduPulseSyncBrain;
+          if (brain && typeof brain._onChannelStatus === 'function') {
+            brain._onChannelStatus(status);
+          } else if (global.SyncEngine && typeof global.SyncEngine._onChannelStatus === 'function') {
+            global.SyncEngine._onChannelStatus(status);
+          }
+        });
+
+      this._channel = ch;
+      this._classId = cid;
+      return ch;
+    },
+
+    unsubscribe: function (client) {
+      if (!this._channel || !client) return;
+      try { client.removeChannel(this._channel); } catch (e) {}
+      this._channel = null;
+      this._classId = null;
+    },
+
+    /* Re-subscribe when the active class changes (called by ClassManager) */
+    resubscribeForClass: function (client, handlers) {
+      this.subscribe(client, handlers);
+    },
+  };
+
+  global.RealtimeService = RealtimeService;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     syncBrain.js  —  inlined & hardened  (v3)
+     Event-driven UI: debounced pull + full UI refresh.
+     Connection status: 🟢 Connected / 🟡 Connecting / 🔴 Offline
+
+     Fixes over v2:
+       • _destroyed flag — prevents stale async callbacks calling _setConnStatus
+         after destroy() is called (was causing ghost 🟢 flashes)
+       • refreshAllUI double-render fixed (renderStudents called once)
+       • _appResumeSync uses DataService.pull (now exists as alias)
+       • focus + visibilitychange both fire on some Android WebViews — the
+         MIN_FOCUS_SYNC_INTERVAL guard handles dedup correctly
+       • Capacitor handler stored so destroy() can remove it if plugin
+         supports removeListener (forward-compatible)
+       • Class-change re-subscribe: when ClassManager switches class,
+         RealtimeService.resubscribeForClass is called so the channel
+         filters to the new class immediately
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function (global) {
+  'use strict';
+
+  var DEBOUNCE_MS             = 300;
+  var MIN_FOCUS_SYNC_INTERVAL = 5000;
+  var MAX_RETRY_ATTEMPTS      = 999;
+  var RETRY_BASE_DELAY_MS     = 2000;
+  var MAX_RETRY_DELAY_MS      = 30000;
+
+  /* ── cache invalidation ───────────────────────────────────────────────── */
+  function invalidateCaches() {
+    try { global.StorageManager.invAll();       } catch (e) {}
+    try { global.StudentManager.inv();          } catch (e) {}
+    try { global.Analytics.invalidate();        } catch (e) {}
+    try { global.InsightEngine.invalidate();    } catch (e) {}
+    try { global.EventCache.invalidate();       } catch (e) {}
+  }
+
+  /* ── full UI refresh ──────────────────────────────────────────────────── */
+  function refreshAllUI() {
+    var scr = '';
+    try { scr = global.App._currentScreen; } catch (e) {}
+
+    // Always refresh the common panels
+    try { global.UI.renderDashboard();          } catch (e) {}
+    try { global.UI.renderReports();            } catch (e) {}
+    try { global.UI.renderAnalytics();          } catch (e) {}
+    try { global.UI.renderLeaderboard();        } catch (e) {}
+    try { global.UI.renderInsights();           } catch (e) {}
+    try { global.UI.renderMiniLeaderboard();    } catch (e) {}
+    try { global.UI._refreshHeaderStats();      } catch (e) {}
+
+    // Students screen is heavy — render once (was rendered twice before the fix)
+    try { global.UI.renderStudents();           } catch (e) {}
+  }
+
+  /* ── legacy global shims (back-compat with old inline onclick refs) ───── */
+  function scheduleDebouncedRefresh() { EduPulseSyncBrain.scheduleRefresh(); }
+  global.reloadStudents  = function () { scheduleDebouncedRefresh(); };
+  global.reloadDashboard = function () { scheduleDebouncedRefresh(); };
+  global.refreshReports  = function () { scheduleDebouncedRefresh(); };
+
+  /* ══════════════════════════════════════════════════════════════════════ */
+  var EduPulseSyncBrain = {
+
+    /* ── state ──────────────────────────────────────────────────────────── */
+    _client:            null,
+    _debounceTimer:     null,
+    _resubscribeTimer:  null,
+    _retryCount:        0,
+    _lastFocusSyncAt:   0,
+    _destroyed:         false,   // guard against stale async callbacks
+
+    _visibilityHandler: null,
+    _focusHandler:      null,
+    _capacitorRemover:  null,    // stores removeListener fn if Capacitor supports it
+
+    /* ── helpers stored for class-change re-subscribe ─────────────────── */
+    _realtimeHandlers: null,
+
+    /* ── debounced remote pull + UI rebuild ──────────────────────────── */
+    scheduleRefresh: function () {
+      if (this._destroyed) return;
+      // Don't stack a refresh while a pull is already in-flight
+      try { if (global.SyncEngine && global.SyncEngine._pullInProgress) return; } catch (e) {}
+      var self = this;
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = setTimeout(function () { self._runRefresh(); }, DEBOUNCE_MS);
+    },
+
+    _runRefresh: async function () {
+      if (this._destroyed) return;
+      if (!global.DataService || !global.ClassManager) return;
+      var cid = global.ClassManager.activeId();
+      try {
+        await global.DataService.pullClassData(cid);
+        invalidateCaches();
+        refreshAllUI();
+        try {
+          if (global.SyncEngine && global.SyncEngine._computeRealState)
+            global.SyncEngine._computeRealState();
+        } catch (e) {}
+      } catch (e) {
+        console.warn('[EduPulseSyncBrain] refresh failed', e);
+      }
+    },
+
+    /* ── app-resume / focus sync ─────────────────────────────────────── */
+    _appResumeSync: async function () {
+      if (this._destroyed) return;
+      var now = Date.now();
+      if (now - this._lastFocusSyncAt < MIN_FOCUS_SYNC_INTERVAL) return;
+      if (!this._client || !global.navigator.onLine) return;
+      if (!global.DataService || !global.ClassManager) return;
+
+      this._lastFocusSyncAt = now;
+      this._setConnStatus('connecting', '🟡 Syncing…');
+
+      var cid = global.ClassManager.activeId();
+      try {
+        // DataService.pull is an alias for pullClassData (added in dataService v2)
+        await global.DataService.pull(cid);
+        if (this._destroyed) return;
+        invalidateCaches();
+        refreshAllUI();
+        this._setConnStatus('connected', '🟢 Live');
+        try {
+          if (global.SyncEngine && global.SyncEngine._computeRealState)
+            global.SyncEngine._computeRealState();
+        } catch (e) {}
+        this.scheduleRefresh();
+      } catch (e) {
+        if (this._destroyed) return;
+        console.warn('[EduPulseSyncBrain] app-resume pull failed', e);
+        this._setConnStatus(
+          global.navigator.onLine ? 'connecting' : 'offline',
+          global.navigator.onLine ? '🟡 Reconnecting…' : '🔴 Offline'
+        );
+      }
+    },
+
+    /* ── channel status handler ──────────────────────────────────────── */
+    _onChannelStatus: function (status) {
+      if (this._destroyed) return;
+      if (status === 'SUBSCRIBED') {
+        this._retryCount = 0;
+        this._setConnStatus('connected', '🟢 Live');
+        try { global.DataService.flushOfflineQueue(); } catch (e) {}
+        this.scheduleRefresh();
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (global.navigator.onLine) {
+          this._setConnStatus('connecting', '🟡 Reconnecting…');
+          this._scheduleResubscribe();
+        } else {
+          this._setConnStatus('offline', '🔴 Offline');
+        }
+      }
+    },
+
+    /* ── exponential back-off re-subscribe ───────────────────────────── */
+    _scheduleResubscribe: function () {
+      if (this._destroyed) return;
+      if (this._retryCount >= MAX_RETRY_ATTEMPTS) {
+        this._retryCount = 0;
+      }
+      clearTimeout(this._resubscribeTimer);
+      var delay = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, this._retryCount), MAX_RETRY_DELAY_MS);
+      this._retryCount++;
+      var self = this;
+      this._resubscribeTimer = setTimeout(function () {
+        if (self._destroyed || !self._client || !global.navigator.onLine) return;
+        // Skip if channel already recovered on its own
+        if (global.RealtimeService && global.RealtimeService._channel) {
+          try {
+            if (global.RealtimeService._channel.state === 'joined') return;
+          } catch (e) {}
+        }
+        console.info('[EduPulseSyncBrain] re-subscribing (attempt ' + self._retryCount + ')…');
+        if (global.RealtimeService) {
+          global.RealtimeService.subscribe(self._client, self._realtimeHandlers);
+        }
+      }, delay);
+    },
+
+    /* ── status indicator ────────────────────────────────────────────── */
+    _setConnStatus: function (state, label) {
+      var el = global.document && global.document.getElementById('realtime-conn-status');
+      if (!el) return;
+      el.textContent = label;
+      el.className   = 'realtime-conn-status ' + state;
+    },
+
+    /* ── init ────────────────────────────────────────────────────────── */
+    init: function (client) {
+      this._client      = client;
+      this._destroyed   = false;
+      this._retryCount  = 0;
+      this._setConnStatus('connecting', '🟡 Connecting…');
+
+      // Store handlers so retries and class-change re-subscribes can reuse them
+      var self = this;
+      this._realtimeHandlers = {
+        onDatabaseChange: function () { EduPulseSyncBrain.scheduleRefresh(); },
+      };
+
+      if (global.RealtimeService) {
+        global.RealtimeService.subscribe(client, this._realtimeHandlers);
+      }
+
+      global.DataService.flushOfflineQueue().catch(function () {});
+
+      // Remove any leftover listeners before adding new ones
+      this._removeAppResumeListeners();
+
+      // 1. visibilitychange — fires when tab/screen becomes visible
+      this._visibilityHandler = function () {
+        if (!global.document.hidden) self._appResumeSync();
+      };
+      global.document.addEventListener('visibilitychange', this._visibilityHandler);
+
+      // 2. window focus — catches gaps in Android WebView visibilitychange
+      this._focusHandler = function () { self._appResumeSync(); };
+      global.window.addEventListener('focus', this._focusHandler);
+
+      // 3. Capacitor App plugin — native foreground event
+      this._tryAttachCapacitorListener();
+    },
+
+    /* ── Capacitor listener (polled, plugin may load after init) ─────── */
+    _tryAttachCapacitorListener: function () {
+      var self   = this;
+      var checks = 0;
+      var MAX    = 10;
+      var poll   = setInterval(function () {
+        checks++;
+        var cap = global.Capacitor || (global.window && global.window.Capacitor);
+        if (cap && cap.Plugins && cap.Plugins.App) {
+          clearInterval(poll);
+          try {
+            var handler = function (state) {
+              if (state && state.isActive) self._appResumeSync();
+            };
+            // Some Capacitor versions return a remove() promise
+            var result = cap.Plugins.App.addListener('appStateChange', handler);
+            if (result && typeof result.remove === 'function') {
+              self._capacitorRemover = function () { result.remove(); };
+            }
+            console.info('[EduPulseSyncBrain] Capacitor appStateChange listener attached');
+          } catch (e) {
+            console.warn('[EduPulseSyncBrain] Capacitor listener failed:', e);
+          }
+        }
+        if (checks >= MAX) clearInterval(poll);
+      }, 500);
+    },
+
+    /* ── tear-down ───────────────────────────────────────────────────── */
+    _removeAppResumeListeners: function () {
+      if (this._visibilityHandler) {
+        global.document.removeEventListener('visibilitychange', this._visibilityHandler);
+        this._visibilityHandler = null;
+      }
+      if (this._focusHandler) {
+        try { global.window.removeEventListener('focus', this._focusHandler); } catch (e) {}
+        this._focusHandler = null;
+      }
+      if (this._capacitorRemover) {
+        try { this._capacitorRemover(); } catch (e) {}
+        this._capacitorRemover = null;
+      }
+    },
+
+    destroy: function () {
+      this._destroyed = true;   // stop all in-flight async ops immediately
+      clearTimeout(this._debounceTimer);
+      clearTimeout(this._resubscribeTimer);
+      this._removeAppResumeListeners();
+      if (this._client && global.RealtimeService) {
+        global.RealtimeService.unsubscribe(this._client);
+      }
+      this._client      = null;
+      this._retryCount  = 0;
+      this._setConnStatus('offline', '🔴 Offline');
+    },
+
+    /* ── class-change hook ───────────────────────────────────────────── */
+    // Call this whenever the active class changes so the Realtime channel
+    // re-filters to the new class.  Invoke from ClassManager after switch.
+    onClassChange: function () {
+      if (!this._client || this._destroyed) return;
+      if (global.RealtimeService && this._realtimeHandlers) {
+        global.RealtimeService.resubscribeForClass(this._client, this._realtimeHandlers);
+      }
+      this.scheduleRefresh();
+    },
+  };
+
+  global.EduPulseSyncBrain = EduPulseSyncBrain;
+  global.SyncBrainV3       = EduPulseSyncBrain; // alias for future references
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
 
 <!-- -══════════════════════ PORTAL ROOTS ════════════════════════════════════ -->
 <div id="global-dropdown-root"></div>
@@ -3769,11 +4396,11 @@ body.privacy-mode .hide-privacy{display:none!important}
               <!-- ── Two-column compact config row ── -->
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
                 <div class="form-group" style="margin:0">
-                  <label class="label" id="rpt-label-student">Student</label>
+                  <label class="label" id="rpt-label-student" for="report-student-select">Student</label>
                   <select class="input" id="report-student-select"></select>
                 </div>
                 <div class="form-group" style="margin:0">
-                  <label class="label" id="rpt-label-type">Report Type</label>
+                  <label class="label" id="rpt-label-type" for="report-type-select">Report Type</label>
                   <select class="input" id="report-type-select">
                     <option value="daily"  id="rpt-opt-daily">Daily Report</option>
                     <option value="weekly" id="rpt-opt-weekly" selected>Weekly Report</option>
@@ -3874,21 +4501,21 @@ body.privacy-mode .hide-privacy{display:none!important}
           <h3>School & Teacher Info</h3>
           <div class="settings-row">
             <div class="form-group">
-              <label class="label">School Name</label>
+              <label class="label" for="setting-school">School Name</label>
               <input class="input" id="setting-school" placeholder="Westfield Academy"/>
             </div>
             <div class="form-group">
-              <label class="label">Teacher Name</label>
+              <label class="label" for="setting-teacher">Teacher Name</label>
               <input class="input" id="setting-teacher" placeholder="Mr. Johnson"/>
             </div>
           </div>
           <div class="settings-row">
             <div class="form-group">
-              <label class="label">Class Name</label>
+              <label class="label" for="setting-class">Class Name</label>
               <input class="input" id="setting-class" placeholder="Grade 6 — Room 12"/>
             </div>
             <div class="form-group">
-              <label class="label">Academic Year</label>
+              <label class="label" for="setting-year">Academic Year</label>
               <input class="input" id="setting-year" placeholder="2024–2025"/>
             </div>
           </div>
@@ -3952,12 +4579,12 @@ body.privacy-mode .hide-privacy{display:none!important}
           </div>
 
           <div class="form-group">
-            <label class="label">Supabase Project URL</label>
+            <label class="label" for="sb-url">Supabase Project URL</label>
             <input class="input" id="sb-url" placeholder="https://xxxx.supabase.co"
                    data-tip="Your Supabase project URL — found in Project Settings → API"/>
           </div>
           <div class="form-group">
-            <label class="label">Supabase Anon Key</label>
+            <label class="label" for="sb-anon-key">Supabase Anon Key</label>
             <input class="input" id="sb-anon-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
                    data-tip="Your Supabase anon/public key — found in Project Settings → API"/>
           </div>
@@ -4367,6 +4994,7 @@ const CONFIG = {
       {id:'absent',        label:'Unexcused Abs', icon:'🚷', pts:-3, cat:'conduct'},
       {id:'incomplete',    label:'Incomplete Work',icon:'📋', pts:-2, cat:'academic'},
       {id:'late',          label:'Late/Tardy',    icon:'⏰', pts:-1, cat:'conduct'},
+      {id:'stationery_missing', label:'No Stationery / القرطاسية', icon:'✏️', pts:-1, cat:'conduct'},
       {id:'dishonesty',    label:'Dishonesty',    icon:'⚠️',  pts:-5, cat:'conduct'},
     ],
   },
@@ -6123,15 +6751,15 @@ const ReportEngine = {
       // ── Daily Report: today-only events with dedicated builder ──────────────
       if(reportType === 'daily'){
         return this._lang === 'ar'
-          ? this._buildDaily_AR(st, sets, tr, dna, sym, notes)
-          : this._buildDaily_EN(st, sets, tr, dna, sym, notes);
+          ? this._buildDaily_AR(st, sets, tr, dna, sym, notes, comment)
+          : this._buildDaily_EN(st, sets, tr, dna, sym, notes, comment);
       }
 
       // ── Standard reports: both languages go through the narrative builders ──
       // Arabic and English receive identical structural quality
       return this._lang === 'ar'
-        ? this._buildWA_AR(st, sets, tr, dna, sym, notes)
-        : this._buildWA_EN(st, sets, tr, dna, sym, notes);
+        ? this._buildWA_AR(st, sets, tr, dna, sym, notes, comment)
+        : this._buildWA_EN(st, sets, tr, dna, sym, notes, comment);
 
     }catch(err){
       console.error('[ReportEngine] generateTextReport failed:', err.message);
@@ -6148,7 +6776,7 @@ const ReportEngine = {
   // Tone is precise, observation-based (real-time classroom snapshot).
   // ═══════════════════════════════════════════════════════════════════════════
 
-  _buildDaily_EN(st, sets, tr, dna, sym, notes){
+  _buildDaily_EN(st, sets, tr, dna, sym, notes, comment = ''){
     const first    = st.name.split(' ')[0];
     const today    = new Date().toISOString().slice(0, 10);
     const allEvs   = BehaviorEngine.getStudentEvents(st.id);
@@ -6269,16 +6897,19 @@ const ReportEngine = {
       '*TEACHER RECOMMENDATION*',
       SEP,
       recommendation,
-      '',
-      SEP,
-      `-- ${sets.teacher || 'Teacher'}, ${sets.school || 'EduPulse'}`
     );
+
+    if(comment){
+      lines.push('', '*TEACHER COMMENT*', SEP, comment);
+    }
+
+    lines.push('', SEP, `-- ${sets.teacher || 'Teacher'}, ${sets.school || 'EduPulse'}`);
 
     return lines.filter(l => l !== null && l !== undefined)
                 .join('\n').replace(/\n{3,}/g, '\n\n');
   },
 
-  _buildDaily_AR(st, sets, tr, dna, sym, notes){
+  _buildDaily_AR(st, sets, tr, dna, sym, notes, comment = ''){
     const first    = st.name.split(' ')[0];
     const today    = new Date().toISOString().slice(0, 10);
     const allEvs   = BehaviorEngine.getStudentEvents(st.id);
@@ -6396,10 +7027,13 @@ const ReportEngine = {
       '*توصية المعلم*',
       SEP,
       recommendation,
-      '',
-      SEP,
-      `-- ${sets.teacher || 'المعلم'}، ${sets.school || 'EduPulse'}`
     );
+
+    if(comment){
+      lines.push('', '*تعليق المعلم*', SEP, comment);
+    }
+
+    lines.push('', SEP, `-- ${sets.teacher || 'المعلم'}، ${sets.school || 'EduPulse'}`);
 
     return lines.filter(l => l !== null && l !== undefined)
                 .join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -6639,15 +7273,16 @@ const ReportEngine = {
 
     // Respect daily type when sending from the Reports screen
     const reportType = document.getElementById('report-type-select')?.value || 'weekly';
+    const comment    = document.getElementById('report-comment')?.value?.trim() || '';
     if(reportType === 'daily'){
       return ar
-        ? this._buildDaily_AR(st, sets, tr, dna, sym, notes)
-        : this._buildDaily_EN(st, sets, tr, dna, sym, notes);
+        ? this._buildDaily_AR(st, sets, tr, dna, sym, notes, comment)
+        : this._buildDaily_EN(st, sets, tr, dna, sym, notes, comment);
     }
 
     return ar
-      ? this._buildWA_AR(st, sets, tr, dna, sym, notes)
-      : this._buildWA_EN(st, sets, tr, dna, sym, notes);
+      ? this._buildWA_AR(st, sets, tr, dna, sym, notes, comment)
+      : this._buildWA_EN(st, sets, tr, dna, sym, notes, comment);
   },
 
   // -─ Threshold-based symbol mapper — deterministic, no randomness ───────────
@@ -6711,7 +7346,7 @@ const ReportEngine = {
   },
 
   // -─ English WhatsApp message ───────────────────────────────────────────────
-  _buildWA_EN(st, sets, tr, dna, sym, notes){
+  _buildWA_EN(st, sets, tr, dna, sym, notes, comment = ''){
     const first    = st.name.split(' ')[0];
     const weekSign = CONFIG.fmt.weekly(st.weeklyScore);
     const total    = st.posCount + st.negCount;
@@ -6856,6 +7491,13 @@ const ReportEngine = {
       '*TEACHER ASSESSMENT*',
       SEP,
       this._adviceEN(st, tr),
+    );
+
+    if(comment){
+      lines.push('', '*TEACHER COMMENT*', SEP, comment);
+    }
+
+    lines.push(
       '',
       SEP,
       'Thank you for your continued support of ' + first + '.',
@@ -6867,7 +7509,7 @@ const ReportEngine = {
   },
 
   // -─ Arabic WhatsApp message ────────────────────────────────────────────────
-  _buildWA_AR(st, sets, tr, dna, sym, notes){
+  _buildWA_AR(st, sets, tr, dna, sym, notes, comment = ''){
     const first    = st.name.split(' ')[0];
     const weekSign = CONFIG.fmt.weekly(st.weeklyScore);
     const total    = st.posCount + st.negCount;
@@ -7003,6 +7645,13 @@ const ReportEngine = {
       '*تقييم المعلم*',
       SEP,
       this._adviceAR(st, tr),
+    );
+
+    if(comment){
+      lines.push('', '*تعليق المعلم*', SEP, comment);
+    }
+
+    lines.push(
       '',
       SEP,
       'شكراً لمتابعتكم ودعمكم المستمر لأبنكم/ابنتكم.',
@@ -10444,6 +11093,13 @@ const ClassManager = {
       SyncLogger.log('info', `🔄 Class switched — flushing queue for: ${classId}`);
     }
 
+    // Re-subscribe Realtime channel to the new classId + pull fresh data
+    try{
+      if(typeof EduPulseSyncBrain !== 'undefined' && EduPulseSyncBrain._client){
+        EduPulseSyncBrain.onClassChange();
+      }
+    }catch(e){}
+
     this.closeDropdown();
     this._renderSwitcher();
     App._applySettings();
@@ -10739,6 +11395,496 @@ const ClassManager = {
   },
 };
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA SERVICE — Supabase CRUD + offline queue (v2 — merged)
+// Tables: students (id,class_id,data,updated_at)  behaviors (id,class_id,data,updated_at)
+// Offline ops stored in localStorage under ep_rt_pending_ops; flushed on reconnect.
+// ═══════════════════════════════════════════════════════════════════════════════
+const DataService = (() => {
+  'use strict';
+
+  const QUEUE_KEY = 'ep_rt_pending_ops';
+
+  function _getClient() {
+    const c = window.supabase;
+    return c && typeof c.from === 'function' ? c : null;
+  }
+
+  function _classId() {
+    try { return ClassManager.activeId(); } catch (e) { return 'default'; }
+  }
+
+  function _studentsKey(cid) { return 'ep_students_' + cid; }
+  function _eventsKey(cid)   { return 'ep_events_'   + cid; }
+
+  function _readQueue() {
+    try {
+      const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+      return Array.isArray(q) ? q : [];
+    } catch (e) { return []; }
+  }
+
+  function _writeQueue(arr) {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function _updateBadge() {
+    try {
+      if (typeof SyncBrain !== 'undefined' && SyncBrain._updatePendingBadge)
+        SyncBrain._updatePendingBadge();
+    } catch (e) {}
+  }
+
+  const DS = {
+    _debounceStudents: null,
+    _debounceEvents:   null,
+    STUDENT_DEBOUNCE_MS: 450,
+    EVENT_DEBOUNCE_MS:   800,
+
+    // ── Queue helpers ─────────────────────────────────────────────────────────
+    getQueueLength() {
+      return _readQueue().length;
+    },
+
+    enqueue(op) {
+      const q = _readQueue();
+      q.push(Object.assign({}, op, { ts: Date.now() }));
+      _writeQueue(q);
+      _updateBadge();
+    },
+
+    // ── Flush offline queue on reconnect ─────────────────────────────────────
+    async flushOfflineQueue() {
+      if (!_getClient() || !navigator.onLine) return;
+      const q = _readQueue();
+      if (!q.length) return;
+      _writeQueue([]);
+      const failed = [];
+      for (const op of q) {
+        try {
+          if      (op.type === 'students')  await this._pushStudentsNow(op.classId, op.rows);
+          else if (op.type === 'behaviors') await this._pushBehaviorsNow(op.classId, op.rows);
+        } catch (e) { failed.push(op); }
+      }
+      if (failed.length) {
+        const rest = _readQueue();
+        _writeQueue(failed.concat(rest));
+      }
+      _updateBadge();
+    },
+
+    // ── Push full local snapshot to cloud ─────────────────────────────────────
+    async pushLocalSnapshot(cid) {
+      cid = cid || _classId();
+      if (!_getClient()) return;
+      let st = [], ev = [];
+      try { st = StorageManager.getStudents() || []; } catch (e) {}
+      try { ev = StorageManager.getEvents()   || []; } catch (e) {}
+      try {
+        await this._pushStudentsNow(cid, st);
+        await this._pushBehaviorsNow(cid, ev);
+      } catch (e) { console.warn('[DataService] pushLocalSnapshot', e); }
+    },
+
+    // ── Raw Supabase upserts (last-write-wins on id conflict) ─────────────────
+    async _pushStudentsNow(cid, students) {
+      const client = _getClient();
+      if (!client) throw new Error('No Supabase client');
+      const rows = (students || []).map(s => ({
+        id: String(s.id), class_id: cid, data: s, updated_at: Date.now(),
+      }));
+      if (!rows.length) return;
+      const res = await client.from('students').upsert(rows, { onConflict: 'id' });
+      if (res.error) throw res.error;
+    },
+
+    async _pushBehaviorsNow(cid, events) {
+      const client = _getClient();
+      if (!client) throw new Error('No Supabase client');
+      const rows = (events || []).map(ev => ({
+        id: String(ev.id), class_id: cid, data: ev, updated_at: Date.now(),
+      }));
+      if (!rows.length) return;
+      const res = await client.from('behaviors').upsert(rows, { onConflict: 'id' });
+      if (res.error) throw res.error;
+    },
+
+    // ── Debounced push triggered by localStorage writes ───────────────────────
+    _schedulePushStudents(cid) {
+      clearTimeout(this._debounceStudents);
+      this._debounceStudents = setTimeout(
+        () => this._flushStudentsOut(cid), this.STUDENT_DEBOUNCE_MS);
+    },
+
+    _schedulePushEvents(cid) {
+      clearTimeout(this._debounceEvents);
+      this._debounceEvents = setTimeout(
+        () => this._flushEventsOut(cid), this.EVENT_DEBOUNCE_MS);
+    },
+
+    async _flushStudentsOut(cid) {
+      let rows = [];
+      try { rows = StorageManager.getStudents() || []; } catch (e) {}
+      if (!_getClient() || !navigator.onLine) {
+        this.enqueue({ type: 'students', classId: cid, rows }); return;
+      }
+      try { await this._pushStudentsNow(cid, rows); }
+      catch (e) { this.enqueue({ type: 'students', classId: cid, rows }); }
+    },
+
+    async _flushEventsOut(cid) {
+      let rows = [];
+      try { rows = StorageManager.getEvents() || []; } catch (e) {}
+      if (!_getClient() || !navigator.onLine) {
+        this.enqueue({ type: 'behaviors', classId: cid, rows }); return;
+      }
+      try { await this._pushBehaviorsNow(cid, rows); }
+      catch (e) { this.enqueue({ type: 'behaviors', classId: cid, rows }); }
+    },
+
+    // Called by SyncEngine._onLocalWrite() on every StorageManager.set()
+    onLocalStorageWrite(key) {
+      const cid = _classId();
+      if (key === _studentsKey(cid)) { this._schedulePushStudents(cid); return; }
+      if (key === _eventsKey(cid))   { this._schedulePushEvents(cid);   return; }
+    },
+
+    // ── Pull latest data from cloud into localStorage then bust caches ─────────
+    async pullClassData(cid) {
+      cid = cid || _classId();
+      const client = _getClient();
+      if (!client) return;
+
+      try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
+
+      try {
+        const [stRes, beRes] = await Promise.all([
+          client.from('students').select('data').eq('class_id', cid),
+          client.from('behaviors').select('data').eq('class_id', cid),
+        ]);
+        if (stRes.error) throw stRes.error;
+        if (beRes.error) throw beRes.error;
+
+        const students = (stRes.data || []).map(r => r.data).filter(Boolean);
+        const events   = (beRes.data || []).map(r => r.data).filter(Boolean);
+
+        // Cloud is empty but local has data => keep local (first sync on new device)
+        if (!students.length && !events.length) {
+          try {
+            const local = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]');
+            if (Array.isArray(local) && local.length) return;
+          } catch (_) {}
+        }
+
+        localStorage.setItem(_studentsKey(cid), JSON.stringify(students));
+        localStorage.setItem(_eventsKey(cid),   JSON.stringify(events));
+
+        // Bust StorageManager in-memory cache so next getStudents()/getEvents() re-reads
+        try { StorageManager.inv(_studentsKey(cid)); } catch (e) {}
+        try { StorageManager.inv(_eventsKey(cid));   } catch (e) {}
+
+      } finally {
+        try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = false; } catch (e) {}
+      }
+    },
+  };
+
+  return DS;
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REALTIME SERVICE — Supabase Realtime WebSocket channel (v2 — merged)
+// One persistent channel 'edupulse-sync' listens to postgres_changes on both
+// tables. Any remote write fires onDatabaseChange -> EduPulseSyncBrain.scheduleRefresh().
+// ═══════════════════════════════════════════════════════════════════════════════
+const RealtimeService = (() => {
+  'use strict';
+
+  const RS = {
+    _channel: null,
+
+    subscribe(client, handlers) {
+      if (!client || typeof client.channel !== 'function') return null;
+      const onDatabaseChange = handlers && handlers.onDatabaseChange;
+
+      if (this._channel) {
+        try { client.removeChannel(this._channel); } catch (e) {}
+        this._channel = null;
+      }
+
+      const ch = client
+        .channel('edupulse-sync')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'students' },
+            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'students', payload }); })
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'behaviors' },
+            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'behaviors', payload }); })
+        .subscribe(status => {
+          if (typeof EduPulseSyncBrain !== 'undefined' &&
+              typeof EduPulseSyncBrain._onChannelStatus === 'function') {
+            EduPulseSyncBrain._onChannelStatus(status);
+          }
+        });
+
+      this._channel = ch;
+      return ch;
+    },
+
+    unsubscribe(client) {
+      if (!this._channel || !client) return;
+      try { client.removeChannel(this._channel); } catch (e) {}
+      this._channel = null;
+    },
+  };
+
+  return RS;
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EDUPULSE SYNC BRAIN — App-level real-time orchestrator (v2 — merged)
+//
+// Responsibilities
+//   • Debounced pull + full UI rebuild on every Realtime event
+//   • App-resume sync (visibilitychange · window focus · Capacitor appStateChange)
+//   • Anti-spam guard — resume sync skipped if one ran < 5 s ago
+//   • Auto channel-recovery with exponential back-off (up to 5 attempts)
+//   • Status pill: 🟢 Live / 🟡 Connecting… / 🔴 Offline
+//
+// Bug fixes vs original syncBrain.js
+//   [BUG-1] DataService.pull() did not exist — always call pullClassData() instead
+//   [BUG-2] Legacy global shims now point at correct EPSB instance
+// ═══════════════════════════════════════════════════════════════════════════════
+const EduPulseSyncBrain = (() => {
+  'use strict';
+
+  const DEBOUNCE_MS             = 300;
+  const MIN_FOCUS_SYNC_INTERVAL = 5000;
+  const MAX_RETRY_ATTEMPTS      = 999;
+  const RETRY_BASE_DELAY_MS     = 2000;
+  const MAX_RETRY_DELAY_MS      = 30000;
+
+  // ── Cache invalidation ──────────────────────────────────────────────────────
+  function _invalidateCaches() {
+    try { StorageManager.invAll();    } catch (e) {}
+    try { StudentManager.inv();       } catch (e) {}
+    try { Analytics.invalidate();     } catch (e) {}
+    try { InsightEngine.invalidate(); } catch (e) {}
+    try { EventCache.invalidate();    } catch (e) {}
+  }
+
+  // ── Full UI rebuild ─────────────────────────────────────────────────────────
+  function _refreshAllUI() {
+    const scr = (() => { try { return App._currentScreen; } catch (e) { return ''; } })();
+    try { UI.renderStudents();    } catch (e) {}
+    try { UI.renderDashboard();   } catch (e) {}
+    try { UI.renderReports();     } catch (e) {}
+    try { UI.renderAnalytics();   } catch (e) {}
+    try { UI.renderLeaderboard(); } catch (e) {}
+    try {
+      UI.renderInsights();
+      UI.renderMiniLeaderboard();
+      UI._refreshHeaderStats();
+    } catch (e) {}
+    if (scr === 'students')  { try { UI.renderStudents();  } catch (e) {} }
+    if (scr === 'dashboard') { try { UI.renderDashboard(); } catch (e) {} }
+    if (scr === 'reports')   { try { UI.renderReports();   } catch (e) {} }
+  }
+
+  // ── Legacy global shims ─────────────────────────────────────────────────────
+  window.reloadStudents  = () => EPSB.scheduleRefresh();
+  window.reloadDashboard = () => EPSB.scheduleRefresh();
+  window.refreshReports  = () => EPSB.scheduleRefresh();
+
+  // ════════════════════════════════════════════════════════════════════════════
+  const EPSB = {
+    _client:            null,
+    _debounceTimer:     null,
+    _resubscribeTimer:  null,
+    _retryCount:        0,
+    _lastFocusSyncAt:   0,
+    _visibilityHandler: null,
+    _focusHandler:      null,
+
+    // ── Debounced pull + UI rebuild ──────────────────────────────────────────
+    scheduleRefresh() {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = setTimeout(() => this._runRefresh(), DEBOUNCE_MS);
+    },
+
+    async _runRefresh() {
+      if (typeof DataService === 'undefined' || typeof ClassManager === 'undefined') return;
+      const cid = ClassManager.activeId();
+      try {
+        await DataService.pullClassData(cid);
+        _invalidateCaches();
+        _refreshAllUI();
+        try {
+          if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
+            SyncEngine._computeRealState();
+        } catch (e) {}
+      } catch (e) {
+        console.warn('[EduPulseSyncBrain] refresh failed', e);
+      }
+    },
+
+    // ── App-resume sync ──────────────────────────────────────────────────────
+    async _appResumeSync() {
+      const now = Date.now();
+      // Anti-spam: skip if a sync ran recently
+      if (now - this._lastFocusSyncAt < MIN_FOCUS_SYNC_INTERVAL) return;
+      if (!this._client || !navigator.onLine) return;
+      if (typeof DataService === 'undefined' || typeof ClassManager === 'undefined') return;
+
+      this._lastFocusSyncAt = now;
+      this._setConnStatus('connecting', '\uD83D\uDFE1 Syncing\u2026');
+
+      const cid = ClassManager.activeId();
+      try {
+        // [BUG-1 FIX] DataService.pull() never existed — use pullClassData()
+        await DataService.pullClassData(cid);
+        _invalidateCaches();
+        _refreshAllUI();
+        this._setConnStatus('connected', '\uD83D\uDFE2 Live');
+        try {
+          if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
+            SyncEngine._computeRealState();
+        } catch (e) {}
+        // Catch any realtime events that arrived during background time
+        this.scheduleRefresh();
+      } catch (e) {
+        console.warn('[EduPulseSyncBrain] app-resume pull failed', e);
+        this._setConnStatus(
+          navigator.onLine ? 'connecting' : 'offline',
+          navigator.onLine ? '\uD83D\uDFE1 Reconnecting\u2026' : '\uD83D\uDD34 Offline'
+        );
+      }
+    },
+
+    // ── Channel status callback ──────────────────────────────────────────────
+    _onChannelStatus(status) {
+      if (status === 'SUBSCRIBED') {
+        this._retryCount = 0;
+        this._setConnStatus('connected', '\uD83D\uDFE2 Live');
+        try { DataService.flushOfflineQueue(); } catch (e) {}
+        this.scheduleRefresh();
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (navigator.onLine) {
+          this._setConnStatus('connecting', '\uD83D\uDFE1 Reconnecting\u2026');
+          this._scheduleResubscribe();
+        } else {
+          this._setConnStatus('offline', '\uD83D\uDD34 Offline');
+        }
+      }
+    },
+
+    // Exponential back-off channel recovery
+    _scheduleResubscribe() {
+      if (this._retryCount >= MAX_RETRY_ATTEMPTS) {
+        this._retryCount = 0;
+      }
+      clearTimeout(this._resubscribeTimer);
+      const delay = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, this._retryCount), MAX_RETRY_DELAY_MS);
+      this._retryCount++;
+      this._resubscribeTimer = setTimeout(() => {
+        if (!this._client || !navigator.onLine) return;
+        if (typeof RealtimeService !== 'undefined' && RealtimeService._channel) {
+          try { if (RealtimeService._channel.state === 'joined') return; } catch (e) {}
+        }
+        console.info('[EduPulseSyncBrain] re-subscribing attempt ' + this._retryCount);
+        if (typeof RealtimeService !== 'undefined') {
+          RealtimeService.subscribe(this._client, {
+            onDatabaseChange: () => EPSB.scheduleRefresh(),
+          });
+        }
+      }, delay);
+    },
+
+    // ── Status pill update ───────────────────────────────────────────────────
+    _setConnStatus(state, label) {
+      const el = document.getElementById('realtime-conn-status');
+      if (!el) return;
+      el.textContent = label;
+      el.className   = 'realtime-conn-status ' + state;
+    },
+
+    // ── Initialise ───────────────────────────────────────────────────────────
+    init(client) {
+      this._client     = client;
+      this._retryCount = 0;
+      this._setConnStatus('connecting', '\uD83D\uDFE1 Connecting\u2026');
+
+      if (typeof RealtimeService !== 'undefined') {
+        RealtimeService.subscribe(client, {
+          onDatabaseChange: () => EPSB.scheduleRefresh(),
+        });
+      }
+
+      DataService.flushOfflineQueue().catch(() => {});
+      this._removeAppResumeListeners();
+
+      this._visibilityHandler = () => {
+        if (!document.hidden) this._appResumeSync();
+      };
+      document.addEventListener('visibilitychange', this._visibilityHandler);
+
+      this._focusHandler = () => this._appResumeSync();
+      window.addEventListener('focus', this._focusHandler);
+
+      this._tryAttachCapacitorListener();
+    },
+
+    _tryAttachCapacitorListener() {
+      let checks = 0;
+      const poll = setInterval(() => {
+        checks++;
+        const cap = window.Capacitor;
+        if (cap && cap.Plugins && cap.Plugins.App) {
+          clearInterval(poll);
+          try {
+            cap.Plugins.App.addListener('appStateChange', state => {
+              if (state && state.isActive) this._appResumeSync();
+            });
+            console.info('[EduPulseSyncBrain] Capacitor appStateChange attached');
+          } catch (e) {
+            console.warn('[EduPulseSyncBrain] Capacitor listener error:', e);
+          }
+        }
+        if (checks >= 10) clearInterval(poll);
+      }, 500);
+    },
+
+    // ── Tear-down ─────────────────────────────────────────────────────────────
+    _removeAppResumeListeners() {
+      if (this._visibilityHandler) {
+        document.removeEventListener('visibilitychange', this._visibilityHandler);
+        this._visibilityHandler = null;
+      }
+      if (this._focusHandler) {
+        try { window.removeEventListener('focus', this._focusHandler); } catch (e) {}
+        this._focusHandler = null;
+      }
+    },
+
+    destroy() {
+      clearTimeout(this._debounceTimer);
+      clearTimeout(this._resubscribeTimer);
+      this._removeAppResumeListeners();
+      if (this._client && typeof RealtimeService !== 'undefined') {
+        RealtimeService.unsubscribe(this._client);
+      }
+      this._client     = null;
+      this._retryCount = 0;
+      this._setConnStatus('offline', '\uD83D\uDD34 Offline');
+    },
+  };
+
+  return EPSB;
+})();
+
 // -══════════════════════════════════════════════════════════════════════════════
 // SYNC ENGINE — Supabase Realtime + dataService.js (students / behaviors tables)
 //   • window.supabase = Supabase client after connect (per app convention)
@@ -10747,17 +11893,19 @@ const ClassManager = {
 // ════════════════════════════════════════════════════════════════════════════════
 const SyncEngine = {
 
-  _ready:          false,
-  _pullInProgress: false,
-  _supabaseUrl:    null,
-  _supabaseKey:    null,
-  _supabase:       null,
-  _isOnline:       true,
-  isSyncRunning:   false,
-  _lastSyncTime:   null,
-  pendingSyncQueue: [],
-  _activeWrites:   0,
-  _debounceMap:    {},
+  _ready:              false,
+  _pullInProgress:     false,
+  _supabaseUrl:        null,
+  _supabaseKey:        null,
+  _supabase:           null,
+  _isOnline:           true,
+  isSyncRunning:       false,
+  _lastSyncTime:       null,
+  pendingSyncQueue:    [],
+  _activeWrites:       0,
+  _debounceMap:        {},
+  _reconnectTimer:     null,
+  _reconnectVisHandler:null,
 
   get _pendingQueue(){ return this.pendingSyncQueue; },
   set _pendingQueue(v){ this.pendingSyncQueue = v; },
@@ -10807,6 +11955,7 @@ const SyncEngine = {
         try{
           if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.init(client);
         }catch(e){ console.warn('[SyncEngine] EduPulseSyncBrain.init', e); }
+        this._setupRealtimeReconnect(client, creds);
         const cid = ClassManager.activeId();
         if(typeof DataService !== 'undefined'){
           DataService.pushLocalSnapshot(cid).then(() => DataService.flushOfflineQueue()).catch(()=>{});
@@ -10830,8 +11979,9 @@ const SyncEngine = {
 
     this._updatePill('syncing','Loading SDK…');
     const s = document.createElement('script');
-    s.src     = SDK_URL;
-    s.async   = true;
+    s.src           = SDK_URL;
+    s.async         = true;
+    s.crossOrigin   = 'anonymous';
     s.onload  = () => {
       try{
         window.__supabaseSdk = window.supabase;
@@ -10845,6 +11995,9 @@ const SyncEngine = {
   },
 
   disconnect(){
+    // Stop reconnect monitor before tearing down the client
+    if(this._reconnectTimer)      { clearInterval(this._reconnectTimer);      this._reconnectTimer      = null; }
+    if(this._reconnectVisHandler) { document.removeEventListener('visibilitychange', this._reconnectVisHandler); this._reconnectVisHandler = null; }
     try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.destroy(); }catch(e){}
     this._supabase    = null;
     this._supabaseUrl = null;
@@ -10936,6 +12089,23 @@ const SyncEngine = {
       NotificationEngine.success('Back online','Syncing pending changes…');
       document.getElementById('offline-banner')?.classList.remove('visible');
       try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain._setConnStatus('connecting','🟡 Connecting…'); }catch(e){}
+      // Re-establish Supabase Realtime WebSocket after network switch (WiFi → 4G)
+      if(this._supabase){
+        try{
+          const rtState = this._supabase.realtime && typeof this._supabase.realtime.connectionState === 'function'
+            ? this._supabase.realtime.connectionState() : null;
+          if(rtState === 'closed' || rtState === 'disconnected'){
+            SyncLogger.log('info','🔄 Network restored — reconnecting Supabase Realtime…');
+            try{ this._supabase.realtime.connect(); }catch(e){}
+            try{
+              if(typeof EduPulseSyncBrain !== 'undefined'){
+                EduPulseSyncBrain.destroy();
+                EduPulseSyncBrain.init(this._supabase);
+              }
+            }catch(e){}
+          }
+        }catch(e){}
+      }
       if(typeof DataService !== 'undefined'){
         DataService.flushOfflineQueue().then(() => {
           if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.scheduleRefresh();
@@ -10992,6 +12162,43 @@ const SyncEngine = {
   _storeLocalTimestamp(key, ts){ try{ const m=JSON.parse(localStorage.getItem(this._TS_KEY)||'{}'); m[key]=ts||Date.now(); localStorage.setItem(this._TS_KEY,JSON.stringify(m)); }catch(e){} },
   _getLocalTimestamp(key){ try{ return JSON.parse(localStorage.getItem(this._TS_KEY)||'{}')[key]||0; }catch(e){return 0;} },
   _deviceId(){ let id=localStorage.getItem('ep_device_id'); if(!id){id='dev_'+Math.random().toString(36).slice(2,10);localStorage.setItem('ep_device_id',id);} return id; },
+
+  // ─── Realtime reconnect monitor ───────────────────────────────────────────────
+  // Handles silent WebSocket drops caused by mobile network switches (WiFi → 4G).
+  // Polls every 15 s; also re-checks when the tab becomes visible again.
+  _setupRealtimeReconnect(client, creds){
+    // Tear down any previous monitor for this client slot
+    if(this._reconnectTimer)      clearInterval(this._reconnectTimer);
+    if(this._reconnectVisHandler) document.removeEventListener('visibilitychange', this._reconnectVisHandler);
+
+    const self = this;
+    const doReconnect = () => {
+      if(!self._supabase || !self._isOnline) return;
+      try{
+        const rtState = client.realtime && typeof client.realtime.connectionState === 'function'
+          ? client.realtime.connectionState()
+          : null;
+        // 'closed' or 'disconnected' means the WebSocket silently dropped
+        if(rtState === 'closed' || rtState === 'disconnected'){
+          SyncLogger.log('info','🔄 Realtime WebSocket dropped — reconnecting…');
+          try{ client.realtime.connect(); }catch(e){}
+          try{
+            if(typeof EduPulseSyncBrain !== 'undefined'){
+              EduPulseSyncBrain.destroy();
+              EduPulseSyncBrain.init(client);
+            }
+          }catch(e){ console.warn('[SyncEngine] _setupRealtimeReconnect', e); }
+        }
+      }catch(e){}
+    };
+
+    // Poll every 15 seconds — catches quiet WiFi→4G drops that don't fire 'offline'
+    this._reconnectTimer = setInterval(doReconnect, 15000);
+
+    // Re-check immediately when user switches back to this tab
+    this._reconnectVisHandler = () => { if(!document.hidden) doReconnect(); };
+    document.addEventListener('visibilitychange', this._reconnectVisHandler);
+  },
 
   // ─── Error handler ────────────────────────────────────────────────────────────
   _sbError(msg){
@@ -16368,7 +17575,7 @@ const IdleReminder = {
 // no popup stacking is possible. The named window is navigated, not re-created.
 // ═══════════════════════════════════════════════════════════════════════════════
 const DispatchWindow = {
-  _NAME: 'edupulse_dispatch',
+  _NAME: 'EduPulseWhatsAppWindow',  // single named tab reused for every outbound link
   _ref:  null,
 
   // Returns true when the window is open and reachable
@@ -16433,24 +17640,35 @@ const PlatformService = {
     }
   },
 
+  // ── getWhatsAppUrl — canonical URL builder ────────────────────────────────
+  // Returns the universal wa.me deeplink. phone must be digits-only (no +, spaces).
+  // rawMessage must be a plain UTF-8 string — encoded exactly once here.
+  getWhatsAppUrl(phone, rawMessage){
+    const safe = encodeURIComponent(rawMessage || '');
+    return phone ? `https://wa.me/${phone}?text=${safe}`
+                 : `https://wa.me/?text=${safe}`;
+  },
+
   // ── WhatsApp: full fallback chain ────────────────────────────────────────
-  // Single-window architecture — reuses the ONE dispatch window for every send.
+  // Single-window architecture — reuses ONE named tab (EduPulseWhatsAppWindow)
+  // for every send on desktop.  Mobile opens the native app via anchor click
+  // so EduPulse is NEVER navigated away from.
   // rawText MUST be plain UTF-8 string (not pre-encoded) — encoded exactly once here.
   async openWhatsApp(phone, rawText){
-    // Normalize first (strip box-drawing chars that render as □ on Android)
+    // ── 0. Sanitize phone — strip everything except digits ─────────────────
+    //    Callers should already pass digitsOnly(), but this is a safety guard.
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+
+    // Normalize text (strip box-drawing chars that render as □ on Android)
     const normalized = (typeof EmojiSystem !== 'undefined' && EmojiSystem.normalizeWhatsAppMessage)
       ? EmojiSystem.normalizeWhatsAppMessage(rawText)
       : rawText;
 
     // Single encode for all URL construction
     const safe    = encodeURIComponent(normalized);
-    const waDeep  = phone ? `whatsapp://send?phone=${phone}&text=${safe}`
-                          : `whatsapp://send?text=${safe}`;
-    const waMe    = phone ? `https://wa.me/${phone}?text=${safe}`
-                          : `https://wa.me/?text=${safe}`;
-    const intent  = `intent://send?phone=${phone}&text=${safe}` +
-                    `#Intent;scheme=whatsapp;S.browser_fallback_url=` +
-                    `https%3A%2F%2Fwww.whatsapp.com;end`;
+    const waDeep  = cleanPhone ? `whatsapp://send?phone=${cleanPhone}&text=${safe}`
+                               : `whatsapp://send?text=${safe}`;
+    const waMe    = this.getWhatsAppUrl(cleanPhone, normalized);
 
     // Copy to clipboard as silent safety net (paste fallback)
     try{ await navigator.clipboard.writeText(normalized); }catch(_){}
@@ -16461,28 +17679,53 @@ const PlatformService = {
         await window.Capacitor.Plugins.App.openUrl({ url: waDeep });
         return;
       }catch(e){ console.warn('[PlatformService] Capacitor openUrl failed:', e.message); }
+      // Capacitor fallback — open wa.me via the App plugin
+      try{
+        await window.Capacitor.Plugins.App.openUrl({ url: waMe });
+        return;
+      }catch(e2){}
     }
 
-    // ── 2. Android / PWA — intent:// deep link (no popup, native WA) ──────
+    // ── 2. Android / PWA — anchor click keeps EduPulse alive ──────────────
+    // Clicking an <a target="_blank"> hands off to the OS intent resolver,
+    // which opens WhatsApp directly without navigating the current WebView.
+    // After WA_FALLBACK ms, if the tab is still visible the OS didn't switch
+    // apps (WA not installed), so we open wa.me in the named dispatch window.
     if(this.isAndroid() || this.isPWA()){
-      window.location.href = intent;
-      // OS needs ~1.5 s to switch app; if still here, wa.me via single window
-      await new Promise(r => setTimeout(r, 1500));
+      const a   = document.createElement('a');
+      a.href    = waDeep;
+      a.target  = '_blank';
+      a.rel     = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      const fallbackMs = (typeof CONFIG !== 'undefined' && CONFIG.WA_FALLBACK) || 1500;
+      await new Promise(r => setTimeout(r, fallbackMs));
       if(!document.hidden) DispatchWindow.navigate(waMe);
       return;
     }
 
-    // ── 3. iOS — whatsapp:// deep link first, wa.me fallback ──────────────
+    // ── 3. iOS — whatsapp:// deep link via anchor, wa.me fallback ─────────
+    // Same anchor-click pattern: EduPulse stays open regardless.
     if(this.isIOS()){
-      window.location.href = waDeep;
-      await new Promise(r => setTimeout(r, 1200));
+      const a   = document.createElement('a');
+      a.href    = waDeep;
+      a.target  = '_blank';
+      a.rel     = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      const fallbackMs = (typeof CONFIG !== 'undefined' && CONFIG.WA_FALLBACK) || 1200;
+      await new Promise(r => setTimeout(r, fallbackMs));
       if(!document.hidden) DispatchWindow.navigate(waMe);
       return;
     }
 
-    // ── 4. Desktop — single named window (reused for every send) ──────────
-    // whatsapp:// protocol opens the desktop app; if blocked, wa.me in the window
-    const opened = DispatchWindow.navigate(waDeep);
+    // ── 4. Desktop — single named window, reused for every send ───────────
+    // wa.me opens WhatsApp Web in EduPulseWhatsAppWindow. If the user also has
+    // WhatsApp Desktop installed the browser will prompt them to open it.
+    // Sending for Student B after Student A simply navigates the SAME tab.
+    const opened = DispatchWindow.navigate(waMe);
     if(!opened){
       // Popup blocked — navigator.share fallback, then clipboard notice
       if(navigator.share){
@@ -19128,21 +20371,34 @@ const PWAManager = {
     });
   },
 
-  // Generate manifest.json inline as a blob: URL — no external file needed
+  // Generate manifest.json inline as a blob: URL — no external file needed.
+  // All URLs are computed as absolute so they resolve correctly even when the
+  // manifest is loaded from blob:null (file:// or APK WebView context).
   _injectManifest(){
+    // PWA manifest is meaningless on file:// — skip entirely to avoid the
+    // "Unsafe attempt to load URL" security error the empty <link rel=manifest>
+    // triggers before JavaScript can set a proper href.
+    if(location.protocol === 'file:') return;
     try{
+      // Build absolute base so relative paths resolve from blob: origins
+      const base     = location.href.replace(/\/[^/]*(\?.*)?$/, '/');
+      const iconBase = base.endsWith('/') ? base : base + '/';
+      const startUrl = base;
+      const scopeUrl = base;
+
       const manifest = {
         name:             'EduPulse — Classroom Intelligence',
         short_name:       'EduPulse',
         description:      'AI-powered classroom behavior intelligence platform',
-        start_url:        './',
+        start_url:        startUrl,
+        scope:            scopeUrl,
         display:          'standalone',
         background_color: '#07091a',
         theme_color:      '#07091a',
         orientation:      'any',
         icons: [
-          { src:'icons/icon-192x192.png', sizes:'192x192', type:'image/png', purpose:'any maskable' },
-          { src:'icons/icon-512x512.png', sizes:'512x512', type:'image/png', purpose:'any maskable' },
+          { src: iconBase + 'icons/icon-192x192.png', sizes:'192x192', type:'image/png', purpose:'any maskable' },
+          { src: iconBase + 'icons/icon-512x512.png', sizes:'512x512', type:'image/png', purpose:'any maskable' },
         ],
         categories: ['education','productivity'],
       };
@@ -19168,12 +20424,26 @@ const PRECACHE=[
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
 ];
+/* Patterns that must NEVER be intercepted — Supabase REST, Realtime WebSockets,
+   and CDN delivery for the Supabase JS SDK itself.  Any fetch/WebSocket to these
+   hosts must reach the network directly so that APK WebViews don't see a stale
+   or blocked response. */
+const BYPASS_PATTERNS=[
+  /supabase\.co/,
+  /supabase\.in/,
+  /supabase\.net/,
+  /cdn\.jsdelivr\.net\/npm\/@supabase/,
+  /realtime-ws/,
+];
+const shouldBypass=url=>BYPASS_PATTERNS.some(p=>p.test(url));
 self.addEventListener('install',e=>{
   e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(PRECACHE.map(u=>c.add(u).catch(()=>{})))).then(()=>self.skipWaiting()));
 });
 self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET') return;
+  /* Let Supabase traffic pass straight through — no cache, no intercept */
+  if(shouldBypass(e.request.url)) return;
   e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>r)));
 });`;
       const blob = new Blob([swCode],{type:'application/javascript'});
