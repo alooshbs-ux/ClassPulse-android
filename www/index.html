@@ -1982,6 +1982,8 @@ a{text-decoration:none;color:inherit}
 
   /* Sync pill — smaller */
   .sync-pill{ padding:3px 7px; font-size:9px }
+  /* Hide separate realtime status on mobile — sync-pill covers the info */
+  #realtime-conn-status{ display:none }
 
   /* ── Screens ─────────────────────────────────────────────── */
   .screen{ overflow-y:auto; height:100% }
@@ -3927,14 +3929,14 @@ body.privacy-mode .hide-privacy{display:none!important}
             <button class="btn btn-ghost btn-sm" onclick="ImportNames.open()" data-tip="Bulk import student names from text or CSV file">📥 Import Names</button>
             <button class="btn btn-ghost btn-sm" onclick="DemoLoader.load()" data-tip="Add 12 demo students with realistic behavior data">🎭 Load Demo</button>
             <button class="btn btn-ghost btn-sm" onclick="StorageManager.exportJSON()" data-tip="Export a full backup of all your data">📄 Export Backup</button>
-            <button class="btn btn-warning btn-sm" onclick="DataHub.open()" data-tip="Manage, export, or delete your class data — includes Factory Reset">🗃️ Data Hub</button>
+            <button class="btn btn-warning btn-sm" onclick="DataHub.open()" data-tip="Selectively delete students, behavior logs, seating, AI data, or other classes. Factory Reset available in Danger Zone.">🗃️ Data Hub</button>
             <button class="btn btn-ghost btn-sm" onclick="YearArchive.open()" data-tip="Archive the school year — full snapshot, nothing deleted">🗂️ Year Archive</button>
           </div>
           <div style="margin-top:10px;padding:10px 12px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px">
             <div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:6px">⚠️ Reset & Clear Data</div>
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
-              Use <strong>🗃️ Data Hub</strong> above to selectively delete students, events, or do a full factory reset.
-              All resets are permanent and cannot be undone.
+              Use <strong>🗃️ Data Hub</strong> above to selectively delete behavior logs, students, seating data, or AI profiles.
+              Factory Reset is available inside the Danger Zone section. All deletions are permanent.
             </div>
             <button class="btn btn-danger btn-sm" onclick="DataHub.open()" style="font-size:11px">
               🔥 Open Reset & Data Manager
@@ -8949,40 +8951,194 @@ const UI = {
   },
 
   _confirmDeleteStudent(id){
-    const st=StudentManager.getById(id);
+    const st = StudentManager.getById(id);
     if(!st) return;
     App.closeModal();
+
+    // Build impact stats
+    const allEvents = StorageManager.getEvents().filter(e => e.studentId == id);
+    const pos  = allEvents.filter(e => e.pts > 0).length;
+    const neg  = allEvents.filter(e => e.pts < 0).length;
+    const joinDate = st.createdAt
+      ? new Date(st.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})
+      : 'Unknown';
+
     setTimeout(()=>UI._openModal({
-      title:'🗑 Remove Student',
-      size:'sm',
-      body:`<div style="text-align:center;padding:8px 0">
-        <div style="font-size:40px;margin-bottom:10px">${st.avatar}</div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:8px">${st.name}</div>
-        <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">This will permanently remove this student and all their behavior history.<br>This action <strong style="color:var(--red)">cannot be undone</strong>.</div>
-      </div>`,
+      title: 'Remove Student',
+      size:  'sm',
+      body:`
+        <!-- Student identity -->
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;
+             background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+          <div style="width:44px;height:44px;border-radius:50%;background:${st.color}22;
+               color:${st.color};font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${st.avatar}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700">${st.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Joined ${joinDate}</div>
+          </div>
+        </div>
+
+        <!-- What will be deleted -->
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+             color:var(--text-muted);margin-bottom:8px">Data that will be affected</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px">
+          <div style="padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;text-align:center">
+            <div style="font-size:18px;font-weight:700;color:var(--green)">${pos}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Positive behaviors</div>
+          </div>
+          <div style="padding:8px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;text-align:center">
+            <div style="font-size:18px;font-weight:700;color:var(--red)">${neg}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Negative behaviors</div>
+          </div>
+        </div>
+
+        <!-- Two-option choice -->
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+             color:var(--text-muted);margin-bottom:8px">Choose an action</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+
+          <!-- Soft: remove from class only -->
+          <label id="del-opt-logs" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                 padding:10px 12px;border-radius:8px;border:2px solid var(--accent);
+                 background:var(--accent-dim);transition:.15s" onclick="UI._studentDelSelect('logs')">
+            <div style="width:16px;height:16px;border-radius:50%;border:2px solid var(--accent);
+                 background:var(--accent);display:flex;align-items:center;justify-content:center;
+                 flex-shrink:0;margin-top:1px;font-size:9px;color:#fff" id="del-radio-logs">✓</div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--text-primary)">Keep student, clear behavior logs only</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                The student stays in your roster. All ${allEvents.length} logged events are deleted.
+                Useful for a fresh start at a new term.
+              </div>
+            </div>
+          </label>
+
+          <!-- Hard: remove student entirely -->
+          <label id="del-opt-all" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                 padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+                 background:var(--bg-elevated);transition:.15s" onclick="UI._studentDelSelect('all')">
+            <div style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);
+                 background:transparent;display:flex;align-items:center;justify-content:center;
+                 flex-shrink:0;margin-top:1px;font-size:9px" id="del-radio-all"></div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--red)">Remove student & all data permanently</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                Removes the student from your roster along with all ${allEvents.length} behavior records.
+                <strong style="color:var(--red)">This cannot be undone.</strong>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Typed confirmation — shown only for full delete -->
+        <div id="del-type-wrap" style="display:none;margin-bottom:4px">
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">
+            Type <strong style="color:var(--red)">${st.name.split(' ')[0]}</strong> to confirm permanent removal:
+          </div>
+          <input id="del-type-input" class="input" placeholder="Type first name…"
+            style="width:100%;font-size:13px"
+            oninput="UI._studentDelTyped(this.value,'${st.name.split(' ')[0]}')">
+        </div>
+      `,
       actions:[
         {label:'Cancel', class:'btn-ghost', onclick:'App.closeModal()'},
-        {label:'🗑 Remove Permanently', class:'btn-danger', onclick:`UI._doDeleteStudent(${id})`},
+        {label:'Confirm', class:'btn-danger', id:'del-confirm-btn',
+         onclick:`UI._doDeleteStudent(${id})`},
       ],
     }),80);
+
+    // Set initial button state
+    setTimeout(()=>{
+      const btn = document.getElementById('del-confirm-btn');
+      if(btn){ btn.textContent = 'Clear Behavior Logs'; btn.className = 'btn btn-warning'; }
+    }, 120);
+  },
+
+  _studentDelSelect(mode){
+    const logsEl  = document.getElementById('del-opt-logs');
+    const allEl   = document.getElementById('del-opt-all');
+    const rLogs   = document.getElementById('del-radio-logs');
+    const rAll    = document.getElementById('del-radio-all');
+    const typeWrap= document.getElementById('del-type-wrap');
+    const btn     = document.getElementById('del-confirm-btn');
+    if(!logsEl||!allEl) return;
+
+    window._delStudentMode = mode;
+
+    if(mode==='logs'){
+      logsEl.style.border='2px solid var(--accent)';
+      logsEl.style.background='var(--accent-dim)';
+      allEl.style.border='1px solid var(--border)';
+      allEl.style.background='var(--bg-elevated)';
+      rLogs.style.background='var(--accent)';
+      rLogs.style.border='2px solid var(--accent)';
+      rLogs.textContent='✓';
+      rAll.style.background='transparent';
+      rAll.style.border='2px solid var(--border)';
+      rAll.textContent='';
+      if(typeWrap) typeWrap.style.display='none';
+      if(btn){ btn.textContent='Clear Behavior Logs'; btn.className='btn btn-warning'; btn.disabled=false; btn.style.opacity='1'; }
+    } else {
+      allEl.style.border='2px solid var(--red)';
+      allEl.style.background='rgba(220,38,38,0.07)';
+      logsEl.style.border='1px solid var(--border)';
+      logsEl.style.background='var(--bg-elevated)';
+      rAll.style.background='var(--red)';
+      rAll.style.border='2px solid var(--red)';
+      rAll.textContent='✓';
+      rLogs.style.background='transparent';
+      rLogs.style.border='2px solid var(--border)';
+      rLogs.textContent='';
+      if(typeWrap) typeWrap.style.display='block';
+      if(btn){ btn.textContent='Remove Student'; btn.className='btn btn-danger'; btn.disabled=true; btn.style.opacity='0.4'; }
+    }
+  },
+
+  _studentDelTyped(val, firstName){
+    const btn = document.getElementById('del-confirm-btn');
+    if(!btn) return;
+    const match = val.trim().toLowerCase() === firstName.toLowerCase();
+    btn.disabled = !match;
+    btn.style.opacity = match ? '1' : '0.4';
   },
 
   _doDeleteStudent(id){
-    const st=StudentManager.getById(id);
+    const st = StudentManager.getById(id);
     if(!st) return;
-    StudentManager.remove(id);
-    if(this._selectedStudentId===id){
-      this._selectedStudentId=null;
-      const ph=document.getElementById('bp-placeholder');
-      const ct=document.getElementById('bp-content');
-      if(ph) ph.style.display='flex';
-      if(ct) ct.style.display='none';
+    const mode = window._delStudentMode || 'logs';
+
+    if(mode === 'logs'){
+      // Clear only behavior events for this student
+      const remaining = StorageManager.getEvents().filter(e => e.studentId != id);
+      StorageManager.saveEvents(remaining);
+      EventCache.invalidate();
+      Analytics.invalidate();
+      InsightEngine.invalidate();
+      App.closeModal();
+      NotificationEngine.success('Behavior Logs Cleared',`All behavior history for ${st.name} has been removed. The student remains in your roster.`);
+    } else {
+      // Full permanent removal
+      StudentManager.remove(id);
+      if(this._selectedStudentId===id){
+        this._selectedStudentId=null;
+        const ph=document.getElementById('bp-placeholder');
+        const ct=document.getElementById('bp-content');
+        if(ph) ph.style.display='flex';
+        if(ct) ct.style.display='none';
+      }
+      App.closeModal();
+      NotificationEngine.warning('Student Removed',`${st.name} and all associated data have been permanently deleted.`);
     }
-    App.closeModal();
+
+    window._delStudentMode = null;
     this.renderStudents();
     this._renderStudentQuickGrid();
     this._refreshHeaderStats();
-    NotificationEngine.warning('Student Removed',`${st.name} has been removed from the class`);
+    // Keep cloud in sync
+    try{
+      if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+    }catch(e){}
   },
 
   // -─ Analytics screen ───────────────────────────────────────────────
@@ -9818,36 +9974,190 @@ const App = {
   clearAllData(){
     const cls = ClassManager.activeClass();
     const clsName = cls?.name || 'current class';
+    const students = StudentManager.getAll();
+    const events   = StorageManager.getEvents();
+    const posCount = events.filter(e=>e.pts>0).length;
+    const negCount = events.filter(e=>e.pts<0).length;
+
     UI._openModal({
-      title:'⚠️ Reset Class Data',
-      size:'sm',
-      body:`<div style="text-align:center;padding:8px 0">
-        <div style="font-size:40px;margin-bottom:12px">🗑️</div>
-        <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:8px">"${clsName}"</div>
-        <div style="font-size:12px;color:var(--text-secondary);line-height:1.7">
-          All students and behavior history will be
-          <strong style="color:var(--red)">permanently deleted</strong>.<br>
-          Other classes are not affected.
+      title: 'Reset Class Data',
+      size:  'md',
+      body:`
+        <!-- Class identity -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+             background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+          <div style="font-size:28px">🏫</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${clsName}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              ${students.length} students · ${events.length.toLocaleString()} behavior events
+            </div>
+          </div>
         </div>
-      </div>`,
+
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+             color:var(--text-muted);margin-bottom:8px">What do you want to reset?</div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+
+          <!-- Option 1: Logs only -->
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                 padding:10px 12px;border-radius:8px;border:2px solid var(--accent);
+                 background:var(--accent-dim)" id="rst-opt-logs" onclick="App._rstSelect('logs')">
+            <div style="width:16px;height:16px;border-radius:50%;background:var(--accent);
+                 border:2px solid var(--accent);color:#fff;font-size:9px;display:flex;
+                 align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"
+                 id="rst-radio-logs">✓</div>
+            <div>
+              <div style="font-size:12px;font-weight:700">Clear behavior logs only</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                Deletes all ${events.length.toLocaleString()} behavior events (${posCount} positive, ${negCount} negative).
+                Students and their current scores remain untouched.
+                <strong style="color:var(--green)">Safest option.</strong>
+              </div>
+            </div>
+          </label>
+
+          <!-- Option 2: Reset scores -->
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                 padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+                 background:var(--bg-elevated)" id="rst-opt-scores" onclick="App._rstSelect('scores')">
+            <div style="width:16px;height:16px;border-radius:50%;background:transparent;
+                 border:2px solid var(--border);display:flex;align-items:center;justify-content:center;
+                 flex-shrink:0;margin-top:1px;font-size:9px" id="rst-radio-scores"></div>
+            <div>
+              <div style="font-size:12px;font-weight:700">Clear logs + reset all scores to 0</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                Removes all behavior events and resets every student's score, streaks, and weekly points to zero.
+                Student names and phone numbers are kept. Use at the start of a new term.
+              </div>
+            </div>
+          </label>
+
+          <!-- Option 3: Full wipe -->
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+                 padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+                 background:var(--bg-elevated)" id="rst-opt-all" onclick="App._rstSelect('all')">
+            <div style="width:16px;height:16px;border-radius:50%;background:transparent;
+                 border:2px solid var(--border);display:flex;align-items:center;justify-content:center;
+                 flex-shrink:0;margin-top:1px;font-size:9px" id="rst-radio-all"></div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--red)">Remove all students + all data</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                Deletes all ${students.length} students and all ${events.length.toLocaleString()} behavior records.
+                The class will be completely empty. <strong style="color:var(--red)">Cannot be undone.</strong>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Typed confirmation for destructive options -->
+        <div id="rst-type-wrap" style="display:none;margin-bottom:4px">
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">
+            Type the class name <strong style="color:var(--red)">${clsName}</strong> to confirm:
+          </div>
+          <input id="rst-type-input" class="input" placeholder="Type class name…"
+            style="width:100%;font-size:13px"
+            oninput="App._rstTyped(this.value,'${clsName.replace(/'/g,"\\'")}')">
+        </div>
+      `,
       actions:[
         {label:'Cancel', class:'btn-ghost', onclick:'App.closeModal()'},
-        {label:'🗑️ Reset Class', class:'btn-danger', onclick:`App._doResetClass("${clsName}")`},
+        {label:'Clear Logs', class:'btn-warning', id:'rst-confirm-btn',
+         onclick:`App._doResetClass('${clsName.replace(/'/g,"\\'")}')`},
       ],
     });
+
+    window._rstMode = 'logs';
+  },
+
+  _rstSelect(mode){
+    window._rstMode = mode;
+    const opts = ['logs','scores','all'];
+    const accent= {logs:'var(--accent)',scores:'var(--orange)',all:'var(--red)'};
+    const accentDim={logs:'var(--accent-dim)',scores:'rgba(243,156,18,.1)',all:'rgba(220,38,38,.07)'};
+    opts.forEach(o=>{
+      const el  = document.getElementById(`rst-opt-${o}`);
+      const rad = document.getElementById(`rst-radio-${o}`);
+      if(!el||!rad) return;
+      if(o===mode){
+        el.style.border=`2px solid ${accent[o]}`;
+        el.style.background=accentDim[o];
+        rad.style.background=accent[o];
+        rad.style.border=`2px solid ${accent[o]}`;
+        rad.style.color='#fff';
+        rad.textContent='✓';
+      } else {
+        el.style.border='1px solid var(--border)';
+        el.style.background='var(--bg-elevated)';
+        rad.style.background='transparent';
+        rad.style.border='2px solid var(--border)';
+        rad.textContent='';
+      }
+    });
+    const typeWrap = document.getElementById('rst-type-wrap');
+    const btn      = document.getElementById('rst-confirm-btn');
+    if(mode==='logs'){
+      if(typeWrap) typeWrap.style.display='none';
+      if(btn){ btn.textContent='Clear Behavior Logs'; btn.className='btn btn-warning'; btn.disabled=false; btn.style.opacity='1'; }
+    } else if(mode==='scores'){
+      if(typeWrap) typeWrap.style.display='none';
+      if(btn){ btn.textContent='Reset Scores & Logs'; btn.className='btn btn-warning'; btn.disabled=false; btn.style.opacity='1'; }
+    } else {
+      if(typeWrap) typeWrap.style.display='block';
+      const inp = document.getElementById('rst-type-input');
+      if(inp) inp.value='';
+      if(btn){ btn.textContent='Remove All Students'; btn.className='btn btn-danger'; btn.disabled=true; btn.style.opacity='0.4'; }
+    }
+  },
+
+  _rstTyped(val, clsName){
+    const btn = document.getElementById('rst-confirm-btn');
+    if(!btn) return;
+    const match = val.trim() === clsName.trim();
+    btn.disabled = !match;
+    btn.style.opacity = match ? '1' : '0.4';
   },
 
   _doResetClass(clsName){
+    const mode = window._rstMode || 'logs';
     App.closeModal();
-    StorageManager.clearCurrentClass();
-    StudentManager.removeAll();
+    window._rstMode = null;
+
+    if(mode === 'logs'){
+      StorageManager.saveEvents([]);
+      EventCache.invalidate();
+      Analytics.invalidate();
+      InsightEngine.invalidate();
+      NotificationEngine.success('Behavior Logs Cleared',`All behavior events for "${clsName}" have been removed. Students and scores are untouched.`);
+    } else if(mode === 'scores'){
+      StorageManager.saveEvents([]);
+      EventCache.invalidate();
+      const students = StudentManager.getAll().map(s=>({
+        ...s, score:0, weeklyScore:0, streak:0, badges:[], achievements:[],
+      }));
+      StorageManager.saveStudents(students);
+      StudentManager.inv();
+      Analytics.invalidate();
+      InsightEngine.invalidate();
+      NotificationEngine.success('Class Reset',`All scores and behavior logs for "${clsName}" have been reset to zero.`);
+    } else {
+      StorageManager.clearCurrentClass();
+      StudentManager.removeAll();
+      NotificationEngine.info('Class Cleared',`All students and data for "${clsName}" have been permanently removed.`);
+    }
+
     StudentManager.inv();
-    Analytics.invalidate();
-    InsightEngine.invalidate();
-    EventCache.invalidate();
+    AppState.clearMemo();
+    try{ GamificationEngine.invalidateLeaderboard(); }catch(e){}
+    // Push the cleared state to Supabase so all devices see the reset
+    try{
+      if(typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase){
+        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+      }
+    }catch(e){}
     ClassManager._renderSwitcher();
     App.navigate('dashboard');
-    NotificationEngine.info('Class Reset',`All data for "${clsName}" has been cleared`);
   },
 };
 
@@ -10187,34 +10497,121 @@ const QuickEdit = {
     UI._openModal({
       title:'🗑️ Remove Student',
       size:'sm',
-      body:`<div style="text-align:center;padding:8px 0">
-        <div style="width:48px;height:48px;border-radius:50%;background:${st.color}20;color:${st.color};font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px">${st.avatar}</div>
-        <div style="font-size:15px;font-weight:700;margin-bottom:8px">${st.name}</div>
-        <div style="font-size:12px;color:var(--text-secondary);line-height:1.6">This will permanently remove this student and all their behavior history.<br><strong style="color:var(--red)">This action cannot be undone.</strong></div>
-      </div>`,
+      body:`
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+             background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+          <div style="width:44px;height:44px;border-radius:50%;background:${st.color}22;
+               color:${st.color};font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${st.avatar}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700">${st.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Score: ${st.score ?? 0} pts</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
+                 border-radius:8px;border:2px solid var(--accent);background:var(--accent-dim)"
+                 id="qe-del-opt-logs" onclick="QuickEdit._delSelect('logs')">
+            <div style="width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--accent);
+                 color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"
+                 id="qe-del-radio-logs">✓</div>
+            <div>
+              <div style="font-size:12px;font-weight:700">Clear behavior logs only</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Student stays in roster. All behavior history is removed.</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
+                 border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated)"
+                 id="qe-del-opt-all" onclick="QuickEdit._delSelect('all')">
+            <div style="width:16px;height:16px;border-radius:50%;background:transparent;border:2px solid var(--border);
+                 display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:9px"
+                 id="qe-del-radio-all"></div>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--red)">Remove student & all data permanently</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Removes from roster. <strong style="color:var(--red)">Cannot be undone.</strong></div>
+            </div>
+          </label>
+        </div>
+        <div id="qe-del-type-wrap" style="display:none;margin-bottom:4px">
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">
+            Type <strong style="color:var(--red)">${st.name.split(' ')[0]}</strong> to confirm removal:
+          </div>
+          <input id="qe-del-type-input" class="input" placeholder="Type first name…"
+            style="width:100%;font-size:13px"
+            oninput="QuickEdit._delTyped(this.value,'${st.name.split(' ')[0]}')">
+        </div>
+      `,
       actions:[
         {label:'Cancel', class:'btn-ghost', onclick:'App.closeModal()'},
-        {label:'🗑️ Remove', class:'btn-danger', onclick:`QuickEdit._doRemove(${id})`},
+        {label:'Clear Logs', class:'btn-warning', id:'qe-del-confirm-btn',
+         onclick:`QuickEdit._doRemove(${id})`},
       ],
     });
+    window._qeDelMode = 'logs';
+  },
+
+  _delSelect(mode){
+    window._qeDelMode = mode;
+    const logsEl = document.getElementById('qe-del-opt-logs');
+    const allEl  = document.getElementById('qe-del-opt-all');
+    const rLogs  = document.getElementById('qe-del-radio-logs');
+    const rAll   = document.getElementById('qe-del-radio-all');
+    const wrap   = document.getElementById('qe-del-type-wrap');
+    const btn    = document.getElementById('qe-del-confirm-btn');
+    if(!logsEl) return;
+    if(mode==='logs'){
+      logsEl.style.border='2px solid var(--accent)'; logsEl.style.background='var(--accent-dim)';
+      allEl.style.border='1px solid var(--border)';  allEl.style.background='var(--bg-elevated)';
+      rLogs.style.background='var(--accent)'; rLogs.style.border='2px solid var(--accent)'; rLogs.textContent='✓';
+      rAll.style.background='transparent';   rAll.style.border='2px solid var(--border)';  rAll.textContent='';
+      if(wrap) wrap.style.display='none';
+      if(btn){ btn.textContent='Clear Logs'; btn.className='btn btn-warning'; btn.disabled=false; btn.style.opacity='1'; }
+    } else {
+      allEl.style.border='2px solid var(--red)'; allEl.style.background='rgba(220,38,38,.07)';
+      logsEl.style.border='1px solid var(--border)'; logsEl.style.background='var(--bg-elevated)';
+      rAll.style.background='var(--red)';  rAll.style.border='2px solid var(--red)'; rAll.textContent='✓';
+      rLogs.style.background='transparent'; rLogs.style.border='2px solid var(--border)'; rLogs.textContent='';
+      if(wrap) wrap.style.display='block';
+      const inp = document.getElementById('qe-del-type-input'); if(inp) inp.value='';
+      if(btn){ btn.textContent='Remove Student'; btn.className='btn btn-danger'; btn.disabled=true; btn.style.opacity='0.4'; }
+    }
+  },
+
+  _delTyped(val, firstName){
+    const btn = document.getElementById('qe-del-confirm-btn');
+    if(!btn) return;
+    const ok = val.trim().toLowerCase() === firstName.toLowerCase();
+    btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.4';
   },
 
   _doRemove(id){
     const st = StudentManager.getById(id); if(!st) return;
-    const name = st.name;
-    StudentManager.remove(id);
-    if(UI._selectedStudentId === id){
-      UI._selectedStudentId = null;
-      const ph = document.getElementById('bp-placeholder');
-      const ct = document.getElementById('bp-content');
-      if(ph) ph.style.display='flex';
-      if(ct) ct.style.display='none';
+    const mode = window._qeDelMode || 'logs';
+    window._qeDelMode = null;
+
+    if(mode === 'logs'){
+      const remaining = StorageManager.getEvents().filter(e => e.studentId != id);
+      StorageManager.saveEvents(remaining);
+      EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate();
+      App.closeModal();
+      NotificationEngine.success('Behavior Logs Cleared', `All behavior history for ${st.name} has been removed.`);
+    } else {
+      const name = st.name;
+      StudentManager.remove(id);
+      if(UI._selectedStudentId === id){
+        UI._selectedStudentId = null;
+        const ph = document.getElementById('bp-placeholder');
+        const ct = document.getElementById('bp-content');
+        if(ph) ph.style.display='flex'; if(ct) ct.style.display='none';
+      }
+      App.closeModal();
+      NotificationEngine.warning('Student Removed', `${name} and all associated data have been permanently deleted.`);
     }
-    App.closeModal();
-    UI._renderStudentFullGrid();
-    UI._renderStudentQuickGrid();
-    UI._refreshHeaderStats();
-    NotificationEngine.warning('Student Removed', `${name} has been removed from the class`);
+    UI._renderStudentFullGrid(); UI._renderStudentQuickGrid(); UI._refreshHeaderStats();
+    // Keep cloud in sync
+    try{
+      if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+    }catch(e){}
   },
 };
 
@@ -10561,23 +10958,69 @@ const ClassManager = {
       return;
     }
     this.closeDropdown();
+    const students = (() => { try { return JSON.parse(localStorage.getItem(`ep_students_${classId}`) || '[]'); } catch(e){ return []; } })();
+    const events   = (() => { try { return JSON.parse(localStorage.getItem(`ep_events_${classId}`)   || '[]'); } catch(e){ return []; } })();
+
     UI._openModal({
-      title:'🗑️ Delete Class',
-      size:'sm',
-      body:`<div style="text-align:center;padding:8px 0">
-        <div style="font-size:36px;margin-bottom:12px">🏫</div>
-        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px">${cls.name}</div>
-        <div style="font-size:12px;color:var(--text-secondary);line-height:1.7">
-          All students and behavior history for this class will be
-          <strong style="color:var(--red)">permanently deleted</strong>.<br>
-          This action <strong>cannot be undone</strong>.
+      title: 'Delete Class',
+      size:  'sm',
+      body:`
+        <!-- Class identity -->
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+             background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+          <div style="font-size:28px;flex-shrink:0">🏫</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${cls.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              ${students.length} students · ${events.length.toLocaleString()} behavior records
+            </div>
+          </div>
         </div>
-      </div>`,
+
+        <!-- Impact warning -->
+        <div style="background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.25);
+             border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:11px;
+             color:var(--text-secondary);line-height:1.6">
+          <strong style="color:var(--red)">Everything in this class will be permanently deleted:</strong><br>
+          all ${students.length} student records, all ${events.length.toLocaleString()} behavior events, seating layout, and AI profiles.
+          <strong>Other classes are not affected.</strong>
+        </div>
+
+        <!-- Backup nudge -->
+        <div style="display:flex;align-items:center;gap:10px;background:var(--bg-elevated);
+             border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+          <span style="font-size:18px;flex-shrink:0">📤</span>
+          <div style="flex:1;font-size:11px;color:var(--text-secondary)">Download a backup before deleting — recommended</div>
+          <button class="btn btn-ghost btn-xs" onclick="DataHub._downloadBackup(this)">Backup</button>
+        </div>
+
+        <!-- Typed confirmation -->
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">
+          Type <strong style="color:var(--red)">${cls.name}</strong> to enable deletion:
+        </div>
+        <input id="cls-del-input" class="input" placeholder="Type class name exactly…"
+          style="width:100%;font-size:13px;margin-bottom:4px"
+          oninput="ClassManager._delTyped(this.value,'${cls.name.replace(/'/g,"\\'")}')">
+        <div style="font-size:10px;color:var(--text-muted)">This action is permanent and cannot be undone.</div>
+      `,
       actions:[
         {label:'Cancel', class:'btn-ghost', onclick:'App.closeModal()'},
-        {label:'🗑️ Delete Class', class:'btn-danger', onclick:`ClassManager._doDeleteClass('${classId}')`},
+        {label:'Delete Class', class:'btn-danger', id:'cls-del-btn',
+         onclick:`ClassManager._doDeleteClass('${classId}')`},
       ],
     });
+
+    setTimeout(()=>{
+      const btn = document.getElementById('cls-del-btn');
+      if(btn){ btn.disabled=true; btn.style.opacity='0.4'; }
+    }, 80);
+  },
+
+  _delTyped(val, clsName){
+    const btn = document.getElementById('cls-del-btn');
+    if(!btn) return;
+    const ok = val.trim() === clsName.trim();
+    btn.disabled = !ok; btn.style.opacity = ok ? '1' : '0.4';
   },
 
   _doDeleteClass(classId){
@@ -10590,17 +11033,20 @@ const ClassManager = {
     localStorage.removeItem(`ep_students_${classId}`);
     localStorage.removeItem(`ep_events_${classId}`);
     localStorage.removeItem(`ep_settings_${classId}`);
+    localStorage.removeItem(`ep_seating_${classId}`);
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(`ep_dna_${classId}_`))
+      .forEach(k => localStorage.removeItem(k));
 
     const remaining = classes.filter(c=>c.id!==classId);
     this._saveList(remaining);
 
-    // If deleting active class, switch to first remaining
     if(classId === this._activeId){
       this.switchTo(remaining[0].id);
     } else {
       this._renderSwitcher();
     }
-    NotificationEngine.warning('Class Deleted', `"${cls.name}" has been permanently removed`);
+    NotificationEngine.warning('Class Deleted', `"${cls.name}" has been permanently removed.`);
   },
 
   renameClass(classId){
@@ -15090,7 +15536,6 @@ const DataHub = {
 
   // -─ Build live preview line ─────────────────────────────────────────────────
   _previewLine(){
-    const chkAll      = document.getElementById('dh-chk-all')?.checked;
     const chkStudents = document.getElementById('dh-chk-students')?.checked;
     const chkEvents   = document.getElementById('dh-chk-events')?.checked;
     const chkSeating  = document.getElementById('dh-chk-seating')?.checked;
@@ -15101,237 +15546,250 @@ const DataHub = {
     const c = this._counts();
 
     const parts = [];
-    if(chkAll || chkStudents)
-      parts.push(`${c.students.length} student${c.students.length!==1?'s':''}`);
-    if(chkAll || chkEvents)
-      parts.push(`${c.events.length.toLocaleString()} behavior event${c.events.length!==1?'s':''}`);
-    if(chkAll || chkSeating)
-      parts.push(`${c.seatingLayouts} seating layout${c.seatingLayouts!==1?'s':''}`);
-    if(chkAll || chkAI)
-      parts.push(`${c.dnaCount} AI/DNA profile${c.dnaCount!==1?'s':''}`);
-    if(chkAll || chkQuest)
-      parts.push('quest history');
-    if(chkAll || chkClasses)
-      parts.push(`${c.otherCls.length} other class${c.otherCls.length!==1?'es':''}`);
-    if(chkAll || chkSettings)
-      parts.push('all settings & preferences');
+    if(chkStudents) parts.push(`${c.students.length} student${c.students.length!==1?'s':''}`);
+    if(chkEvents)   parts.push(`${c.events.length.toLocaleString()} behavior event${c.events.length!==1?'s':''}`);
+    if(chkSeating)  parts.push(`${c.seatingLayouts} seating layout${c.seatingLayouts!==1?'s':''}`);
+    if(chkAI)       parts.push(`${c.dnaCount} AI/DNA profile${c.dnaCount!==1?'s':''}`);
+    if(chkQuest)    parts.push('quest history');
+    if(chkClasses)  parts.push(`${c.otherCls.length} other class${c.otherCls.length!==1?'es':''}`);
+    if(chkSettings) parts.push('all settings & preferences');
 
     const previewEl = document.getElementById('dh-preview-text');
     if(!previewEl) return;
     if(parts.length === 0){
-      previewEl.textContent = 'Select items below to see what will be deleted.';
+      previewEl.textContent = 'Select items below to see what will be removed.';
       previewEl.style.color = 'var(--text-muted)';
     } else {
       previewEl.innerHTML = '<strong style="color:var(--red)">This will permanently delete:</strong> ' + parts.join(', ') + '.';
       previewEl.style.color = 'var(--text-secondary)';
     }
 
-    // Enable/disable confirm button
     const btn = document.getElementById('dh-confirm-btn');
-    if(btn){
-      btn.disabled = parts.length === 0;
-      btn.style.opacity = parts.length > 0 ? '1' : '0.4';
-    }
+    if(btn){ btn.disabled = parts.length===0; btn.style.opacity = parts.length>0?'1':'0.4'; }
   },
 
-  // -─ Toggle all checkboxes when "Everything" is selected -─────────────────
-  _onAllToggle(){
-    const allChecked = document.getElementById('dh-chk-all')?.checked;
-    ['students','events','seating','ai','quest','classes','settings'].forEach(id => {
-      const el = document.getElementById(`dh-chk-${id}`);
-      if(el){ el.checked = allChecked; el.disabled = allChecked; }
-    });
-    this._previewLine();
-  },
+  // kept for backward compat but no longer used by the new UI
+  _onAllToggle(){ this._previewLine(); },
 
-  // -─ Open modal ─────────────────────────────────────────────────────────────
   open(){
     const c = this._counts();
 
     UI._openModal({
-      title: '🗃️ Data Management Hub',
+      title: '🗃️ Data Management',
       size:  'lg',
       body: `
-        <!-- Live preview summary -->
-        <div id="dh-preview-box" style="
-          background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.2);
-          border-radius:10px;padding:12px 14px;margin-bottom:16px;
-          min-height:44px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:18px;flex-shrink:0">⚠️</span>
+        <!-- Live preview -->
+        <div id="dh-preview-box" style="background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.2);
+             border-radius:10px;padding:11px 14px;margin-bottom:14px;min-height:44px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
           <div id="dh-preview-text" style="font-size:12px;line-height:1.6;color:var(--text-muted)">
-            Select items below to see what will be deleted.
+            Select items below to see what will be removed.
           </div>
         </div>
 
-        <!-- Step 1: Mandatory backup -->
-        <div style="display:flex;align-items:center;gap:10px;
-             background:var(--bg-elevated);border:1px solid var(--border);
-             border-radius:10px;padding:12px 14px;margin-bottom:16px">
-          <span style="font-size:20px">📤</span>
+        <!-- Mandatory backup -->
+        <div style="display:flex;align-items:center;gap:10px;background:var(--bg-elevated);
+             border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px">
+          <span style="font-size:20px;flex-shrink:0">📤</span>
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">Download Backup First</div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">Exports all data as JSON — strongly recommended before any deletion</div>
+            <div style="font-size:12px;font-weight:700">Download Backup First</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:1px">
+              Exports all data as JSON — strongly recommended before any deletion
+            </div>
           </div>
-          <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="DataHub._downloadBackup(this)">
-            📤 Backup
-          </button>
+          <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="DataHub._downloadBackup(this)">📤 Backup</button>
         </div>
 
-        <!-- Checkboxes -->
+        <!-- Section label -->
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
-                    color:var(--text-muted);margin-bottom:8px">Select Data to Delete</div>
+             color:var(--text-muted);margin-bottom:8px">Select data to remove</div>
 
-        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+        <!-- Granular checkboxes only — no "Everything" here -->
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
 
-          <!-- Everything -->
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.25);
-                        border-radius:8px;transition:background .15s">
-            <input type="checkbox" id="dh-chk-all" style="width:16px;height:16px;margin-top:1px;
-                   accent-color:var(--red);flex-shrink:0" onchange="DataHub._onAllToggle()">
-            <div>
-              <div style="font-size:12px;font-weight:700;color:var(--red)">🔥 Everything — Complete Factory Reset</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Deletes all students, events, classes, seating, AI data, quests, and settings.
-                The app will restart fresh.
-              </div>
-            </div>
-          </label>
-
-          <!-- Divider -->
-          <div style="display:flex;align-items:center;gap:8px;margin:2px 0">
-            <div style="flex:1;height:1px;background:var(--border)"></div>
-            <span style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:.5px">OR SELECT INDIVIDUALLY</span>
-            <div style="flex:1;height:1px;background:var(--border)"></div>
-          </div>
-
-          <!-- Students -->
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
-            <input type="checkbox" id="dh-chk-students" style="width:16px;height:16px;margin-top:1px;
-                   accent-color:var(--red);flex-shrink:0" onchange="DataHub._previewLine()">
-            <div>
-              <div style="font-size:12px;font-weight:600">👥 All Students</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Names, avatars, colors, scores, weekly scores, streaks, badges, achievements,
-                notes, and parent phone numbers.
-                <strong style="color:var(--orange)">${c.students.length} student${c.students.length!==1?'s':''}</strong>
-              </div>
-            </div>
-          </label>
-
-          <!-- Events -->
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
             <input type="checkbox" id="dh-chk-events" style="width:16px;height:16px;margin-top:1px;
                    accent-color:var(--red);flex-shrink:0" onchange="DataHub._previewLine()">
             <div>
-              <div style="font-size:12px;font-weight:600">📋 All Behavior Logs & Event History</div>
+              <div style="font-size:12px;font-weight:600">📋 Behavior Logs & Event History</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Every recorded positive and negative behavior event.
-                Student scores and streaks are not recalculated — only the log is cleared.
+                Every recorded behavior event. Student scores and streaks are not recalculated.
                 <strong style="color:var(--orange)">${c.events.length.toLocaleString()} event${c.events.length!==1?'s':''}</strong>
               </div>
             </div>
           </label>
 
-          <!-- Seating -->
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+            <input type="checkbox" id="dh-chk-students" style="width:16px;height:16px;margin-top:1px;
+                   accent-color:var(--red);flex-shrink:0" onchange="DataHub._previewLine()">
+            <div>
+              <div style="font-size:12px;font-weight:600">👥 All Students</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+                Names, scores, streaks, badges, notes, and parent contacts.
+                <strong style="color:var(--orange)">${c.students.length} student${c.students.length!==1?'s':''}</strong>
+              </div>
+            </div>
+          </label>
+
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
             <input type="checkbox" id="dh-chk-seating" style="width:16px;height:16px;margin-top:1px;
                    accent-color:var(--orange);flex-shrink:0" onchange="DataHub._previewLine()">
             <div>
-              <div style="font-size:12px;font-weight:600">🪑 All Seating Charts & Layouts</div>
+              <div style="font-size:12px;font-weight:600">🪑 Seating Charts & Layouts</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Clears all seat assignments across every class. Students and scores are unaffected.
+                All seat assignments across every class.
                 <strong style="color:var(--orange)">${c.seatingLayouts} layout${c.seatingLayouts!==1?'s':''}</strong>
               </div>
             </div>
           </label>
 
-          <!-- AI -->
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
             <input type="checkbox" id="dh-chk-ai" style="width:16px;height:16px;margin-top:1px;
                    accent-color:var(--purple);flex-shrink:0" onchange="DataHub._previewLine()">
             <div>
-              <div style="font-size:12px;font-weight:600">🧠 All AI-related Data</div>
+              <div style="font-size:12px;font-weight:600">🧬 AI & DNA Profiles</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Student DNA profiles, behavior predictions, Teacher Assistant history, and
-                intervention suggestions. AI will relearn from scratch.
-                <strong style="color:var(--purple)">${c.dnaCount} profile${c.dnaCount!==1?'s':''}</strong>
+                All AI-generated student profiles and behavioral pattern data.
+                <strong style="color:var(--orange)">${c.dnaCount} profile${c.dnaCount!==1?'s':''}</strong>
               </div>
             </div>
           </label>
 
-          <!-- Quest -->
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
             <input type="checkbox" id="dh-chk-quest" style="width:16px;height:16px;margin-top:1px;
                    accent-color:var(--gold);flex-shrink:0" onchange="DataHub._previewLine()">
             <div>
-              <div style="font-size:12px;font-weight:600">🎯 All Quest & Goal Progress</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Current quest configuration, goal history, and completion records.
-                ${c.hasQuest ? '<strong style="color:var(--gold)">Active quest found</strong>' : 'No active quest'}
-              </div>
+              <div style="font-size:12px;font-weight:600">⚔️ Quest & Gamification History</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">All quest progress and gamification data.</div>
             </div>
           </label>
 
-          <!-- Other Classes -->
-          ${c.otherCls.length > 0 ? `
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
             <input type="checkbox" id="dh-chk-classes" style="width:16px;height:16px;margin-top:1px;
                    accent-color:var(--orange);flex-shrink:0" onchange="DataHub._previewLine()">
             <div>
-              <div style="font-size:12px;font-weight:600">🏫 All Classes Except Active</div>
+              <div style="font-size:12px;font-weight:600">🏫 Other Classes</div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                Removes all other classes with their students and events. Your current active
-                class is kept untouched.
-                <strong style="color:var(--orange)">${c.otherCls.length} class${c.otherCls.length!==1?'es':''}</strong>:
-                ${c.otherCls.map(cl => cl.name).join(', ')}
-              </div>
-            </div>
-          </label>` : ''}
-
-          <!-- Settings -->
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
-                        background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
-            <input type="checkbox" id="dh-chk-settings" style="width:16px;height:16px;margin-top:1px;
-                   accent-color:var(--cyan);flex-shrink:0" onchange="DataHub._previewLine()">
-            <div>
-              <div style="font-size:12px;font-weight:600">⚙️ All Settings & Preferences</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
-                School name, teacher name, class name, academic year, appearance theme,
-                Firebase sync credentials, lesson mode, and onboarding state.
+                All classes except the one currently active.
+                <strong style="color:var(--orange)">${c.otherCls.length} class${c.otherCls.length!==1?'es':''}</strong>
               </div>
             </div>
           </label>
 
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;
+                 background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px">
+            <input type="checkbox" id="dh-chk-settings" style="width:16px;height:16px;margin-top:1px;
+                   accent-color:var(--cyan);flex-shrink:0" onchange="DataHub._previewLine()">
+            <div>
+              <div style="font-size:12px;font-weight:600">⚙️ Settings & Preferences</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Theme, sync credentials, notification preferences, and all app settings.</div>
+            </div>
+          </label>
         </div>
 
-        <!-- Final warning -->
-        <div style="background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.25);
-             border-radius:8px;padding:10px 14px;font-size:11px;
-             color:var(--text-secondary);line-height:1.6;text-align:center">
-          ⛔ <strong style="color:var(--red)">This action is permanent and irreversible.</strong>
-          There is no undo. Make sure you have downloaded a backup.
+        <!-- ── Danger Zone: Factory Reset (collapsed) ── -->
+        <div style="border:1px solid rgba(220,38,38,.3);border-radius:10px;overflow:hidden;margin-top:4px">
+          <button onclick="DataHub._toggleDangerZone()" style="width:100%;display:flex;align-items:center;
+                 justify-content:space-between;padding:10px 14px;background:rgba(220,38,38,.06);
+                 border:none;cursor:pointer;color:var(--red);font-size:12px;font-weight:700">
+            <span>⚡ Danger Zone — Factory Reset</span>
+            <span id="dh-danger-caret" style="font-size:10px;transition:.2s">▼</span>
+          </button>
+          <div id="dh-danger-body" style="display:none;padding:12px 14px;border-top:1px solid rgba(220,38,38,.2)">
+            <div style="font-size:11px;color:var(--text-secondary);line-height:1.6;margin-bottom:10px">
+              Factory reset deletes <strong>absolutely everything</strong> — all classes, all students, all behavior
+              history, all settings, and all synced data. The app will return to its initial state.<br><br>
+              <strong style="color:var(--red)">This cannot be undone.</strong> Download a backup first.
+            </div>
+            <div style="margin-bottom:8px">
+              <div style="font-size:11px;color:var(--text-secondary);margin-bottom:5px">
+                Type <strong style="color:var(--red)">RESET</strong> to unlock the factory reset button:
+              </div>
+              <input id="dh-reset-input" class="input" placeholder="Type RESET…"
+                style="width:100%;font-size:13px" oninput="DataHub._onResetTyped(this.value)">
+            </div>
+            <button id="dh-factory-btn" disabled style="width:100%;padding:10px;border-radius:8px;
+                   background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.4);
+                   color:var(--red);font-size:12px;font-weight:700;cursor:not-allowed;opacity:0.5;
+                   transition:.2s" onclick="DataHub._startFactoryReset()">
+              🔥 Factory Reset — Erase Everything
+            </button>
+          </div>
         </div>
       `,
       actions: [
         { label: 'Cancel', class: 'btn-ghost', onclick: 'App.closeModal()' },
-        { label: '🗑 Yes, Permanently Delete Selected Data',
+        { label: 'Delete Selected',
           class: 'btn-danger', id: 'dh-confirm-btn',
           onclick: 'DataHub._executePurge()' },
       ],
     });
 
-    // Disable confirm until at least one item selected
     setTimeout(() => {
       const btn = document.getElementById('dh-confirm-btn');
       if(btn){ btn.disabled = true; btn.style.opacity = '0.4'; }
     }, 80);
+  },
+
+  _toggleDangerZone(){
+    const body   = document.getElementById('dh-danger-body');
+    const caret  = document.getElementById('dh-danger-caret');
+    if(!body) return;
+    const open = body.style.display !== 'none';
+    body.style.display  = open ? 'none' : 'block';
+    if(caret) caret.textContent = open ? '▼' : '▲';
+  },
+
+  _onResetTyped(val){
+    const btn = document.getElementById('dh-factory-btn');
+    if(!btn) return;
+    const ok = val.trim() === 'RESET';
+    btn.disabled    = !ok;
+    btn.style.opacity  = ok ? '1'   : '0.5';
+    btn.style.cursor   = ok ? 'pointer' : 'not-allowed';
+    btn.style.background = ok ? 'rgba(220,38,38,.25)' : 'rgba(220,38,38,.15)';
+  },
+
+  _factoryCountdown: null,
+  _startFactoryReset(){
+    const btn = document.getElementById('dh-factory-btn');
+    if(!btn || btn.disabled) return;
+    // Countdown 5 → 0 then execute
+    let count = 5;
+    btn.style.background = 'var(--red)';
+    btn.style.color = '#fff';
+    btn.textContent = `Hold on… cancelling in ${count}s`;
+    btn.onclick = () => {
+      clearInterval(this._factoryCountdown);
+      btn.textContent = '🔥 Factory Reset — Erase Everything';
+      btn.style.background = 'rgba(220,38,38,.25)';
+      btn.style.color = 'var(--red)';
+      btn.onclick = () => DataHub._startFactoryReset();
+    };
+    this._factoryCountdown = setInterval(()=>{
+      count--;
+      if(count <= 0){
+        clearInterval(this._factoryCountdown);
+        this._executeFactoryReset();
+      } else {
+        btn.textContent = `Hold on… cancelling in ${count}s`;
+      }
+    }, 1000);
+  },
+
+  _executeFactoryReset(){
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('ep_'))
+      .forEach(k => localStorage.removeItem(k));
+    App.closeModal();
+    NotificationEngine.success('Factory Reset Complete', 'Reloading…', 2500);
+    setTimeout(() => location.reload(), 2500);
   },
 
   _downloadBackup(btn){
@@ -15362,26 +15820,16 @@ const DataHub = {
   },
 
   _executePurge(){
-    const chkAll      = document.getElementById('dh-chk-all')?.checked;
-    const chkStudents = document.getElementById('dh-chk-students')?.checked;
-    const chkEvents   = document.getElementById('dh-chk-events')?.checked;
-    const chkSeating  = document.getElementById('dh-chk-seating')?.checked;
-    const chkAI       = document.getElementById('dh-chk-ai')?.checked;
-    const chkQuest    = document.getElementById('dh-chk-quest')?.checked;
-    const chkClasses  = document.getElementById('dh-chk-classes')?.checked;
-    const chkSettings = document.getElementById('dh-chk-settings')?.checked;
+    const doStudents = document.getElementById('dh-chk-students')?.checked;
+    const doEvents   = document.getElementById('dh-chk-events')?.checked;
+    const doSeating  = document.getElementById('dh-chk-seating')?.checked;
+    const doAI       = document.getElementById('dh-chk-ai')?.checked;
+    const doQuest    = document.getElementById('dh-chk-quest')?.checked;
+    const doClasses  = document.getElementById('dh-chk-classes')?.checked;
+    const doSettings = document.getElementById('dh-chk-settings')?.checked;
 
-    const doStudents = chkAll || chkStudents;
-    const doEvents   = chkAll || chkEvents;
-    const doSeating  = chkAll || chkSeating;
-    const doAI       = chkAll || chkAI;
-    const doQuest    = chkAll || chkQuest;
-    const doClasses  = chkAll || chkClasses;
-    const doSettings = chkAll || chkSettings;
-
-    if(!doStudents && !doEvents && !doSeating && !doAI &&
-       !doQuest    && !doClasses && !doSettings){
-      NotificationEngine.warning('Nothing Selected', 'Select at least one item to delete.');
+    if(!doStudents && !doEvents && !doSeating && !doAI && !doQuest && !doClasses && !doSettings){
+      NotificationEngine.warning('Nothing Selected', 'Select at least one category to remove.');
       return;
     }
 
@@ -15393,7 +15841,6 @@ const DataHub = {
 
       if(doStudents){
         StudentManager.removeAll();
-        // Also clear DNA for this class
         Object.keys(localStorage)
           .filter(k => k.startsWith(`ep_dna_${cid}_`))
           .forEach(k => localStorage.removeItem(k));
@@ -15413,7 +15860,6 @@ const DataHub = {
       }
 
       if(doAI){
-        // All DNA profiles across all classes
         Object.keys(localStorage)
           .filter(k => k.startsWith('ep_dna_'))
           .forEach(k => localStorage.removeItem(k));
@@ -15429,7 +15875,6 @@ const DataHub = {
         const active   = classes.find(c => c.id === cid);
         const filtered = active ? [active] : [];
         localStorage.setItem('ep_classes', JSON.stringify(filtered));
-        // Remove data for removed classes
         classes.filter(c => c.id !== cid).forEach(c => {
           localStorage.removeItem(`ep_students_${c.id}`);
           localStorage.removeItem(`ep_events_${c.id}`);
@@ -15451,28 +15896,21 @@ const DataHub = {
         purged.push('settings');
       }
 
-      // Factory reset: clear absolutely everything and reload
-      if(chkAll){
-        Object.keys(localStorage)
-          .filter(k => k.startsWith('ep_'))
-          .forEach(k => localStorage.removeItem(k));
-        App.closeModal();
-        NotificationEngine.success('🔄 Factory Reset Complete', 'Reloading app…', 2500);
-        setTimeout(() => location.reload(), 2500);
-        return;
-      }
-
-      // Partial: invalidate caches and refresh
       try{ StorageManager.invAll?.(); }catch(e){}
       EventCache.invalidate();
       AppState.clearMemo();
       try{ GamificationEngine.invalidateLeaderboard(); }catch(e){}
 
       App.closeModal();
-      NotificationEngine.success(
-        '✅ Deletion Complete',
-        `Removed: ${purged.join(', ')}.`
-      );
+      NotificationEngine.success('Deletion Complete', `Removed: ${purged.join(', ')}.`);
+
+      // Push cleared state to Supabase so all devices reflect the deletion
+      setTimeout(()=>{
+        try{
+          if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+            DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+        }catch(e){}
+      }, 350);
 
       setTimeout(() => {
         try{ UI._renderStudentQuickGrid(); }catch(e){}
