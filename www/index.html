@@ -2,14 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<script>
-// Chrome logs "Unsafe attempt to load URL file://..." as a browser-level
-// security warning on the very first file:// load of each session.
-// A single silent reload before any resources parse eliminates it.
-if(location.protocol==='file:'&&!sessionStorage.getItem('_ep_fr')){
-  sessionStorage.setItem('_ep_fr','1');location.reload();
-}
-</script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>EduPulse — Classroom Intelligence Platform</title>
 <meta name="application-name" content="EduPulse"/>
@@ -22,6 +14,7 @@ if(location.protocol==='file:'&&!sessionStorage.getItem('_ep_fr')){
 <meta name="msapplication-tap-highlight" content="no"/>
 <meta name="description" content="AI-powered classroom behavior intelligence platform"/>
 <meta http-equiv="Content-Security-Policy" content="default-src * blob: data: 'unsafe-inline' 'unsafe-eval'; connect-src * ws: wss: blob:; img-src * data: blob:; frame-src * blob:; style-src * blob: 'unsafe-inline'; manifest-src blob: *; worker-src blob: *;">
+<link rel="manifest" id="ep-manifest-link"/>
 <link rel="apple-touch-icon" href="icons/icon-192x192.png"/>
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==">
 <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png"/>
@@ -783,6 +776,7 @@ a{text-decoration:none;color:inherit}
   background:var(--bg-card);border:1px solid var(--border);
   border-radius:var(--radius-lg);padding:14px;
   display:flex;flex-direction:column;gap:10px;
+  min-width:0;overflow:hidden;
 }
 .behavior-panel-header{
   display:flex;align-items:center;gap:10px;padding-bottom:10px;
@@ -807,7 +801,7 @@ a{text-decoration:none;color:inherit}
   content:'';flex:1;height:1px;
   background:var(--border);opacity:.6;
 }
-.behavior-btns{display:grid;grid-template-columns:repeat(auto-fill,64px);gap:6px}
+.behavior-btns{display:grid;grid-template-columns:repeat(auto-fill,minmax(60px,1fr));gap:6px;min-width:0;width:100%}
 /* Quick card edit button — was 100% inline, now CSS */
 .scard-edit-btn{
   position:absolute;top:2px;right:3px;
@@ -824,13 +818,15 @@ a{text-decoration:none;color:inherit}
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
   gap:3px;
-  width:64px;height:64px;
+  width:100%;height:64px;
   border-radius:10px;
   border:none;cursor:pointer;
   transition:background .15s,transform .12s,box-shadow .12s;
   flex-shrink:0;
   position:relative;
   overflow:hidden;
+  min-width:0;
+  box-sizing:border-box;
 }
 .beh-btn .beh-icon{
   font-size:20px;line-height:1;
@@ -1041,27 +1037,6 @@ a{text-decoration:none;color:inherit}
   background:linear-gradient(90deg,#4F46E5,#6366F1);
   box-shadow:0 0 8px rgba(99,102,241,0.3);
 }
-
-/* Score distribution — numeric table under analytics bar chart */
-.score-dist-table-wrap{
-  padding:0 12px 12px;
-}
-.score-dist-table{
-  width:100%;font-size:11px;border-collapse:collapse;
-  color:var(--text-primary);
-}
-.score-dist-table th{
-  text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;
-  letter-spacing:.4px;color:var(--text-muted);
-  padding:6px 8px;border-bottom:1px solid var(--border);
-}
-.score-dist-table td{
-  padding:5px 8px;border-bottom:1px solid var(--border);
-}
-.score-dist-table tbody tr:last-child td{ border-bottom:none; }
-.score-dist-table .sd-num{ text-align:right;font-family:var(--mono); }
-.score-dist-table .sd-pct{ text-align:right;color:var(--text-muted);font-size:10px; }
-
 .ep-stat-row{
   display:flex;align-items:center;gap:10px;padding:5px 0;
 }
@@ -2095,17 +2070,23 @@ a{text-decoration:none;color:inherit}
   }
 
   /* Behavior panel */
-  .behavior-panel{ min-height:280px }
+  .behavior-panel{ min-height:280px;padding:10px }
   .bp-note-wrap{ padding:6px }
-  .behavior-btns{ gap:5px }
+  .behavior-btns{
+    grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+    gap:5px;
+    width:100%;
+    min-width:0;
+  }
   .beh-btn{
-    width:58px;height:58px;
+    width:100%;
+    min-width:0;
+    height:58px;
     border-radius:9px;
   }
   .beh-btn .beh-icon{ font-size:18px; }
-  .beh-btn .beh-label{ font-size:7.5px; }
+  .beh-btn .beh-label{ font-size:7.5px;max-width:100%; }
   .beh-btn .beh-pts{ font-size:7.5px; }
-  .behavior-btns{ grid-template-columns:repeat(auto-fill,58px);gap:5px; }
   .beh-icon{ font-size:16px }
   .beh-pts{ font-size:8px }
   .behavior-section-label{ font-size:9px; padding:4px 0 3px }
@@ -3234,638 +3215,6 @@ body.privacy-mode .hide-privacy{display:none!important}
 </style>
 </head>
 <body>
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     dataService.js  —  inlined & hardened  (v2)
-     Supabase CRUD + offline queue with:
-       • Concurrency guard on flushOfflineQueue (_flushInProgress flag)
-       • Queue size cap (MAX_QUEUE = 200 ops) — prevents unbounded growth
-       • updated_at conflict guard on pull (skip if server row older than local)
-       • StorageManager.invAll() called after pull so caches are busted
-       • DataService.pull alias so syncBrain can call it by short name
-       • classId snapshot in enqueue — prevents class-switch ops being sent
-         under the wrong class ID
-═══════════════════════════════════════════════════════════════════════════ -->
-<script>
-(function (global) {
-  'use strict';
-
-  var QUEUE_KEY  = 'ep_rt_pending_ops';
-  var MAX_QUEUE  = 200;   // hard cap — prevents unbounded localStorage growth
-
-  /* ── helpers ─────────────────────────────────────────────────────────── */
-  function getClient() {
-    var c = global.supabase;
-    return c && typeof c.from === 'function' ? c : null;
-  }
-
-  function classId() {
-    try { return global.ClassManager.activeId(); } catch (e) { return 'default'; }
-  }
-
-  function studentsKey(cid) { return 'ep_students_' + cid; }
-  function eventsKey(cid)   { return 'ep_events_'   + cid; }
-
-  /* ── queue helpers ────────────────────────────────────────────────────── */
-  function readQueue() {
-    try {
-      var q = JSON.parse(global.localStorage.getItem(QUEUE_KEY) || '[]');
-      return Array.isArray(q) ? q : [];
-    } catch (e) { return []; }
-  }
-
-  function writeQueue(arr) {
-    // Enforce hard cap — keep the most-recent ops if over limit
-    if (arr.length > MAX_QUEUE) arr = arr.slice(arr.length - MAX_QUEUE);
-    try { global.localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (e) {}
-  }
-
-  function notifyBadge() {
-    try {
-      if (global.SyncBrain && global.SyncBrain._updatePendingBadge)
-        global.SyncBrain._updatePendingBadge();
-    } catch (e) {}
-  }
-
-  /* ══════════════════════════════════════════════════════════════════════ */
-  var DataService = {
-    _debounceStudents:  null,
-    _debounceEvents:    null,
-    _flushInProgress:   false,   // concurrency guard
-    STUDENT_DEBOUNCE_MS: 450,
-    EVENT_DEBOUNCE_MS:   800,
-
-    /* ── queue accessors ─────────────────────────────────────────────── */
-    getQueueLength: function () { return readQueue().length; },
-    _readQueue:     function () { return readQueue(); },
-    _writeQueue:    function (arr) { writeQueue(arr); },
-
-    enqueue: function (op) {
-      var q = readQueue();
-      // Snapshot classId NOW so future class switches don't corrupt the op
-      q.push(Object.assign({}, op, { ts: Date.now(), classId: op.classId || classId() }));
-      writeQueue(q);
-      notifyBadge();
-    },
-
-    /* ── flush offline queue ─────────────────────────────────────────── */
-    flushOfflineQueue: async function () {
-      if (this._flushInProgress) return;   // prevent concurrent flushes
-      var client = getClient();
-      if (!client || !global.navigator.onLine) return;
-      var q = readQueue();
-      if (!q.length) return;
-
-      this._flushInProgress = true;
-      writeQueue([]);                      // optimistic clear
-      var failed = [];
-
-      for (var i = 0; i < q.length; i++) {
-        var op = q[i];
-        try {
-          if (op.type === 'students')  await this._pushStudentsNow(op.classId, op.rows);
-          else if (op.type === 'behaviors') await this._pushBehaviorsNow(op.classId, op.rows);
-        } catch (e) {
-          failed.push(op);
-        }
-      }
-
-      if (failed.length) {
-        var rest = readQueue();           // pick up any ops added while we were flushing
-        writeQueue(failed.concat(rest));
-      }
-
-      this._flushInProgress = false;
-      notifyBadge();
-    },
-
-    /* ── push helpers ────────────────────────────────────────────────── */
-    pushLocalSnapshot: async function (cid) {
-      cid = cid || classId();
-      if (!getClient()) return;
-      var st = [], ev = [];
-      try { st = global.StorageManager.getStudents() || []; } catch (e) {}
-      try { ev = global.StorageManager.getEvents()   || []; } catch (e) {}
-      try {
-        await this._pushStudentsNow(cid, st);
-        await this._pushBehaviorsNow(cid, ev);
-      } catch (e) {
-        console.warn('[DataService] pushLocalSnapshot', e);
-      }
-    },
-
-    _pushStudentsNow: async function (cid, students) {
-      var client = getClient();
-      if (!client) throw new Error('No Supabase client');
-      var rows = (students || []).map(function (s) {
-        return { id: String(s.id), class_id: cid, data: s, updated_at: new Date().toISOString() };
-      });
-      if (!rows.length) return;
-      var res = await client.from('ep_students').upsert(rows, { onConflict: 'id', defaultToNull: true });
-      if (res.error) throw res.error;
-    },
-
-    _pushBehaviorsNow: async function (cid, events) {
-      var client = getClient();
-      if (!client) throw new Error('No Supabase client');
-      var rows = (events || []).map(function (ev) {
-        return { id: String(ev.id), class_id: cid, data: ev, updated_at: new Date().toISOString() };
-      });
-      if (!rows.length) return;
-      var res = await client.from('ep_movements').upsert(rows, { onConflict: 'id', defaultToNull: true });
-      if (res.error) throw res.error;
-    },
-
-    /* ── debounced push schedulers ───────────────────────────────────── */
-    _schedulePushStudents: function (cid) {
-      var self = this;
-      clearTimeout(this._debounceStudents);
-      this._debounceStudents = setTimeout(function () { self._flushStudentsOut(cid); },
-        this.STUDENT_DEBOUNCE_MS);
-    },
-
-    _schedulePushEvents: function (cid) {
-      var self = this;
-      clearTimeout(this._debounceEvents);
-      this._debounceEvents = setTimeout(function () { self._flushEventsOut(cid); },
-        this.EVENT_DEBOUNCE_MS);
-    },
-
-    _flushStudentsOut: async function (cid) {
-      var rows = [];
-      try { rows = global.StorageManager.getStudents() || []; } catch (e) {}
-      var client = getClient();
-      if (!client || !global.navigator.onLine) {
-        this.enqueue({ type: 'students', classId: cid, rows: rows });
-        return;
-      }
-      try { await this._pushStudentsNow(cid, rows); }
-      catch (e) { this.enqueue({ type: 'students', classId: cid, rows: rows }); }
-    },
-
-    _flushEventsOut: async function (cid) {
-      var rows = [];
-      try { rows = global.StorageManager.getEvents() || []; } catch (e) {}
-      var client = getClient();
-      if (!client || !global.navigator.onLine) {
-        this.enqueue({ type: 'behaviors', classId: cid, rows: rows });
-        return;
-      }
-      try { await this._pushBehaviorsNow(cid, rows); }
-      catch (e) { this.enqueue({ type: 'behaviors', classId: cid, rows: rows }); }
-    },
-
-    /* ── localStorage write hook (called by StorageManager) ─────────── */
-    onLocalStorageWrite: function (key, val) {
-      var cid = classId();
-      if (key === studentsKey(cid)) { this._schedulePushStudents(cid); return; }
-      if (key === eventsKey(cid))   { this._schedulePushEvents(cid);   return; }
-    },
-
-    /* ── pull from Supabase → localStorage ──────────────────────────── */
-    pullClassData: async function (cid) {
-      cid = cid || classId();
-      var client = getClient();
-      if (!client) return;
-
-      // Signal to SyncEngine that a pull is in progress (prevents re-entrancy)
-      try { if (global.SyncEngine) global.SyncEngine._pullInProgress = true; } catch (e) {}
-
-      try {
-        var stRes = await client.from('ep_students').select('data,updated_at').eq('class_id', cid);
-        var beRes = await client.from('ep_movements').select('data,updated_at').eq('class_id', cid);
-        if (stRes.error) throw stRes.error;
-        if (beRes.error) throw beRes.error;
-
-        var students = (stRes.data || []).map(function (r) { return r.data; }).filter(Boolean);
-        var events   = (beRes.data || []).map(function (r) { return r.data; }).filter(Boolean);
-
-        // If server returns empty AND we have local data, trust local (avoids wipe on new device)
-        if (students.length === 0 && events.length === 0) {
-          try {
-            var keep = JSON.parse(global.localStorage.getItem(studentsKey(cid)) || '[]');
-            if (Array.isArray(keep) && keep.length > 0) return;
-          } catch (e2) {}
-        }
-
-        // Write to localStorage — use direct setItem so we don't trigger
-        // the StorageManager debounce push loop
-        global.localStorage.setItem(studentsKey(cid), JSON.stringify(students));
-        global.localStorage.setItem(eventsKey(cid),   JSON.stringify(events));
-
-        // Bust all in-memory caches so the next read gets fresh data
-        try { global.StorageManager.invAll();    } catch (e) {}
-        try { global.StudentManager.inv();       } catch (e) {}
-        try { global.Analytics.invalidate();     } catch (e) {}
-        try { global.InsightEngine.invalidate(); } catch (e) {}
-        try { global.EventCache.invalidate();    } catch (e) {}
-
-      } finally {
-        try { if (global.SyncEngine) global.SyncEngine._pullInProgress = false; } catch (e) {}
-      }
-    },
-
-    /* ── short alias used by syncBrain._appResumeSync ───────────────── */
-    pull: function (cid) { return this.pullClassData(cid); },
-  };
-
-  global.DataService = DataService;
-})(typeof window !== 'undefined' ? window : globalThis);
-</script>
-
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     realtimeService.js  —  inlined & hardened  (v2)
-     Supabase Realtime: one channel per class, postgres_changes on
-     students + behaviors tables.
-     Fixes:
-       • Channel name now includes classId — prevents cross-class noise
-         when multiple teachers use the same Supabase project
-       • Status callback uses both EduPulseSyncBrain (preferred) and
-         SyncEngine as fallback
-       • Graceful teardown on re-subscribe prevents channel leak
-═══════════════════════════════════════════════════════════════════════════ -->
-<script>
-(function (global) {
-  'use strict';
-
-  var RealtimeService = {
-    _channel:   null,
-    _classId:   null,
-
-    subscribe: function (client, handlers) {
-      if (!client || typeof client.channel !== 'function') return null;
-      var onDatabaseChange = handlers && handlers.onDatabaseChange;
-
-      // Determine current class for channel naming
-      var cid = 'default';
-      try { cid = global.ClassManager.activeId() || 'default'; } catch (e) {}
-
-      // Tear down existing channel cleanly before creating a new one
-      if (this._channel) {
-        try { client.removeChannel(this._channel); } catch (e) {}
-        this._channel = null;
-        this._classId = null;
-      }
-
-      var channelName = 'edupulse-sync-' + cid;   // class-scoped channel name
-
-      var ch = client
-        .channel(channelName)
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'ep_students' },
-          function (payload) {
-            try {
-              if (global.DataService && typeof global.DataService.applyRemoteEpStudentRealtime === 'function') {
-                global.DataService.applyRemoteEpStudentRealtime(payload);
-              }
-            } catch (e0) {}
-            if (onDatabaseChange) onDatabaseChange({ table: 'ep_students', payload: payload });
-          })
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'ep_movements',
-            filter: 'class_id=eq.' + cid },
-          function (payload) {
-            if (onDatabaseChange) onDatabaseChange({ table: 'ep_movements', payload: payload });
-          })
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'ep_classes' },
-          function (payload) {
-            if (onDatabaseChange) onDatabaseChange({ table: 'ep_classes', payload: payload });
-          })
-        .subscribe(function (status) {
-          // Prefer EduPulseSyncBrain; fall back to SyncEngine
-          var brain = global.EduPulseSyncBrain;
-          if (brain && typeof brain._onChannelStatus === 'function') {
-            brain._onChannelStatus(status);
-          } else if (global.SyncEngine && typeof global.SyncEngine._onChannelStatus === 'function') {
-            global.SyncEngine._onChannelStatus(status);
-          }
-        });
-
-      this._channel = ch;
-      this._classId = cid;
-      return ch;
-    },
-
-    unsubscribe: function (client) {
-      if (!this._channel || !client) return;
-      try { client.removeChannel(this._channel); } catch (e) {}
-      this._channel = null;
-      this._classId = null;
-    },
-
-    /* Re-subscribe when the active class changes (called by ClassManager) */
-    resubscribeForClass: function (client, handlers) {
-      this.subscribe(client, handlers);
-    },
-  };
-
-  global.RealtimeService = RealtimeService;
-})(typeof window !== 'undefined' ? window : globalThis);
-</script>
-
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     syncBrain.js  —  inlined & hardened  (v3)
-     Event-driven UI: debounced pull + full UI refresh.
-     Connection status: 🟢 Connected / 🟡 Connecting / 🔴 Offline
-
-     Fixes over v2:
-       • _destroyed flag — prevents stale async callbacks calling _setConnStatus
-         after destroy() is called (was causing ghost 🟢 flashes)
-       • refreshAllUI double-render fixed (renderStudents called once)
-       • _appResumeSync uses DataService.pull (now exists as alias)
-       • focus + visibilitychange both fire on some Android WebViews — the
-         MIN_FOCUS_SYNC_INTERVAL guard handles dedup correctly
-       • Capacitor handler stored so destroy() can remove it if plugin
-         supports removeListener (forward-compatible)
-       • Class-change re-subscribe: when ClassManager switches class,
-         RealtimeService.resubscribeForClass is called so the channel
-         filters to the new class immediately
-═══════════════════════════════════════════════════════════════════════════ -->
-<script>
-(function (global) {
-  'use strict';
-
-  var DEBOUNCE_MS             = 300;
-  var MIN_FOCUS_SYNC_INTERVAL = 5000;
-  var MAX_RETRY_ATTEMPTS      = 999;
-  var RETRY_BASE_DELAY_MS     = 2000;
-  var MAX_RETRY_DELAY_MS      = 30000;
-
-  /* ── cache invalidation ───────────────────────────────────────────────── */
-  function invalidateCaches() {
-    try { global.StorageManager.invAll();       } catch (e) {}
-    try { global.StudentManager.inv();          } catch (e) {}
-    try { global.Analytics.invalidate();        } catch (e) {}
-    try { global.InsightEngine.invalidate();    } catch (e) {}
-    try { global.EventCache.invalidate();       } catch (e) {}
-  }
-
-  /* ── full UI refresh ──────────────────────────────────────────────────── */
-  function refreshAllUI() {
-    var scr = '';
-    try { scr = global.App._currentScreen; } catch (e) {}
-
-    // Always refresh the common panels
-    try { global.UI.renderDashboard();          } catch (e) {}
-    try { global.UI.renderReports();            } catch (e) {}
-    try { global.UI.renderAnalytics();          } catch (e) {}
-    try { global.UI.renderLeaderboard();        } catch (e) {}
-    try { global.UI.renderInsights();           } catch (e) {}
-    try { global.UI.renderMiniLeaderboard();    } catch (e) {}
-    try { global.UI._refreshHeaderStats();      } catch (e) {}
-
-    // Students screen is heavy — render once (was rendered twice before the fix)
-    try { global.UI.renderStudents();           } catch (e) {}
-  }
-
-  /* ── legacy global shims (back-compat with old inline onclick refs) ───── */
-  function scheduleDebouncedRefresh() { EduPulseSyncBrain.scheduleRefresh(); }
-  global.reloadStudents  = function () { scheduleDebouncedRefresh(); };
-  global.reloadDashboard = function () { scheduleDebouncedRefresh(); };
-  global.refreshReports  = function () { scheduleDebouncedRefresh(); };
-
-  /* ══════════════════════════════════════════════════════════════════════ */
-  var EduPulseSyncBrain = {
-
-    /* ── state ──────────────────────────────────────────────────────────── */
-    _client:            null,
-    _debounceTimer:     null,
-    _resubscribeTimer:  null,
-    _retryCount:        0,
-    _lastFocusSyncAt:   0,
-    _destroyed:         false,   // guard against stale async callbacks
-
-    _visibilityHandler: null,
-    _focusHandler:      null,
-    _capacitorRemover:  null,    // stores removeListener fn if Capacitor supports it
-
-    /* ── helpers stored for class-change re-subscribe ─────────────────── */
-    _realtimeHandlers: null,
-
-    /* ── debounced remote pull + UI rebuild ──────────────────────────── */
-    scheduleRefresh: function () {
-      if (this._destroyed) return;
-      // Don't stack a refresh while a pull is already in-flight
-      try { if (global.SyncEngine && global.SyncEngine._pullInProgress) return; } catch (e) {}
-      var self = this;
-      clearTimeout(this._debounceTimer);
-      this._debounceTimer = setTimeout(function () { self._runRefresh(); }, DEBOUNCE_MS);
-    },
-
-    _runRefresh: async function () {
-      if (this._destroyed) return;
-      if (!global.DataService || !global.ClassManager) return;
-      var cid = global.ClassManager.activeId();
-      try {
-        await global.DataService.pullClassData(cid);
-        invalidateCaches();
-        refreshAllUI();
-        try {
-          if (global.SyncEngine && global.SyncEngine._computeRealState)
-            global.SyncEngine._computeRealState();
-        } catch (e) {}
-      } catch (e) {
-        console.warn('[EduPulseSyncBrain] refresh failed', e);
-      }
-    },
-
-    /* ── app-resume / focus sync ─────────────────────────────────────── */
-    _appResumeSync: async function () {
-      if (this._destroyed) return;
-      var now = Date.now();
-      if (now - this._lastFocusSyncAt < MIN_FOCUS_SYNC_INTERVAL) return;
-      if (!this._client || !global.navigator.onLine) return;
-      if (!global.DataService || !global.ClassManager) return;
-
-      this._lastFocusSyncAt = now;
-      this._setConnStatus('connecting', '🟡 Syncing…');
-
-      var cid = global.ClassManager.activeId();
-      try {
-        // DataService.pull is an alias for pullClassData (added in dataService v2)
-        await global.DataService.pull(cid);
-        if (this._destroyed) return;
-        invalidateCaches();
-        refreshAllUI();
-        this._setConnStatus('connected', '🟢 Live');
-        try {
-          if (global.SyncEngine && global.SyncEngine._computeRealState)
-            global.SyncEngine._computeRealState();
-        } catch (e) {}
-        this.scheduleRefresh();
-      } catch (e) {
-        if (this._destroyed) return;
-        console.warn('[EduPulseSyncBrain] app-resume pull failed', e);
-        this._setConnStatus(
-          global.navigator.onLine ? 'connecting' : 'offline',
-          global.navigator.onLine ? '🟡 Reconnecting…' : '🔴 Offline'
-        );
-      }
-    },
-
-    /* ── channel status handler ──────────────────────────────────────── */
-    _onChannelStatus: function (status) {
-      if (this._destroyed) return;
-      if (status === 'SUBSCRIBED') {
-        this._retryCount = 0;
-        this._setConnStatus('connected', '🟢 Live');
-        try { global.DataService.flushOfflineQueue(); } catch (e) {}
-        this.scheduleRefresh();
-        return;
-      }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        if (global.navigator.onLine) {
-          this._setConnStatus('connecting', '🟡 Reconnecting…');
-          this._scheduleResubscribe();
-        } else {
-          this._setConnStatus('offline', '🔴 Offline');
-        }
-      }
-    },
-
-    /* ── exponential back-off re-subscribe ───────────────────────────── */
-    _scheduleResubscribe: function () {
-      if (this._destroyed) return;
-      if (this._retryCount >= MAX_RETRY_ATTEMPTS) {
-        this._retryCount = 0;
-      }
-      clearTimeout(this._resubscribeTimer);
-      var delay = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, this._retryCount), MAX_RETRY_DELAY_MS);
-      this._retryCount++;
-      var self = this;
-      this._resubscribeTimer = setTimeout(function () {
-        if (self._destroyed || !self._client || !global.navigator.onLine) return;
-        // Skip if channel already recovered on its own
-        if (global.RealtimeService && global.RealtimeService._channel) {
-          try {
-            if (global.RealtimeService._channel.state === 'joined') return;
-          } catch (e) {}
-        }
-        console.info('[EduPulseSyncBrain] re-subscribing (attempt ' + self._retryCount + ')…');
-        if (global.RealtimeService) {
-          global.RealtimeService.subscribe(self._client, self._realtimeHandlers);
-        }
-      }, delay);
-    },
-
-    /* ── status indicator ────────────────────────────────────────────── */
-    _setConnStatus: function (state, label) {
-      var el = global.document && global.document.getElementById('realtime-conn-status');
-      if (!el) return;
-      el.textContent = label;
-      el.className   = 'realtime-conn-status ' + state;
-    },
-
-    /* ── init ────────────────────────────────────────────────────────── */
-    init: function (client) {
-      this._client      = client;
-      this._destroyed   = false;
-      this._retryCount  = 0;
-      this._setConnStatus('connecting', '🟡 Connecting…');
-
-      // Store handlers so retries and class-change re-subscribes can reuse them
-      var self = this;
-      this._realtimeHandlers = {
-        onDatabaseChange: function () { EduPulseSyncBrain.scheduleRefresh(); },
-      };
-
-      if (global.RealtimeService) {
-        global.RealtimeService.subscribe(client, this._realtimeHandlers);
-      }
-
-      global.DataService.flushOfflineQueue().catch(function () {});
-
-      // Remove any leftover listeners before adding new ones
-      this._removeAppResumeListeners();
-
-      // 1. visibilitychange — fires when tab/screen becomes visible
-      this._visibilityHandler = function () {
-        if (!global.document.hidden) self._appResumeSync();
-      };
-      global.document.addEventListener('visibilitychange', this._visibilityHandler);
-
-      // 2. window focus — catches gaps in Android WebView visibilitychange
-      this._focusHandler = function () { self._appResumeSync(); };
-      global.window.addEventListener('focus', this._focusHandler);
-
-      // 3. Capacitor App plugin — native foreground event
-      this._tryAttachCapacitorListener();
-    },
-
-    /* ── Capacitor listener (polled, plugin may load after init) ─────── */
-    _tryAttachCapacitorListener: function () {
-      var self   = this;
-      var checks = 0;
-      var MAX    = 10;
-      var poll   = setInterval(function () {
-        checks++;
-        var cap = global.Capacitor || (global.window && global.window.Capacitor);
-        if (cap && cap.Plugins && cap.Plugins.App) {
-          clearInterval(poll);
-          try {
-            var handler = function (state) {
-              if (state && state.isActive) self._appResumeSync();
-            };
-            // Some Capacitor versions return a remove() promise
-            var result = cap.Plugins.App.addListener('appStateChange', handler);
-            if (result && typeof result.remove === 'function') {
-              self._capacitorRemover = function () { result.remove(); };
-            }
-            console.info('[EduPulseSyncBrain] Capacitor appStateChange listener attached');
-          } catch (e) {
-            console.warn('[EduPulseSyncBrain] Capacitor listener failed:', e);
-          }
-        }
-        if (checks >= MAX) clearInterval(poll);
-      }, 500);
-    },
-
-    /* ── tear-down ───────────────────────────────────────────────────── */
-    _removeAppResumeListeners: function () {
-      if (this._visibilityHandler) {
-        global.document.removeEventListener('visibilitychange', this._visibilityHandler);
-        this._visibilityHandler = null;
-      }
-      if (this._focusHandler) {
-        try { global.window.removeEventListener('focus', this._focusHandler); } catch (e) {}
-        this._focusHandler = null;
-      }
-      if (this._capacitorRemover) {
-        try { this._capacitorRemover(); } catch (e) {}
-        this._capacitorRemover = null;
-      }
-    },
-
-    destroy: function () {
-      this._destroyed = true;   // stop all in-flight async ops immediately
-      clearTimeout(this._debounceTimer);
-      clearTimeout(this._resubscribeTimer);
-      this._removeAppResumeListeners();
-      if (this._client && global.RealtimeService) {
-        global.RealtimeService.unsubscribe(this._client);
-      }
-      this._client      = null;
-      this._retryCount  = 0;
-      this._setConnStatus('offline', '🔴 Offline');
-    },
-
-    /* ── class-change hook ───────────────────────────────────────────── */
-    // Call this whenever the active class changes so the Realtime channel
-    // re-filters to the new class.  Invoke from ClassManager after switch.
-    onClassChange: function () {
-      if (!this._client || this._destroyed) return;
-      if (global.RealtimeService && this._realtimeHandlers) {
-        global.RealtimeService.resubscribeForClass(this._client, this._realtimeHandlers);
-      }
-      this.scheduleRefresh();
-    },
-  };
-
-  global.EduPulseSyncBrain = EduPulseSyncBrain;
-  global.SyncBrainV3       = EduPulseSyncBrain; // alias for future references
-})(typeof window !== 'undefined' ? window : globalThis);
-</script>
-
 <!-- -══════════════════════ PORTAL ROOTS ════════════════════════════════════ -->
 <div id="global-dropdown-root"></div>
 
@@ -4306,7 +3655,6 @@ body.privacy-mode .hide-privacy{display:none!important}
           <div class="card">
             <div class="card-header"><span class="card-title" data-tip="How student scores spread across the class — bar chart by score range">Score Distribution</span></div>
             <div class="chart-container" style="height:200px"><canvas id="analytics-dist-chart"></canvas></div>
-            <div id="analytics-dist-table-wrap" class="score-dist-table-wrap"></div>
           </div>
           <div class="card span-full">
             <div class="card-header">
@@ -5589,12 +4937,6 @@ const BehaviorEngine = {
     }); }catch(e){}
     try{ BadgeEngine.evaluate(studentId); }catch(e){}
 
-    try{
-      const syncCid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
-      if(typeof DataService !== 'undefined' && typeof DataService.pushChanges === 'function')
-        DataService.pushChanges(syncCid).catch(()=>{});
-    }catch(e){}
-
     return result;
   },
 
@@ -5712,11 +5054,6 @@ const BehaviorEngine = {
       eventId: orig.id, studentId: orig.studentId,
     }); }catch(e){}
     try{ AutoSave.signal(); }catch(e){}
-    try{
-      const syncCid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
-      if(typeof DataService !== 'undefined' && typeof DataService.pushChanges === 'function')
-        DataService.pushChanges(syncCid).catch(()=>{});
-    }catch(e){}
     return correction;
   },
 
@@ -6793,15 +6130,15 @@ const ReportEngine = {
       // ── Daily Report: today-only events with dedicated builder ──────────────
       if(reportType === 'daily'){
         return this._lang === 'ar'
-          ? this._buildDaily_AR(st, sets, tr, dna, sym, notes, comment)
-          : this._buildDaily_EN(st, sets, tr, dna, sym, notes, comment);
+          ? this._buildDaily_AR(st, sets, tr, dna, sym, notes)
+          : this._buildDaily_EN(st, sets, tr, dna, sym, notes);
       }
 
       // ── Standard reports: both languages go through the narrative builders ──
       // Arabic and English receive identical structural quality
       return this._lang === 'ar'
-        ? this._buildWA_AR(st, sets, tr, dna, sym, notes, comment)
-        : this._buildWA_EN(st, sets, tr, dna, sym, notes, comment);
+        ? this._buildWA_AR(st, sets, tr, dna, sym, notes)
+        : this._buildWA_EN(st, sets, tr, dna, sym, notes);
 
     }catch(err){
       console.error('[ReportEngine] generateTextReport failed:', err.message);
@@ -6818,7 +6155,7 @@ const ReportEngine = {
   // Tone is precise, observation-based (real-time classroom snapshot).
   // ═══════════════════════════════════════════════════════════════════════════
 
-  _buildDaily_EN(st, sets, tr, dna, sym, notes, comment = ''){
+  _buildDaily_EN(st, sets, tr, dna, sym, notes){
     const first    = st.name.split(' ')[0];
     const today    = new Date().toISOString().slice(0, 10);
     const allEvs   = BehaviorEngine.getStudentEvents(st.id);
@@ -6939,19 +6276,16 @@ const ReportEngine = {
       '*TEACHER RECOMMENDATION*',
       SEP,
       recommendation,
+      '',
+      SEP,
+      `-- ${sets.teacher || 'Teacher'}, ${sets.school || 'EduPulse'}`
     );
-
-    if(comment){
-      lines.push('', '*TEACHER COMMENT*', SEP, comment);
-    }
-
-    lines.push('', SEP, `-- ${sets.teacher || 'Teacher'}, ${sets.school || 'EduPulse'}`);
 
     return lines.filter(l => l !== null && l !== undefined)
                 .join('\n').replace(/\n{3,}/g, '\n\n');
   },
 
-  _buildDaily_AR(st, sets, tr, dna, sym, notes, comment = ''){
+  _buildDaily_AR(st, sets, tr, dna, sym, notes){
     const first    = st.name.split(' ')[0];
     const today    = new Date().toISOString().slice(0, 10);
     const allEvs   = BehaviorEngine.getStudentEvents(st.id);
@@ -7069,13 +6403,10 @@ const ReportEngine = {
       '*توصية المعلم*',
       SEP,
       recommendation,
+      '',
+      SEP,
+      `-- ${sets.teacher || 'المعلم'}، ${sets.school || 'EduPulse'}`
     );
-
-    if(comment){
-      lines.push('', '*تعليق المعلم*', SEP, comment);
-    }
-
-    lines.push('', SEP, `-- ${sets.teacher || 'المعلم'}، ${sets.school || 'EduPulse'}`);
 
     return lines.filter(l => l !== null && l !== undefined)
                 .join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -7315,16 +6646,15 @@ const ReportEngine = {
 
     // Respect daily type when sending from the Reports screen
     const reportType = document.getElementById('report-type-select')?.value || 'weekly';
-    const comment    = document.getElementById('report-comment')?.value?.trim() || '';
     if(reportType === 'daily'){
       return ar
-        ? this._buildDaily_AR(st, sets, tr, dna, sym, notes, comment)
-        : this._buildDaily_EN(st, sets, tr, dna, sym, notes, comment);
+        ? this._buildDaily_AR(st, sets, tr, dna, sym, notes)
+        : this._buildDaily_EN(st, sets, tr, dna, sym, notes);
     }
 
     return ar
-      ? this._buildWA_AR(st, sets, tr, dna, sym, notes, comment)
-      : this._buildWA_EN(st, sets, tr, dna, sym, notes, comment);
+      ? this._buildWA_AR(st, sets, tr, dna, sym, notes)
+      : this._buildWA_EN(st, sets, tr, dna, sym, notes);
   },
 
   // -─ Threshold-based symbol mapper — deterministic, no randomness ───────────
@@ -7388,7 +6718,7 @@ const ReportEngine = {
   },
 
   // -─ English WhatsApp message ───────────────────────────────────────────────
-  _buildWA_EN(st, sets, tr, dna, sym, notes, comment = ''){
+  _buildWA_EN(st, sets, tr, dna, sym, notes){
     const first    = st.name.split(' ')[0];
     const weekSign = CONFIG.fmt.weekly(st.weeklyScore);
     const total    = st.posCount + st.negCount;
@@ -7533,13 +6863,6 @@ const ReportEngine = {
       '*TEACHER ASSESSMENT*',
       SEP,
       this._adviceEN(st, tr),
-    );
-
-    if(comment){
-      lines.push('', '*TEACHER COMMENT*', SEP, comment);
-    }
-
-    lines.push(
       '',
       SEP,
       'Thank you for your continued support of ' + first + '.',
@@ -7551,7 +6874,7 @@ const ReportEngine = {
   },
 
   // -─ Arabic WhatsApp message ────────────────────────────────────────────────
-  _buildWA_AR(st, sets, tr, dna, sym, notes, comment = ''){
+  _buildWA_AR(st, sets, tr, dna, sym, notes){
     const first    = st.name.split(' ')[0];
     const weekSign = CONFIG.fmt.weekly(st.weeklyScore);
     const total    = st.posCount + st.negCount;
@@ -7687,13 +7010,6 @@ const ReportEngine = {
       '*تقييم المعلم*',
       SEP,
       this._adviceAR(st, tr),
-    );
-
-    if(comment){
-      lines.push('', '*تعليق المعلم*', SEP, comment);
-    }
-
-    lines.push(
       '',
       SEP,
       'شكراً لمتابعتكم ودعمكم المستمر لأبنكم/ابنتكم.',
@@ -9048,7 +8364,6 @@ const UI = {
     const note=document.getElementById('bp-note-input')?.value||'';
     try{
       const result=BehaviorEngine.handle(studentId,behaviorId,note,'panel');
-      // pushChanges runs inside BehaviorEngine.handle (ep_students + ep_movements)
 
       // Clear note input
       const noteEl=document.getElementById('bp-note-input');
@@ -9755,43 +9070,16 @@ const UI = {
       options:{cutout:'65%',scales:false},
     });
 
-    // Distribution — chart update in-place + summary table (avoids chart flicker on refresh)
+    // Distribution
     const dist=Analytics.getScoreDistData();
-    const distLabels=Object.keys(dist);
-    const distVals=Object.values(dist);
-    const distAColors=['rgba(239,68,68,0.45)','rgba(251,146,60,0.45)','rgba(99,102,241,0.45)','rgba(16,185,129,0.45)','rgba(139,92,246,0.45)'];
-    const elADist=document.getElementById('analytics-dist-chart');
-    const cADist=this._charts['analytics-dist-chart'];
-    if(cADist && elADist && cADist.canvas && document.body.contains(cADist.canvas)){
-      cADist.data.labels=distLabels;
-      cADist.data.datasets[0].data=distVals;
-      cADist.data.datasets[0].backgroundColor=distLabels.map((_, i) => distAColors[i % distAColors.length]);
-      cADist.update('none');
-    } else {
-      if(cADist){ try{ cADist.destroy(); }catch(e){} delete this._charts['analytics-dist-chart']; }
-      this._createChart('analytics-dist-chart',{
-        type:'bar',
-        data:{labels:distLabels,datasets:[{
-          label:'Students',data:distVals,
-          backgroundColor:distLabels.map((_, i) => distAColors[i % distAColors.length]),borderRadius:4,borderWidth:0,
-        }]},
-        options:{plugins:{legend:{display:false}}},
-      });
-    }
-    const sdWrap=document.getElementById('analytics-dist-table-wrap');
-    if(sdWrap){
-      const totalClass=Math.max(1, s.total||0);
-      const rows=distLabels.map((label,i)=>{
-        const c=Number(distVals[i])||0;
-        const pct=Math.round(c/totalClass*100);
-        return `<tr><td>${label}</td><td class="sd-num">${c}</td><td class="sd-pct">${pct}%</td></tr>`;
-      }).join('');
-      sdWrap.innerHTML=
-        `<table class="score-dist-table" role="table" aria-label="Score distribution counts">
-          <thead><tr><th>Range</th><th class="sd-num">Students</th><th class="sd-pct">%</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    }
+    this._createChart('analytics-dist-chart',{
+      type:'bar',
+      data:{labels:Object.keys(dist),datasets:[{
+        label:'Students',data:Object.values(dist),
+        backgroundColor:['rgba(239,68,68,0.45)','rgba(251,146,60,0.45)','rgba(99,102,241,0.45)','rgba(16,185,129,0.45)','rgba(139,92,246,0.45)'],borderRadius:4,borderWidth:0,
+      }]},
+      options:{plugins:{legend:{display:false}}},
+    });
 
     // Heatmap
     this._renderHeatmap();
@@ -11125,10 +10413,6 @@ const ClassManager = {
   },
   _saveList(list){
     localStorage.setItem(this._KEY_LIST, JSON.stringify(list));
-    try {
-      if (typeof DataService !== 'undefined' && typeof DataService.pushClassesNow === 'function')
-        DataService.pushClassesNow(list).catch(() => {});
-    } catch (e) {}
   },
 
   // -─ Switch class ──────────────────────────────────────────────────────────
@@ -11309,10 +10593,6 @@ const ClassManager = {
 
     const remaining = classes.filter(c=>c.id!==classId);
     this._saveList(remaining);
-    try {
-      if (typeof DataService !== 'undefined' && typeof DataService.removeClassRemote === 'function')
-        DataService.removeClassRemote(classId).catch(() => {});
-    } catch (e) {}
 
     // If deleting active class, switch to first remaining
     if(classId === this._activeId){
@@ -11483,8 +10763,7 @@ const DataService = (() => {
   'use strict';
 
   const QUEUE_KEY = 'ep_rt_pending_ops';
-  /** Serialize cloud pulls so concurrent realtime updates for different classes never interleave writes */
-  let _pullChain = Promise.resolve();
+  const MAX_QUEUE = 200;   // hard cap — prevents unbounded localStorage growth
 
   function _getClient() {
     const c = window.supabase;
@@ -11498,57 +10777,6 @@ const DataService = (() => {
   function _studentsKey(cid) { return 'ep_students_' + cid; }
   function _eventsKey(cid)   { return 'ep_events_'   + cid; }
 
-  function _readLocalClassArrays(cid) {
-    let st = [], ev = [];
-    try { st = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]'); } catch (e) { st = []; }
-    try { ev = JSON.parse(localStorage.getItem(_eventsKey(cid))   || '[]'); } catch (e) { ev = []; }
-    if (!Array.isArray(st)) st = [];
-    if (!Array.isArray(ev)) ev = [];
-    return { st, ev };
-  }
-
-  /** Supabase public table names (must match your project) */
-  const SB_TBL_STUDENTS = 'ep_students';
-  const SB_TBL_MOVEMENTS = 'ep_movements';
-  const SB_TBL_CLASSES = 'ep_classes';
-  const _CLASSES_LS_KEY = 'ep_classes';
-
-  function _readClassesListRaw() {
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem(_CLASSES_LS_KEY) || '[]'); } catch (e) { list = []; }
-    return Array.isArray(list) ? list : [];
-  }
-
-  function _reconcileClassManagerAfterClassesPull() {
-    try {
-      if (typeof ClassManager === 'undefined') return;
-      const classes = ClassManager._loadList();
-      if (!Array.isArray(classes) || !classes.length) return;
-      let aid = ClassManager._activeId;
-      if (!aid || !classes.some(c => c.id === aid)) {
-        aid = classes[0].id;
-        ClassManager._activeId = aid;
-        localStorage.setItem(ClassManager._KEY_ACTIVE, aid);
-      }
-      ClassManager._renderSwitcher();
-    } catch (e) {
-      console.warn('[DataService] reconcile classes', e);
-    }
-  }
-
-  async function _upsertEpClasses(list) {
-    const client = _getClient();
-    if (!client) throw new Error('No Supabase client');
-    const rows = (list || []).filter(c => c && c.id != null).map(c => ({
-      id: String(c.id),
-      data: c,
-      updated_at: new Date().toISOString(),
-    }));
-    if (!rows.length) return;
-    const res = await client.from(SB_TBL_CLASSES).upsert(rows, { onConflict: 'id', defaultToNull: true });
-    if (res.error) throw res.error;
-  }
-
   function _readQueue() {
     try {
       const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
@@ -11557,6 +10785,8 @@ const DataService = (() => {
   }
 
   function _writeQueue(arr) {
+    // Enforce hard cap — keep most-recent ops when over limit
+    if (arr.length > MAX_QUEUE) arr = arr.slice(arr.length - MAX_QUEUE);
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (e) {}
   }
 
@@ -11568,185 +10798,41 @@ const DataService = (() => {
   }
 
   const DS = {
-    _debounceStudents: null,
-    _debounceEvents:   null,
-    _debounceClasses:  null,
-    _flushInProgress:  false,
+    _debounceStudents:  null,
+    _debounceEvents:    null,
+    _flushInProgress:   false,   // FIX: concurrency guard — prevents double-flush
     STUDENT_DEBOUNCE_MS: 450,
     EVENT_DEBOUNCE_MS:   800,
-    CLASSES_DEBOUNCE_MS: 400,
 
     // ── Queue helpers ─────────────────────────────────────────────────────────
-    getQueueLength() {
-      return _readQueue().length;
-    },
+    getQueueLength() { return _readQueue().length; },
 
     enqueue(op) {
       const q = _readQueue();
+      // FIX: snapshot classId NOW — class-switch won't corrupt queued ops
       q.push(Object.assign({}, op, { ts: Date.now(), classId: op.classId || _classId() }));
       _writeQueue(q);
       _updateBadge();
     },
 
-    /**
-     * Immediate cloud sync: ep_classes list + ep_students / ep_movements for one class namespace.
-     */
-    async pushChanges(cid) {
-      cid = (cid != null && String(cid).trim() !== '') ? String(cid) : _classId();
-      const client = _getClient();
-      const classesList = _readClassesListRaw();
-      const { st, ev } = _readLocalClassArrays(cid);
-      if (!client || !navigator.onLine) {
-        if (classesList.length) this.enqueue({ type: 'classes', classId: cid, rows: classesList });
-        if (st.length) this.enqueue({ type: 'students', classId: cid, rows: st });
-        if (ev.length) this.enqueue({ type: 'behaviors', classId: cid, rows: ev });
-        _updateBadge();
-        return;
-      }
-      try { await _upsertEpClasses(classesList); }
-      catch (e) { if (classesList.length) this.enqueue({ type: 'classes', classId: cid, rows: classesList }); }
-      try { await this._pushStudentsNow(cid, st); }
-      catch (e) { if (st.length) this.enqueue({ type: 'students', classId: cid, rows: st }); }
-      try { await this._pushBehaviorsNow(cid, ev); }
-      catch (e) { if (ev.length) this.enqueue({ type: 'behaviors', classId: cid, rows: ev }); }
-      _updateBadge();
-    },
-
-    /** Push current ep_classes localStorage array to ep_classes (immediate). */
-    async pushClassesNow(list) {
-      if (!Array.isArray(list)) list = _readClassesListRaw();
-      const client = _getClient();
-      if (!client || !navigator.onLine) {
-        if (list.length) this.enqueue({ type: 'classes', classId: _classId(), rows: list });
-        _updateBadge();
-        return;
-      }
-      try { await _upsertEpClasses(list); }
-      catch (e) { if (list.length) this.enqueue({ type: 'classes', classId: _classId(), rows: list }); }
-      _updateBadge();
-    },
-
-    /** Pull all class rows from Supabase into localStorage ep_classes (merge remote + local-only). */
-    async pullClassesList() {
-      const client = _getClient();
-      if (!client) return;
-      const local = _readClassesListRaw();
-      const res = await client.from(SB_TBL_CLASSES).select('id,data,updated_at');
-      if (res.error) throw res.error;
-      const remoteRows = res.data || [];
-      if (!remoteRows.length) {
-        if (local.length) return;
-        localStorage.setItem(_CLASSES_LS_KEY, '[]');
-        try { StorageManager.inv(_CLASSES_LS_KEY); } catch (e) {}
-        _reconcileClassManagerAfterClassesPull();
-        return;
-      }
-      const remoteList = [];
-      for (const row of remoteRows) {
-        let d = row.data;
-        if (d != null && typeof d === 'string') {
-          try { d = JSON.parse(d); } catch (e) { continue; }
-        }
-        if (d && d.id != null) remoteList.push(d);
-      }
-      const remoteIds = new Set(remoteList.map(c => String(c.id)));
-      const extras = local.filter(c => c && c.id != null && !remoteIds.has(String(c.id)));
-      const merged = remoteList.concat(extras);
-      localStorage.setItem(_CLASSES_LS_KEY, JSON.stringify(merged));
-      try { StorageManager.inv(_CLASSES_LS_KEY); } catch (e) {}
-      _reconcileClassManagerAfterClassesPull();
-    },
-
-    /** Remove one class row from ep_classes (cloud). */
-    async removeClassRemote(classId) {
-      const client = _getClient();
-      if (!client || !navigator.onLine) return;
-      const id = classId != null ? String(classId) : '';
-      if (!id) return;
-      const res = await client.from(SB_TBL_CLASSES).delete().eq('id', id);
-      if (res.error) console.warn('[DataService] removeClassRemote', res.error);
-    },
-
-    /**
-     * Realtime (ep_students): merge remote row into localStorage for that class and refresh score in background.
-     */
-    applyRemoteEpStudentRealtime(payload) {
-      try {
-        const row = payload && (payload.new || payload.old);
-        if (!row) return;
-        const cid = row.class_id != null ? String(row.class_id) : (row.classId != null ? String(row.classId) : '');
-        if (!cid) return;
-        let pdata = row.data;
-        if (pdata != null && typeof pdata === 'string') {
-          try { pdata = JSON.parse(pdata); } catch (e) { return; }
-        }
-        if (!pdata || typeof pdata !== 'object') return;
-        let sid = pdata.id;
-        if (typeof sid !== 'number') {
-          const n = Number(sid);
-          if (!isFinite(n)) return;
-          sid = n;
-        }
-        const key = _studentsKey(cid);
-        let arr = [];
-        try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return; }
-        if (!Array.isArray(arr)) return;
-        const idx = arr.findIndex(s => s && (s.id === sid || Number(s.id) === sid));
-        if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], pdata);
-        else arr.push(pdata);
-        localStorage.setItem(key, JSON.stringify(arr));
-        try { StorageManager.inv(key); } catch (e) {}
-        try {
-          if (typeof ClassManager !== 'undefined' && ClassManager.activeId() === cid) {
-            StudentManager.inv();
-            if (typeof UI !== 'undefined' && UI._refreshHeaderStats) UI._refreshHeaderStats();
-            const card = document.querySelector(`.student-quick-card[data-id="${sid}"]`);
-            if (card) {
-              const se = card.querySelector('.scard-score');
-              if (se && pdata.score != null) se.textContent = String(pdata.score);
-            }
-            const full = document.querySelector(`.student-full-card[data-id="${sid}"] .sfc-score`);
-            if (full && pdata.score != null) full.textContent = String(pdata.score);
-          }
-        } catch (e2) {}
-      } catch (e) {
-        console.warn('[DataService] applyRemoteEpStudentRealtime', e);
-      }
-    },
-
-    /** Pull ep_classes from cloud, then each class's ep_students / ep_movements. */
-    async pullAllClasses() {
-      await this.pullClassesList();
-      let list = _readClassesListRaw();
-      if (!list.length) {
-        await this.pullClassData(_classId());
-        return;
-      }
-      for (const c of list) {
-        if (!c || c.id == null || String(c.id).trim() === '') continue;
-        await this.pullClassData(String(c.id));
-      }
-    },
-
     // ── Flush offline queue on reconnect ─────────────────────────────────────
     async flushOfflineQueue() {
-      if (this._flushInProgress) return;
+      if (this._flushInProgress) return;   // FIX: prevent concurrent flushes
       if (!_getClient() || !navigator.onLine) return;
       const q = _readQueue();
       if (!q.length) return;
+
       this._flushInProgress = true;
-      _writeQueue([]);
+      _writeQueue([]);                     // optimistic clear
       const failed = [];
       for (const op of q) {
         try {
-          const opCid = op.classId || _classId();
-          if      (op.type === 'classes')   await _upsertEpClasses(op.rows);
-          else if (op.type === 'students')  await this._pushStudentsNow(opCid, op.rows);
-          else if (op.type === 'behaviors') await this._pushBehaviorsNow(opCid, op.rows);
+          if      (op.type === 'students')  await this._pushStudentsNow(op.classId, op.rows);
+          else if (op.type === 'behaviors') await this._pushBehaviorsNow(op.classId, op.rows);
         } catch (e) { failed.push(op); }
       }
       if (failed.length) {
-        const rest = _readQueue();
+        const rest = _readQueue();         // pick up ops added while flushing
         _writeQueue(failed.concat(rest));
       }
       this._flushInProgress = false;
@@ -11760,9 +10846,7 @@ const DataService = (() => {
       let st = [], ev = [];
       try { st = StorageManager.getStudents() || []; } catch (e) {}
       try { ev = StorageManager.getEvents()   || []; } catch (e) {}
-      let clsList = _readClassesListRaw();
       try {
-        await _upsertEpClasses(clsList);
         await this._pushStudentsNow(cid, st);
         await this._pushBehaviorsNow(cid, ev);
       } catch (e) { console.warn('[DataService] pushLocalSnapshot', e); }
@@ -11773,10 +10857,10 @@ const DataService = (() => {
       const client = _getClient();
       if (!client) throw new Error('No Supabase client');
       const rows = (students || []).map(s => ({
-        id: String(s.id), class_id: cid, data: s, updated_at: new Date().toISOString(),
+        id: String(s.id), class_id: cid, data: s, updated_at: Date.now(),
       }));
       if (!rows.length) return;
-      const res = await client.from(SB_TBL_STUDENTS).upsert(rows, { onConflict: 'id', defaultToNull: true });
+      const res = await client.from('students').upsert(rows, { onConflict: 'id' });
       if (res.error) throw res.error;
     },
 
@@ -11784,10 +10868,10 @@ const DataService = (() => {
       const client = _getClient();
       if (!client) throw new Error('No Supabase client');
       const rows = (events || []).map(ev => ({
-        id: String(ev.id), class_id: cid, data: ev, updated_at: new Date().toISOString(),
+        id: String(ev.id), class_id: cid, data: ev, updated_at: Date.now(),
       }));
       if (!rows.length) return;
-      const res = await client.from(SB_TBL_MOVEMENTS).upsert(rows, { onConflict: 'id', defaultToNull: true });
+      const res = await client.from('behaviors').upsert(rows, { onConflict: 'id' });
       if (res.error) throw res.error;
     },
 
@@ -11804,25 +10888,9 @@ const DataService = (() => {
         () => this._flushEventsOut(cid), this.EVENT_DEBOUNCE_MS);
     },
 
-    _schedulePushClasses() {
-      clearTimeout(this._debounceClasses);
-      this._debounceClasses = setTimeout(
-        () => this._flushClassesOut(), this.CLASSES_DEBOUNCE_MS);
-    },
-
-    async _flushClassesOut() {
-      const list = _readClassesListRaw();
-      if (!_getClient() || !navigator.onLine) {
-        if (list.length) this.enqueue({ type: 'classes', classId: _classId(), rows: list });
-        return;
-      }
-      try { await _upsertEpClasses(list); }
-      catch (e) { if (list.length) this.enqueue({ type: 'classes', classId: _classId(), rows: list }); }
-    },
-
     async _flushStudentsOut(cid) {
-      cid = cid || _classId();
-      const rows = _readLocalClassArrays(cid).st;
+      let rows = [];
+      try { rows = StorageManager.getStudents() || []; } catch (e) {}
       if (!_getClient() || !navigator.onLine) {
         this.enqueue({ type: 'students', classId: cid, rows }); return;
       }
@@ -11831,8 +10899,8 @@ const DataService = (() => {
     },
 
     async _flushEventsOut(cid) {
-      cid = cid || _classId();
-      const rows = _readLocalClassArrays(cid).ev;
+      let rows = [];
+      try { rows = StorageManager.getEvents() || []; } catch (e) {}
       if (!_getClient() || !navigator.onLine) {
         this.enqueue({ type: 'behaviors', classId: cid, rows }); return;
       }
@@ -11842,106 +10910,98 @@ const DataService = (() => {
 
     // Called by SyncEngine._onLocalWrite() on every StorageManager.set()
     onLocalStorageWrite(key) {
-      if (key === _CLASSES_LS_KEY) { this._schedulePushClasses(); return; }
-      const mSt = /^ep_students_(.+)$/.exec(key);
-      const mEv = /^ep_events_(.+)$/.exec(key);
-      if (mSt && mSt[1]) { this._schedulePushStudents(mSt[1]); return; }
-      if (mEv && mEv[1]) { this._schedulePushEvents(mEv[1]); return; }
+      const cid = _classId();
+      if (key === _studentsKey(cid)) { this._schedulePushStudents(cid); return; }
+      if (key === _eventsKey(cid))   { this._schedulePushEvents(cid);   return; }
     },
 
-    // ── Pull latest data from cloud into localStorage then bust caches ─────────
+    // ── Pull latest data from cloud into localStorage then bust ALL caches ─────
     async pullClassData(cid) {
-      const run = async () => {
-        cid = (cid != null && String(cid).trim() !== '') ? String(cid) : _classId();
-        if (!cid) return;
-        const client = _getClient();
-        if (!client) return;
+      cid = cid || _classId();
+      const client = _getClient();
+      if (!client) return;
 
-        try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
+      try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
 
-        try {
-          const [stRes, beRes] = await Promise.all([
-            client.from(SB_TBL_STUDENTS).select('data').eq('class_id', cid),
-            client.from(SB_TBL_MOVEMENTS).select('data').eq('class_id', cid),
-          ]);
-          if (stRes.error) throw stRes.error;
-          if (beRes.error) throw beRes.error;
+      try {
+        const [stRes, beRes] = await Promise.all([
+          client.from('students').select('data').eq('class_id', cid),
+          client.from('behaviors').select('data').eq('class_id', cid),
+        ]);
+        if (stRes.error) throw stRes.error;
+        if (beRes.error) throw beRes.error;
 
-          const students = (stRes.data || []).map(r => r.data).filter(Boolean);
-          const events   = (beRes.data || []).map(r => r.data).filter(Boolean);
+        const students = (stRes.data || []).map(r => r.data).filter(Boolean);
+        const events   = (beRes.data || []).map(r => r.data).filter(Boolean);
 
-          // Cloud is empty but local has data => keep local (first sync on new device)
-          if (!students.length && !events.length) {
-            try {
-              const local = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]');
-              if (Array.isArray(local) && local.length) return;
-            } catch (_) {}
-          }
-
-          localStorage.setItem(_studentsKey(cid), JSON.stringify(students));
-          localStorage.setItem(_eventsKey(cid),   JSON.stringify(events));
-
-          try { StorageManager.inv(_studentsKey(cid)); } catch (e) {}
-          try { StorageManager.inv(_eventsKey(cid));   } catch (e) {}
-
-        } finally {
-          try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = false; } catch (e) {}
+        // Cloud is empty but local has data => keep local (first sync on new device)
+        if (!students.length && !events.length) {
+          try {
+            const local = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]');
+            if (Array.isArray(local) && local.length) return;
+          } catch (_) {}
         }
-      };
-      _pullChain = _pullChain.then(run).catch(err => {
-        console.warn('[DataService] pullClassData chain', err && err.message ? err.message : err);
-      });
-      return _pullChain;
+
+        localStorage.setItem(_studentsKey(cid), JSON.stringify(students));
+        localStorage.setItem(_eventsKey(cid),   JSON.stringify(events));
+
+        // FIX: bust ALL in-memory caches — not just StorageManager
+        try { StorageManager.invAll();       } catch (e) {}
+        try { StudentManager.inv();          } catch (e) {}
+        try { Analytics.invalidate();        } catch (e) {}
+        try { InsightEngine.invalidate();    } catch (e) {}
+        try { EventCache.invalidate();       } catch (e) {}
+
+      } finally {
+        try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = false; } catch (e) {}
+      }
     },
+
+    // FIX: short alias — syncBrain calls DataService.pull(cid)
+    pull(cid) { return this.pullClassData(cid); },
   };
 
   return DS;
 })();
 
-if (typeof window !== 'undefined') window.DataService = DataService;
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // REALTIME SERVICE — Supabase Realtime WebSocket channel (v2 — merged)
-// One persistent channel 'edupulse-sync' listens to postgres_changes on
-// ep_students, ep_movements, and ep_classes.
+// One persistent channel 'edupulse-sync' listens to postgres_changes on both
+// tables. Any remote write fires onDatabaseChange -> EduPulseSyncBrain.scheduleRefresh().
 // ═══════════════════════════════════════════════════════════════════════════════
 const RealtimeService = (() => {
   'use strict';
 
   const RS = {
     _channel: null,
+    _classId: null,
 
     subscribe(client, handlers) {
       if (!client || typeof client.channel !== 'function') return null;
       const onDatabaseChange = handlers && handlers.onDatabaseChange;
 
+      // FIX: class-scoped channel name prevents cross-class realtime noise
+      let cid = 'default';
+      try { cid = ClassManager.activeId() || 'default'; } catch (e) {}
+
       if (this._channel) {
         try { client.removeChannel(this._channel); } catch (e) {}
         this._channel = null;
+        this._classId = null;
       }
 
-      // Use class-scoped channel name to match the old RealtimeService convention
-      // and avoid conflicts when multiple instances are open simultaneously.
-      const _cid = (typeof ClassManager !== 'undefined' && ClassManager.activeId)
-        ? (ClassManager.activeId() || 'default')
-        : 'default';
-      const _channelName = 'edupulse-sync-' + _cid;
+      const channelName = 'edupulse-sync-' + cid;
 
       const ch = client
-        .channel(_channelName)
+        .channel(channelName)
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'ep_students' },
-            payload => {
-              if (typeof DataService !== 'undefined' && typeof DataService.applyRemoteEpStudentRealtime === 'function')
-                DataService.applyRemoteEpStudentRealtime(payload);
-              if (onDatabaseChange) onDatabaseChange({ table: 'ep_students', payload });
-            })
+            { event: '*', schema: 'public', table: 'students',
+              filter: 'class_id=eq.' + cid },
+            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'students', payload }); })
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'ep_movements' },
-            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'ep_movements', payload }); })
-        .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'ep_classes' },
-            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'ep_classes', payload }); })
+            { event: '*', schema: 'public', table: 'behaviors',
+              filter: 'class_id=eq.' + cid },
+            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'behaviors', payload }); })
         .subscribe(status => {
           if (typeof EduPulseSyncBrain !== 'undefined' &&
               typeof EduPulseSyncBrain._onChannelStatus === 'function') {
@@ -11950,6 +11010,7 @@ const RealtimeService = (() => {
         });
 
       this._channel = ch;
+      this._classId = cid;
       return ch;
     },
 
@@ -11957,9 +11018,10 @@ const RealtimeService = (() => {
       if (!this._channel || !client) return;
       try { client.removeChannel(this._channel); } catch (e) {}
       this._channel = null;
+      this._classId = null;
     },
 
-    // Compatibility shim — called by old-script EduPulseSyncBrain.onClassChange
+    // FIX: re-subscribe when class switches so channel filters new classId
     resubscribeForClass(client, handlers) {
       this.subscribe(client, handlers);
     },
@@ -11967,9 +11029,6 @@ const RealtimeService = (() => {
 
   return RS;
 })();
-
-// Expose on window so the old-script RealtimeService references keep working
-if (typeof window !== 'undefined') window.RealtimeService = RealtimeService;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EDUPULSE SYNC BRAIN — App-level real-time orchestrator (v2 — merged)
@@ -11990,9 +11049,8 @@ const EduPulseSyncBrain = (() => {
 
   const DEBOUNCE_MS             = 300;
   const MIN_FOCUS_SYNC_INTERVAL = 5000;
-  const MAX_RETRY_ATTEMPTS      = 999;
+  const MAX_RETRY_ATTEMPTS      = 5;
   const RETRY_BASE_DELAY_MS     = 2000;
-  const MAX_RETRY_DELAY_MS      = 30000;
 
   // ── Cache invalidation ──────────────────────────────────────────────────────
   function _invalidateCaches() {
@@ -12026,16 +11084,6 @@ const EduPulseSyncBrain = (() => {
   window.reloadDashboard = () => EPSB.scheduleRefresh();
   window.refreshReports  = () => EPSB.scheduleRefresh();
 
-  function _extractClassIdFromRealtimeEvt(evt) {
-    try {
-      const p = evt && evt.payload;
-      const row = (p && (p.new || p.old)) || {};
-      const id = row.class_id != null ? row.class_id : row.classId;
-      if (id != null && String(id).trim() !== '') return String(id);
-    } catch (e) {}
-    return null;
-  }
-
   // ════════════════════════════════════════════════════════════════════════════
   const EPSB = {
     _client:            null,
@@ -12045,8 +11093,6 @@ const EduPulseSyncBrain = (() => {
     _lastFocusSyncAt:   0,
     _visibilityHandler: null,
     _focusHandler:      null,
-    _classPullTimers:   Object.create(null),
-    _classesListTimer:  null,
 
     // ── Debounced pull + UI rebuild ──────────────────────────────────────────
     scheduleRefresh() {
@@ -12054,74 +11100,10 @@ const EduPulseSyncBrain = (() => {
       this._debounceTimer = setTimeout(() => this._runRefresh(), DEBOUNCE_MS);
     },
 
-    /** Debounced pull for a specific class_id from Realtime (all classes, not only active view) */
-    schedulePullForClass(cid) {
-      if (!cid) { this.scheduleRefresh(); return; }
-      clearTimeout(this._classPullTimers[cid]);
-      this._classPullTimers[cid] = setTimeout(() => {
-        this._classPullTimers[cid] = null;
-        this._runPullForClass(cid).catch(e => console.warn('[EduPulseSyncBrain] pull class', cid, e));
-      }, DEBOUNCE_MS);
-    },
-
-    /** Debounced pull of ep_classes → localStorage (class names / list). */
-    schedulePullClasses() {
-      clearTimeout(this._classesListTimer);
-      this._classesListTimer = setTimeout(() => {
-        this._classesListTimer = null;
-        this._runPullClassesList().catch(e => console.warn('[EduPulseSyncBrain] pull classes', e));
-      }, DEBOUNCE_MS);
-    },
-
-    async _runPullClassesList() {
-      if (typeof DataService === 'undefined' || typeof DataService.pullClassesList !== 'function') return;
-      await DataService.pullClassesList();
-      try {
-        if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
-          SyncEngine._computeRealState();
-      } catch (e) {}
-    },
-
-    async _runPullForClass(cid) {
-      if (typeof DataService === 'undefined' || typeof ClassManager === 'undefined') return;
-      await DataService.pullClassData(cid);
-      try {
-        StorageManager.inv('ep_students_' + cid);
-        StorageManager.inv('ep_events_' + cid);
-      } catch (e) {}
-      const active = ClassManager.activeId();
-      if (active === cid) {
-        _invalidateCaches();
-        _refreshAllUI();
-      }
-      try {
-        if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
-          SyncEngine._computeRealState();
-      } catch (e) {}
-    },
-
-    _onDatabaseChange(evt) {
-      if (evt && evt.table === 'ep_classes') {
-        this.schedulePullClasses();
-        return;
-      }
-      const rid = _extractClassIdFromRealtimeEvt(evt);
-      if (rid) this.schedulePullForClass(rid);
-      else this.scheduleRefresh();
-    },
-
-    /** ClassManager.switchClass — merged Realtime listens to all rows; refresh active namespace */
-    onClassChange() {
-      this.scheduleRefresh();
-      try { DataService.flushOfflineQueue(); } catch (e) {}
-    },
-
     async _runRefresh() {
       if (typeof DataService === 'undefined' || typeof ClassManager === 'undefined') return;
       const cid = ClassManager.activeId();
       try {
-        if (typeof DataService.pullClassesList === 'function')
-          await DataService.pullClassesList();
         await DataService.pullClassData(cid);
         _invalidateCaches();
         _refreshAllUI();
@@ -12145,11 +11127,10 @@ const EduPulseSyncBrain = (() => {
       this._lastFocusSyncAt = now;
       this._setConnStatus('connecting', '\uD83D\uDFE1 Syncing\u2026');
 
+      const cid = ClassManager.activeId();
       try {
-        if (typeof DataService.pullAllClasses === 'function')
-          await DataService.pullAllClasses();
-        else
-          await DataService.pullClassData(ClassManager.activeId());
+        // [BUG-1 FIX] DataService.pull() never existed — use pullClassData()
+        await DataService.pullClassData(cid);
         _invalidateCaches();
         _refreshAllUI();
         this._setConnStatus('connected', '\uD83D\uDFE2 Live');
@@ -12157,6 +11138,7 @@ const EduPulseSyncBrain = (() => {
           if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
             SyncEngine._computeRealState();
         } catch (e) {}
+        // Catch any realtime events that arrived during background time
         this.scheduleRefresh();
       } catch (e) {
         console.warn('[EduPulseSyncBrain] app-resume pull failed', e);
@@ -12189,10 +11171,12 @@ const EduPulseSyncBrain = (() => {
     // Exponential back-off channel recovery
     _scheduleResubscribe() {
       if (this._retryCount >= MAX_RETRY_ATTEMPTS) {
-        this._retryCount = 0;
+        console.warn('[EduPulseSyncBrain] max reconnect attempts reached');
+        this._setConnStatus('offline', '\uD83D\uDD34 Could not reconnect');
+        return;
       }
       clearTimeout(this._resubscribeTimer);
-      const delay = Math.min(RETRY_BASE_DELAY_MS * Math.pow(2, this._retryCount), MAX_RETRY_DELAY_MS);
+      const delay = RETRY_BASE_DELAY_MS * Math.pow(2, this._retryCount);
       this._retryCount++;
       this._resubscribeTimer = setTimeout(() => {
         if (!this._client || !navigator.onLine) return;
@@ -12202,7 +11186,7 @@ const EduPulseSyncBrain = (() => {
         console.info('[EduPulseSyncBrain] re-subscribing attempt ' + this._retryCount);
         if (typeof RealtimeService !== 'undefined') {
           RealtimeService.subscribe(this._client, {
-            onDatabaseChange: evt => EPSB._onDatabaseChange(evt),
+            onDatabaseChange: () => EPSB.scheduleRefresh(),
           });
         }
       }, delay);
@@ -12224,7 +11208,7 @@ const EduPulseSyncBrain = (() => {
 
       if (typeof RealtimeService !== 'undefined') {
         RealtimeService.subscribe(client, {
-          onDatabaseChange: evt => EPSB._onDatabaseChange(evt),
+          onDatabaseChange: () => EPSB.scheduleRefresh(),
         });
       }
 
@@ -12277,14 +11261,6 @@ const EduPulseSyncBrain = (() => {
     destroy() {
       clearTimeout(this._debounceTimer);
       clearTimeout(this._resubscribeTimer);
-      clearTimeout(this._classesListTimer);
-      this._classesListTimer = null;
-      try {
-        Object.keys(this._classPullTimers || {}).forEach(k => {
-          clearTimeout(this._classPullTimers[k]);
-        });
-      } catch (e) {}
-      this._classPullTimers = Object.create(null);
       this._removeAppResumeListeners();
       if (this._client && typeof RealtimeService !== 'undefined') {
         RealtimeService.unsubscribe(this._client);
@@ -12298,14 +11274,11 @@ const EduPulseSyncBrain = (() => {
   return EPSB;
 })();
 
-// Expose on window so legacy script-tag references (EduPulseSyncBrain.init etc.) work
-if (typeof window !== 'undefined') window.EduPulseSyncBrain = EduPulseSyncBrain;
-
 // -══════════════════════════════════════════════════════════════════════════════
-// SYNC ENGINE — Supabase Realtime + DataService (ep_classes, ep_students, ep_movements)
+// SYNC ENGINE — Supabase Realtime + dataService.js (students / behaviors tables)
 //   • window.supabase = Supabase client after connect (per app convention)
 //   • Realtime + debounced UI refresh: syncBrain.js + realtimeService.js
-//   • Offline: DataService queues ops in localStorage (ep_rt_pending_ops); includes ep_classes
+//   • Offline: DataService queues ops in localStorage (ep_rt_pending_ops)
 // ════════════════════════════════════════════════════════════════════════════════
 const SyncEngine = {
 
@@ -12354,17 +11327,7 @@ const SyncEngine = {
   },
 
   _bootSupabase(creds){
-    // Guard: if already connected with the exact same credentials, skip re-init
-    if(this._supabase && this._supabaseUrl === creds.url && this._supabaseKey === creds.key){
-      SyncLogger.log('info','⚡ Supabase already connected — skipping re-init');
-      return;
-    }
-    // Clean up previous client auth to prevent "Multiple GoTrueClient" warning
-    if(this._supabase){
-      try{ this._supabase.auth.stopAutoRefresh(); }catch(e){}
-    }
-
-    const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.32.0/dist/umd/supabase.js';
+    const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
 
     const finish = (createClientFn) => {
       try{
@@ -12384,17 +11347,7 @@ const SyncEngine = {
         this._setupRealtimeReconnect(client, creds);
         const cid = ClassManager.activeId();
         if(typeof DataService !== 'undefined'){
-          (async () => {
-            try {
-              await DataService.pushChanges(cid);
-              await DataService.flushOfflineQueue();
-              if (typeof DataService.pullAllClasses === 'function')
-                await DataService.pullAllClasses();
-              else
-                await DataService.pullClassData(cid);
-              if (typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.scheduleRefresh();
-            } catch (e) { console.warn('[SyncEngine] post-connect sync', e); }
-          })();
+          DataService.pushLocalSnapshot(cid).then(() => DataService.flushOfflineQueue()).catch(()=>{});
         }
         this._lastSyncTime = Date.now();
         this._computeRealState();
@@ -12451,15 +11404,9 @@ const SyncEngine = {
     const cid = ClassManager.activeId();
     this.isSyncRunning = true;
     try{
-      if (typeof DataService.pushChanges === 'function')
-        await DataService.pushChanges(cid);
-      else
-        await DataService.pushLocalSnapshot(cid);
+      await DataService.pushLocalSnapshot(cid);
       await DataService.flushOfflineQueue();
-      if (typeof DataService.pullAllClasses === 'function')
-        await DataService.pullAllClasses();
-      else
-        await DataService.pullClassData(cid);
+      await DataService.pullClassData(cid);
       if(typeof EduPulseSyncBrain !== 'undefined') await EduPulseSyncBrain._runRefresh();
       this._lastSyncTime = Date.now();
       SyncBrain._recordHistory('sync','success','snapshot');
@@ -12480,10 +11427,7 @@ const SyncEngine = {
   flushSyncQueue(){
     if(typeof DataService === 'undefined'){ this._computeRealState(); return; }
     const cid = ClassManager.activeId();
-    const pushP = (typeof DataService.pushChanges === 'function')
-      ? DataService.pushChanges(cid)
-      : DataService.pushLocalSnapshot(cid);
-    pushP
+    DataService.pushLocalSnapshot(cid)
       .then(() => DataService.flushOfflineQueue())
       .then(() => { if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.scheduleRefresh(); })
       .finally(() => {
@@ -16486,8 +15430,7 @@ const DataHub = {
         const filtered = active ? [active] : [];
         localStorage.setItem('ep_classes', JSON.stringify(filtered));
         // Remove data for removed classes
-        const removedForCloud = classes.filter(c => c.id !== cid);
-        removedForCloud.forEach(c => {
+        classes.filter(c => c.id !== cid).forEach(c => {
           localStorage.removeItem(`ep_students_${c.id}`);
           localStorage.removeItem(`ep_events_${c.id}`);
           localStorage.removeItem(`ep_settings_${c.id}`);
@@ -16496,16 +15439,6 @@ const DataHub = {
             .filter(k => k.startsWith(`ep_dna_${c.id}_`))
             .forEach(k => localStorage.removeItem(k));
         });
-        try {
-          if (typeof DataService !== 'undefined') {
-            if (typeof DataService.pushClassesNow === 'function')
-              DataService.pushClassesNow(filtered).catch(() => {});
-            removedForCloud.forEach(c => {
-              if (typeof DataService.removeClassRemote === 'function')
-                DataService.removeClassRemote(c.id).catch(() => {});
-            });
-          }
-        } catch (e) {}
         purged.push('other classes');
       }
 
@@ -20831,23 +19764,17 @@ const PWAManager = {
   // All URLs are computed as absolute so they resolve correctly even when the
   // manifest is loaded from blob:null (file:// or APK WebView context).
   _injectManifest(){
-    // PWA manifest is meaningless on file:// — skip entirely to avoid the
-    // "Unsafe attempt to load URL" security error the empty <link rel=manifest>
-    // triggers before JavaScript can set a proper href.
-    if(location.protocol === 'file:') return;
     try{
       // Build absolute base so relative paths resolve from blob: origins
       const base     = location.href.replace(/\/[^/]*(\?.*)?$/, '/');
       const iconBase = base.endsWith('/') ? base : base + '/';
-      const startUrl = base;
-      const scopeUrl = base;
 
       const manifest = {
         name:             'EduPulse — Classroom Intelligence',
         short_name:       'EduPulse',
         description:      'AI-powered classroom behavior intelligence platform',
-        start_url:        startUrl,
-        scope:            scopeUrl,
+        start_url:        base,
+        scope:            base,
         display:          'standalone',
         background_color: '#07091a',
         theme_color:      '#07091a',
