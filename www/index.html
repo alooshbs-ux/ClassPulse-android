@@ -273,49 +273,51 @@ a{text-decoration:none;color:inherit}
 /* -── Header ─────────────────────────────────────────────────── */
 .app-header{
   grid-area:header;
-  flex-shrink:0;    /* never compress in flex layout */
+  flex-shrink:0;
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  padding:0 20px;
+  gap:8px;
+  padding:0 14px;
+  height:var(--header-h);
   background:var(--bg-surface);
   border-bottom:1px solid var(--border);
   z-index:var(--z-nav);
+  overflow:hidden;
 }
-.header-brand{display:flex;align-items:center;gap:10px}
+.header-brand{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .brand-mark{
-  width:32px;height:32px;border-radius:8px;
+  width:30px;height:30px;border-radius:8px;
   background:linear-gradient(135deg,var(--accent),#6c63ff);
   display:flex;align-items:center;justify-content:center;
-  font-size:16px;font-weight:700;color:#fff;
+  font-size:14px;font-weight:700;color:#fff;flex-shrink:0;
 }
-.brand-name{font-size:18px;font-weight:700;letter-spacing:-0.3px}
+.brand-name{font-size:16px;font-weight:700;letter-spacing:-0.3px}
 .brand-class{font-size:11px;color:var(--text-secondary);margin-top:-2px}
-.header-center{display:flex;align-items:center;gap:8px}
-.header-right{display:flex;align-items:center;gap:12px}
+.header-center{display:flex;align-items:center;gap:6px;flex:1;justify-content:center;min-width:0}
+.header-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .header-stat{
-  display:flex;align-items:center;gap:6px;
-  padding:5px 12px;border-radius:20px;
+  display:flex;align-items:center;gap:4px;
+  padding:4px 8px;border-radius:16px;
   background:var(--bg-card);border:1px solid var(--border);
-  font-size:12px;
+  font-size:11px;flex-shrink:0;
 }
-.header-stat .val{font-weight:600;font-size:13px}
+.header-stat .val{font-weight:700;font-size:12px}
 .header-stat .val.green{color:var(--green)}
 .header-stat .val.red{color:var(--red)}
 .header-stat .val.accent{color:var(--accent)}
 .header-btn{
-  width:34px;height:34px;border-radius:8px;
+  width:32px;height:32px;border-radius:8px;
   background:var(--bg-card);border:1px solid var(--border);
-  color:var(--text-secondary);font-size:17px;
+  color:var(--text-secondary);font-size:16px;
   display:flex;align-items:center;justify-content:center;
   transition:all var(--transition);cursor:pointer;
   flex-shrink:0;
 }
 .header-btn:hover{color:var(--text-primary);border-color:var(--border-strong);background:var(--bg-hover)}
 .date-chip{
-  padding:4px 10px;border-radius:6px;
+  padding:3px 8px;border-radius:6px;
   background:var(--bg-card);border:1px solid var(--border);
-  font-size:11px;color:var(--text-secondary);
+  font-size:10px;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;
 }
 
 /* ─── Sidebar ────────────────────────────────────────────────── */
@@ -1570,17 +1572,22 @@ a{text-decoration:none;color:inherit}
 
 /* ── Lesson Mode Selector ─────────────────────────────────────── */
 .lesson-mode-bar{
-  display:flex;gap:5px;align-items:center;flex-wrap:wrap;
+  display:flex;gap:3px;align-items:center;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:10px;padding:3px;
 }
 .lesson-btn{
-  padding:4px 9px;border-radius:12px;font-size:10px;font-weight:600;
-  background:var(--bg-card);border:1px solid var(--border);
-  color:var(--text-secondary);cursor:pointer;transition:all var(--transition);
-  white-space:nowrap;
+  width:28px;height:28px;border-radius:7px;font-size:14px;
+  background:transparent;border:none;
+  color:var(--text-secondary);cursor:pointer;
+  transition:all var(--transition);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
 }
-.lesson-btn:hover{border-color:var(--border-strong);color:var(--text-primary)}
+.lesson-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
 .lesson-btn.active{
-  background:var(--accent-dim);color:var(--accent);border-color:rgba(79,142,247,.4);
+  background:var(--accent-dim);color:var(--accent);
+  box-shadow:0 0 0 1px rgba(79,142,247,.35);
 }
 
 /* ── AI screen nav item badge ────────────────────────────────── */
@@ -1759,15 +1766,11 @@ a{text-decoration:none;color:inherit}
     overflow:hidden;
   }
   .app-insights{ display:none }
-  .header-center{ gap:6px }
-  .lesson-mode-bar span{ display:none }
-  .lesson-btn{ padding:4px 7px; font-size:9px }
-  .lesson-btn:not(.active){ display:none }
-  .lesson-btn.active{ display:flex }
-  #lesson-mode-bar .lesson-btn{ display:flex }
+  .header-center{ gap:4px }
 }
 @media(max-width:1024px) and (min-width:601px){
-  #lesson-mode-bar .lesson-btn:not(.active){ display:none }
+  /* All lesson buttons visible as icons even on tablet */
+  .lesson-btn{ display:flex }
 }
 
 /* ── Honor Pad 10 / Tablet portrait (601–900px wide) ─────────────────────────
@@ -1834,15 +1837,20 @@ a{text-decoration:none;color:inherit}
   .mobile-nav{ display:flex !important }
 
   /* ── Header compact ── */
-  .app-header{ padding:0 10px; gap:6px; overflow:hidden }
+  .app-header{ padding:0 8px; gap:4px; overflow:hidden }
   .brand-name{ font-size:14px }
   .brand-class{ display:none }
-  .header-center{ display:none }
+  /* On mobile: show header-center but compact — mood+lesson as tiny icon groups */
+  .header-center{ display:flex; gap:3px }
+  .mood-bar{ padding:2px; border-radius:8px; gap:1px }
+  .mood-btn{ width:24px; height:24px; font-size:12px; border-radius:5px }
+  .lesson-mode-bar{ padding:2px; border-radius:8px; gap:1px }
+  .lesson-btn{ width:24px; height:24px; font-size:12px; border-radius:5px }
   .date-chip{ display:none }
-  .header-stat{ padding:3px 7px; font-size:10px }
+  .header-stat{ padding:3px 6px; font-size:10px }
   .header-stat .lbl{ display:none }
-  .header-btn{ width:30px; height:30px; font-size:15px }
-  .header-right{ gap:5px }
+  .header-btn{ width:28px; height:28px; font-size:14px }
+  .header-right{ gap:4px }
   .ai-nav-badge{ display:none }
 
   /* ── Grids single-column ── */
@@ -1863,357 +1871,128 @@ a{text-decoration:none;color:inherit}
     --radius-lg:12px;
   }
 
-  /* ── FIX: Single-column layout, no overflow:hidden ────────── */
-  html, body{
-    height:100dvh !important;
-    max-height:100dvh !important;
-    overflow:hidden !important;   /* app-shell handles all scrolling */
-  }
+  html, body{ height:100dvh !important; max-height:100dvh !important; overflow:hidden !important; }
   .app-shell{
-    display:flex !important;
-    flex-direction:column !important;
-    grid-template-columns:unset !important;
-    grid-template-rows:unset !important;
+    display:flex !important; flex-direction:column !important;
+    grid-template-columns:unset !important; grid-template-rows:unset !important;
     grid-template-areas:unset !important;
-    /* Fixed height — CRITICAL for screens to fill via position:absolute */
-    height:100dvh !important;
-    max-height:100dvh !important;
-    overflow:hidden !important;     /* clips everything to viewport */
-    /* Safe area top (notch) */
+    height:100dvh !important; max-height:100dvh !important; overflow:hidden !important;
     padding-top:env(safe-area-inset-top, 0px);
   }
   .app-sidebar{ display:none !important }
   .app-insights{ display:none !important }
-  .app-header{
-    flex-shrink:0;
-    position:sticky;
-    top:0;
-    z-index:var(--z-header);
-    width:100%;
-    padding:0 10px;
-    flex-wrap:wrap;
-    gap:0;
-    row-gap:4px;
-    padding-bottom:4px;
-  }
-  /* Brand takes full first row */
-  .header-brand{
-    flex:1;
-    min-width:0;
-  }
-  /* header-right: all stats always visible — no scroll, no overflow */
-  .header-right{
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    flex-shrink: 0;
-    flex-wrap: nowrap;
-  }
-  /* Each stat chip: compact, no-shrink */
-  .header-right .header-stat{
-    flex-shrink: 0;
-    padding: 3px 5px;
-    gap: 2px;
-    font-size: 9px;
-    border-radius: 10px;
-  }
-  /* Icon-only buttons: tight circles */
-  .header-right .header-btn{
-    width: 26px; height: 26px;
-    font-size: 13px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    padding: 0;
-  }
-  /* hide "Avg" / "Today" / "Risk" text labels on small phones */
-  .header-right .header-stat > span:first-child{ display:none }
-  .header-right .header-stat .val{ font-size:10px; font-weight:800 }
-  /* Sync pill sits between brand and stats */
-  .sync-pill{ flex-shrink:0 }
-  main.app-main{
-    flex:1;
-    min-height:0;
-    /* Container for absolutely-positioned screens */
-    position:relative !important;
-    overflow:hidden !important;     /* clips screens — they scroll internally */
-    /* NO padding-bottom here — screens handle their own bottom padding */
-  }
 
-  /* -─ Screens: stay absolute, scroll internally, clear bottom nav ── */
-  .screen{
-    /* Keep position:absolute — fills app-main container */
-    /* Add bottom padding to clear the fixed bottom nav */
-    padding-bottom:calc(62px + env(safe-area-inset-bottom, 0px)) !important;
-    overflow-y:auto !important;
-    overflow-x:hidden !important;
-  }
-  .screen.active{
-    display:block !important;
-    position:absolute !important;
-    inset:0 !important;
-  }
-
-  /* ── Header — slim single row ───────────────────────────── */
+  /* ── Header: single tight row (48px) ── */
   .app-header{
-    padding:0 10px;
-    gap:6px;
-    height:var(--header-h);
+    flex-shrink:0; position:sticky; top:0; z-index:var(--z-header);
+    width:100%; height:var(--header-h);
+    padding:0 8px; gap:5px; flex-wrap:nowrap; overflow:hidden;
   }
-  .header-brand{ gap:7px }
-  .brand-mark{ width:28px; height:28px; font-size:13px; border-radius:7px }
-  .brand-name{ font-size:14px; font-weight:700 }
+  .header-brand{ gap:6px; flex-shrink:0; min-width:0 }
+  .brand-mark{ width:26px; height:26px; font-size:12px; border-radius:6px }
+  .brand-name{ font-size:13px; font-weight:700 }
   .brand-class{ display:none }
-  .header-center{ display:none }
+  /* Mood+Lesson move to tool strip below header */
+  .header-center{ display:none !important }
   .date-chip{ display:none }
-
-  /* Header stats — tiny chips */
-  .header-stat{
-    padding:3px 6px;
-    border-radius:12px;
-    font-size:9px;
-    gap:2px;
-    white-space:nowrap;
-    flex-shrink:0;
-  }
-  .header-stat .lbl{ display:none }
-  .header-stat .val{ font-size:10px; font-weight:700 }
-  #hdr-stats-row{ gap:3px }
-  .header-btn{ width:28px; height:28px; font-size:15px; border-radius:7px; flex-shrink:0 }
-
-  /* Sync pill — smaller */
-  .sync-pill{ padding:3px 7px; font-size:9px }
-  /* Hide separate realtime status on mobile — sync-pill covers the info */
   #realtime-conn-status{ display:none }
+  .header-right{ gap:3px; flex-shrink:0 }
+  .header-stat{ padding:3px 5px; border-radius:8px; font-size:9px; gap:2px; flex-shrink:0 }
+  .header-stat > span:not(.val){ font-size:9px }
+  .header-stat .val{ font-size:10px; font-weight:800 }
+  .header-btn{ width:28px; height:28px; font-size:14px; border-radius:7px; flex-shrink:0 }
+  .sync-pill{ padding:3px 6px; font-size:9px; flex-shrink:0 }
 
-  /* ── Screens ─────────────────────────────────────────────── */
+  /* ── Tool strip (38px) — Mood + Lesson under header ── */
+  #mobile-tool-strip{
+    display:flex; align-items:center; gap:6px;
+    padding:3px 10px; background:var(--bg-elevated);
+    border-bottom:1px solid var(--border); flex-shrink:0; height:38px;
+  }
+  #mobile-tool-strip .mood-bar{ padding:2px; gap:1px; border-radius:7px }
+  #mobile-tool-strip .mood-btn{ width:26px; height:26px; font-size:13px; border-radius:6px }
+  #mobile-tool-strip .lesson-mode-bar{ padding:2px; gap:1px; border-radius:7px }
+  #mobile-tool-strip .lesson-btn{ width:26px; height:26px; font-size:13px; border-radius:6px }
+  #mobile-tool-strip .date-chip{
+    display:block; margin-left:auto; font-size:9px;
+    padding:2px 7px; border-radius:6px; white-space:nowrap; flex-shrink:0;
+  }
+
+  main.app-main{ flex:1; min-height:0; position:relative !important; overflow:hidden !important; }
+
+  .screen{
+    padding-bottom:calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y:auto !important; overflow-x:hidden !important;
+  }
+  .screen.active{ display:block !important; position:absolute !important; inset:0 !important; }
   .screen{ overflow-y:auto; height:100% }
   .screen-header{
-    flex-wrap:wrap;
-    gap:6px;
-    padding:10px 12px;
+    flex-wrap:wrap; gap:6px; padding:10px 12px;
     position:sticky; top:0; z-index:50;
-    background:var(--bg-base);
-    border-bottom:1px solid var(--border);
+    background:var(--bg-base); border-bottom:1px solid var(--border);
   }
   .screen-title{ font-size:15px; font-weight:700 }
   .screen-sub{ font-size:10px }
 
-  /* ── Dashboard ───────────────────────────────────────────── */
-  .dashboard-grid{
-    grid-template-columns:1fr;
-    gap:8px;
-    padding:8px;
-  }
-  .student-action-area{
-    grid-template-columns:1fr;
-    gap:8px;
-  }
-
-  /* Stats cards — 2×2 compact grid */
-  .stats-row{
-    grid-template-columns:1fr 1fr;
-    gap:6px;
-  }
-  .stat-card{
-    padding:10px 8px;
-    border-radius:10px;
-    display:flex;
-    flex-direction:row;
-    align-items:center;
-    gap:8px;
-  }
-  .stat-card .stat-icon{
-    font-size:18px;
-    margin-bottom:0;
-    flex-shrink:0;
-  }
-  .stat-card .stat-value{
-    font-size:18px;
-    font-weight:700;
-    line-height:1;
-  }
-  .stat-card .stat-label{
-    font-size:9px;
-    margin-top:1px;
-    color:var(--text-muted);
-  }
+  .dashboard-grid{ grid-template-columns:1fr; gap:8px; padding:8px }
+  .student-action-area{ grid-template-columns:1fr; gap:8px }
+  .stats-row{ grid-template-columns:1fr 1fr; gap:6px }
+  .stat-card{ padding:10px 8px; border-radius:10px; display:flex; flex-direction:row; align-items:center; gap:8px }
+  .stat-card .stat-icon{ font-size:18px; margin-bottom:0; flex-shrink:0 }
+  .stat-card .stat-value{ font-size:18px; font-weight:700; line-height:1 }
+  .stat-card .stat-label{ font-size:9px; margin-top:1px; color:var(--text-muted) }
   .stat-card .stat-change{ font-size:9px; margin-top:1px }
 
-  /* Student quick grid — compact 4-column */
-  .student-quick-grid{
-    grid-template-columns:repeat(3,1fr);
-    gap:5px;
-  }
-  .student-quick-card{
-    padding:6px 3px;
-    border-radius:8px;
-  }
-  .scard-avatar{
-    width:28px; height:28px;
-    font-size:10px;
-    margin-bottom:4px;
-  }
-  .scard-name{
-    font-size:8px;
-    font-weight:600;
-    line-height:1.2;
-    margin-bottom:2px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  }
-  .scard-score{
-    font-size:12px;
-    font-weight:700;
-  }
-  .scard-risk-dot{
-    width:5px; height:5px;
-    top:3px; left:3px;
-  }
+  .student-quick-grid{ grid-template-columns:repeat(3,1fr); gap:5px }
+  .student-quick-card{ padding:6px 3px; border-radius:8px }
+  .scard-avatar{ width:28px; height:28px; font-size:10px; margin-bottom:4px }
+  .scard-name{ font-size:8px; font-weight:600; line-height:1.2; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .scard-score{ font-size:12px; font-weight:700 }
+  .scard-risk-dot{ width:5px; height:5px; top:3px; left:3px }
+  .scard-full{ padding:10px }
+  .scard-full .scard-name-big{ font-size:13px }
 
-  /* Behavior panel */
-  .behavior-panel{ min-height:280px;padding:10px }
+  .behavior-panel{ min-height:280px; padding:10px }
   .bp-note-wrap{ padding:6px }
-  .behavior-btns{
-    grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
-    gap:5px;
-    width:100%;
-    min-width:0;
-  }
-  .beh-btn{
-    width:100%;
-    min-width:0;
-    height:58px;
-    border-radius:9px;
-  }
-  .beh-btn .beh-icon{ font-size:18px; }
-  .beh-btn .beh-label{ font-size:7.5px;max-width:100%; }
-  .beh-btn .beh-pts{ font-size:7.5px; }
+  .behavior-btns{ grid-template-columns:repeat(auto-fill,minmax(52px,1fr)); gap:5px; width:100%; min-width:0 }
+  .beh-btn{ width:100%; min-width:0; height:58px; border-radius:9px }
+  .beh-btn .beh-icon{ font-size:18px }
+  .beh-btn .beh-label{ font-size:7.5px; max-width:100% }
+  .beh-btn .beh-pts{ font-size:7.5px }
   .beh-icon{ font-size:16px }
   .beh-pts{ font-size:8px }
   .behavior-section-label{ font-size:9px; padding:4px 0 3px }
   #bp-note-input{ font-size:14px }
 
-  /* Cards */
   .card{ border-radius:10px }
   .card-header{ padding:8px 10px 6px; gap:6px }
   .card-title{ font-size:12px }
   .card-body{ padding:8px 10px }
 
-  /* Activity feed */
-  .activity-feed{ max-height:180px }
-  .act-item{ padding:6px 10px; gap:8px }
-  .act-icon{ font-size:14px }
-  .act-label{ font-size:11px }
-  .act-time{ font-size:9px }
-
-  /* Charts */
-  .chart-container{ height:150px !important }
-
-  /* ── Students screen ─────────────────────────────────────── */
-  .student-full-grid{ padding:8px; gap:6px }
+  .analytics-grid{ grid-template-columns:1fr; padding:8px; gap:8px }
+  .analytics-screen .screen-header .btn{ font-size:10px; padding:4px 8px }
+  .reports-grid{ grid-template-columns:1fr; gap:8px; padding:8px }
+  .reports-screen .screen-header .btn{ font-size:10px; padding:4px 8px }
   .students-screen .screen-header{ padding:8px 10px }
   .students-screen .screen-header > select{ font-size:10px; padding:5px 6px }
   .students-screen .screen-header .search-wrap{ max-width:140px }
-  .scard-full{ padding:10px }
-  .scard-full .scard-name-big{ font-size:13px }
-  .profile-stats-grid{ grid-template-columns:repeat(2,1fr); gap:5px }
-
-  /* ── Analytics ────────────────────────────────────────────── */
-  .analytics-grid{ grid-template-columns:1fr; padding:8px; gap:8px }
-  .analytics-screen .screen-header .btn{ font-size:10px; padding:4px 8px }
-  #analytics-kpis .stats-row{ grid-template-columns:1fr 1fr }
-
-  /* ── AI Screen ────────────────────────────────────────────── */
-  .heat-grid{
-    grid-template-columns:repeat(5,1fr);
-    gap:4px;
-  }
-  .heat-cell{ padding:5px 3px; border-radius:7px }
-  .heat-avatar{ width:20px; height:20px; font-size:8px; margin-bottom:2px }
-  .heat-name{ font-size:7px }
-  .heat-score{ font-size:9px }
-  .ta-card{ padding:10px }
-  .pred-card{ padding:6px 8px }
-  .pred-avatar{ width:22px; height:22px; font-size:8px }
-  .pred-name{ font-size:10px }
-  .pred-state{ font-size:8px }
-
-  /* ── Leaderboard ─────────────────────────────────────────── */
-  .lb-item{ padding:8px 10px; gap:8px }
-  .lb-rank{ font-size:14px; min-width:24px }
-  .lb-name{ font-size:12px }
-  .lb-score{ font-size:13px }
-  .lb-avatar{ width:28px; height:28px; font-size:10px }
-
-  /* ── Reports ─────────────────────────────────────────────── */
-  .reports-grid{ grid-template-columns:1fr; gap:8px; padding:8px }
-  .reports-screen .screen-header .btn{ font-size:10px; padding:4px 8px }
-
-  /* ── Settings ────────────────────────────────────────────── */
-  .settings-screen{ padding:8px }
-  #sync-settings-section{ padding:10px }
-
-  /* ── Modals — bottom sheet ───────────────────────────────── */
-  .modal{
-    width:100vw !important;
-    max-width:100vw !important;
-    margin:0;
-    border-radius:18px 18px 0 0;
-    position:fixed;
-    bottom:0; left:0; right:0;
-    max-height:90dvh;
-    overflow-y:auto;
-  }
-  .modal-overlay{ align-items:flex-end; padding:0 }
-  .modal-lg{ width:100vw !important; max-width:100vw !important }
-  .modal-sm{ width:100vw !important; max-width:100vw !important }
-  .modal-header{ padding:12px 16px 10px }
-  .modal-title{ font-size:14px }
-  .modal-body{ padding:12px 16px }
-  .modal-footer{ padding:10px 16px; gap:6px; flex-wrap:wrap }
-  .modal-footer .btn{ flex:1; min-width:100px; justify-content:center; font-size:11px }
-
-  /* ── Inputs & Buttons ────────────────────────────────────── */
-  .input{ height:42px; font-size:16px; border-radius:8px }
-  select.select{ height:42px; font-size:14px }
-  .btn{ min-height:38px; font-size:11px; padding:8px 12px; border-radius:8px }
-  .btn-sm{ min-height:32px; font-size:10px; padding:5px 10px }
-  .btn-xs{ min-height:26px; font-size:9px; padding:3px 7px }
-
-  /* ── Pills & badges ──────────────────────────────────────── */
-  .pill{ padding:2px 6px; font-size:9px }
-  .ai-badge{ padding:2px 5px; font-size:9px }
-
-  /* ── Tooltips — no hover on touch ───────────────────────── */
-  
-
-  /* ── Onboarding tour button ──────────────────────────────── */
-  #ep-onboard-start-btn{
-    bottom:72px;
-    right:10px;
-    padding:6px 10px;
-    font-size:10px;
-  }
-  #ep-onboard-card{
-    width:calc(100vw - 20px) !important;
-    bottom:72px; left:10px; right:10px;
-  }
-
-  /* ── DNA Radar modal ─────────────────────────────────────── */
-  .dna-grid{ grid-template-columns:1fr 1fr; gap:6px }
-  .dna-radar-wrap{ height:160px }
-  .dna-metric .dm-val{ font-size:16px }
-  .dna-modal-hero{ padding:10px; gap:10px }
-  .dna-name{ font-size:13px }
-
-  /* ── Hide "Take the Tour" on very small screens if overlapping */
-  #ep-onboard-start-btn{ z-index:200 }
 }
 
 /* -══════════════════════════════════════════════════════════════
    iOS-QUALITY BOTTOM NAVIGATION
 ═══════════════════════════════════════════════════════════════ */
+/* Mobile tool strip — hidden on desktop, shown via @media ≤600px */
+#mobile-tool-strip{
+  display:none;
+  align-items:center;
+  gap:6px;
+  padding:3px 10px;
+  background:var(--bg-elevated);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  height:38px;
+  overflow:hidden;
+}
 .mobile-nav{
   display:none;
   position:fixed; bottom:0; left:0; right:0;
@@ -2569,10 +2348,10 @@ body.privacy-mode .hide-privacy{display:none!important}
 .ptoggle-track.on .ptoggle-thumb{transform:translateX(12px)}
 
 /* ── MOOD BAR ───────────────────────────────────────────── */
-.mood-bar{display:flex;align-items:center;gap:3px;background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:3px 8px}
-.mood-btn{width:23px;height:23px;border-radius:50%;font-size:13px;background:transparent;transition:all var(--transition);display:flex;align-items:center;justify-content:center;opacity:.38}
-.mood-btn:hover{opacity:.75;transform:scale(1.1)}
-.mood-btn.active{opacity:1;background:rgba(255,255,255,.08);transform:scale(1.14)}
+.mood-bar{display:flex;align-items:center;gap:3px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:3px}
+.mood-btn{width:28px;height:28px;border-radius:7px;font-size:14px;background:transparent;border:none;transition:all var(--transition);display:flex;align-items:center;justify-content:center;opacity:.42;cursor:pointer;flex-shrink:0}
+.mood-btn:hover{opacity:.8;background:var(--bg-hover)}
+.mood-btn.active{opacity:1;background:rgba(255,255,255,.1);box-shadow:0 0 0 1px rgba(255,255,255,.18)}
 
 /* ── QUICK EDIT DROPDOWN ────────────────────────────────── */
 /* Portal-mode: JS overrides position/top/left via inline style */
@@ -3363,58 +3142,74 @@ body.privacy-mode .hide-privacy{display:none!important}
       <span id="autosave-label">Saved</span>
     </div>
     <div class="header-center" class="ep-row">
-      <!-- Mood Tracker -->
+      <!-- Mood Tracker — icon-only buttons, label shows in tooltip -->
       <div class="mood-bar" data-title="Class Mood" data-description="Record today's classroom atmosphere. The AI Insight Engine uses this to adjust predictions and risk scores." data-tip-text="Restless mood increases risk multipliers by 40%.">
-        <span style="font-size:9px;color:var(--text-muted);margin-right:2px">Mood</span>
-        <button class="mood-btn" data-mood="focused" data-tip="Mark class mood as Focused — students are on task and engaged"    onclick="MoodTracker.set('focused',this)"    title="Focused">🎯</button>
-        <button class="mood-btn" data-mood="energetic" data-tip="Mark class mood as Energetic — high energy, possibly restless"  onclick="MoodTracker.set('energetic',this)"  title="Energetic">⚡</button>
-        <button class="mood-btn" data-mood="calm" data-tip="Mark class mood as Calm — quiet and cooperative atmosphere"       onclick="MoodTracker.set('calm',this)"       title="Calm">😌</button>
-        <button class="mood-btn" data-mood="distracted" onclick="MoodTracker.set('distracted',this)" title="Distracted">😵</button>
-        <button class="mood-btn" data-mood="restless" data-tip="Mark class mood as Restless — distracted, may need activity change"   onclick="MoodTracker.set('restless',this)"   title="Restless">🌪</button>
+        <button class="mood-btn" data-mood="focused"   title="Focused"    onclick="MoodTracker.set('focused',this)">🎯</button>
+        <button class="mood-btn" data-mood="energetic" title="Energetic"  onclick="MoodTracker.set('energetic',this)">⚡</button>
+        <button class="mood-btn" data-mood="calm"      title="Calm"       onclick="MoodTracker.set('calm',this)">😌</button>
+        <button class="mood-btn" data-mood="distracted"title="Distracted" onclick="MoodTracker.set('distracted',this)">😵</button>
+        <button class="mood-btn" data-mood="restless"  title="Restless"   onclick="MoodTracker.set('restless',this)">🌪</button>
       </div>
-      <!-- Lesson Mode Selector — feeds DNA weight system -->
+      <!-- Lesson Mode — icon-only, active shows icon + short label -->
       <div class="lesson-mode-bar" id="lesson-mode-bar"
-           data-title="Lesson Mode" data-description="Sets the active lesson type to shift AI DNA weight multipliers. Speaking boosts participation; Reading boosts focus; Test amplifies disruption." data-tip-text="Changing this instantly recomputes all Student DNA profiles.">
-        <span style="font-size:9px;color:var(--text-muted);margin-right:1px">Lesson</span>
-        <button class="lesson-btn active" data-lesson="general"   data-tip="General lesson mode — balanced behavior weights" onclick="LessonMode.set('general',this)"   title="General">📖 General</button>
-        <button class="lesson-btn"        data-lesson="speaking"  data-tip="Speaking mode — participation and verbal engagement weighted higher" onclick="LessonMode.set('speaking',this)"  title="Speaking">🎤 Speaking</button>
-        <button class="lesson-btn"        data-lesson="reading"   onclick="LessonMode.set('reading',this)"   title="Reading">📚 Reading</button>
-        <button class="lesson-btn"        data-lesson="group"     onclick="LessonMode.set('group',this)"     title="Group Work">👥 Group</button>
-        <button class="lesson-btn"        data-lesson="test"      onclick="LessonMode.set('test',this)"      title="Test/Exam">📝 Test</button>
+           data-title="Lesson Mode" data-description="Sets the active lesson type to shift AI DNA weight multipliers." data-tip-text="Changing this instantly recomputes all Student DNA profiles.">
+        <button class="lesson-btn active" data-lesson="general"  title="General"    onclick="LessonMode.set('general',this)">📖</button>
+        <button class="lesson-btn"        data-lesson="speaking" title="Speaking"   onclick="LessonMode.set('speaking',this)">🎤</button>
+        <button class="lesson-btn"        data-lesson="reading"  title="Reading"    onclick="LessonMode.set('reading',this)">📚</button>
+        <button class="lesson-btn"        data-lesson="group"    title="Group Work" onclick="LessonMode.set('group',this)">👥</button>
+        <button class="lesson-btn"        data-lesson="test"     title="Test/Exam"  onclick="LessonMode.set('test',this)">📝</button>
       </div>
       <div class="date-chip" id="header-date"></div>
     </div>
     <div class="header-right">
-      <div class="header-stat" data-title="Class Average" data-description="Average behavior score across all students in the current class.">
-        <span>Avg</span><span class="val accent" id="hdr-avg">—</span>
+      <div class="header-stat" title="Class average score" data-title="Class Average" data-description="Average behavior score across all students in the current class.">
+        <span style="font-size:10px">⭐</span><span class="val accent" id="hdr-avg">—</span>
       </div>
-      <div class="header-stat" data-title="Today's Events" data-description="Count of positive and negative behavior events logged today.">
-        <span>Today</span>
-        <span class="val green" id="hdr-pos">+0</span><span>/</span>
-        <span class="val red" id="hdr-neg">-0</span>
+      <div class="header-stat" title="Today's positive / negative events" data-title="Today's Events" data-description="Count of positive and negative behavior events logged today.">
+        <span class="val green" id="hdr-pos">+0</span><span style="opacity:.4;font-size:10px">/</span><span class="val red" id="hdr-neg">-0</span>
       </div>
-      <div class="header-stat" data-title="At Risk" data-description="Number of students currently flagged at risk based on behavior frequency and score trends in the last 24–48 hours.">
-        <span>Risk</span><span class="val" id="hdr-risk" style="color:var(--orange);cursor:pointer" onclick="App.navigate('students');setTimeout(()=>UI.filterByRisk('high'),80)" title="View at-risk students">0</span>
+      <div class="header-stat" title="Students at risk" data-title="At Risk" data-description="Number of students currently flagged at risk based on behavior frequency and score trends in the last 24–48 hours.">
+        <span style="font-size:10px">⚠️</span><span class="val" id="hdr-risk" style="color:var(--orange);cursor:pointer" onclick="App.navigate('students');setTimeout(()=>UI.filterByRisk('high'),80)">0</span>
       </div>
-      <button class="header-btn" onclick="ColdCallPicker.open()"
-        data-tip="Cold Call — randomly selects a student weighted toward low-engagement students">
+      <button class="header-btn" onclick="ColdCallPicker.open()" title="Cold Call — randomly selects a student" data-tip="Cold Call — randomly selects a student weighted toward low-engagement students">
         🎲
       </button>
       <button class="header-btn" onclick="App.openAddStudent()"
         data-title="Add Student ＋" data-description="Add a new student to the class roster. You can include their name, group, and parent phone number."
-        style="background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-size:18px;font-weight:600">
+        style="background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-size:18px;font-weight:600" title="Add Student">
         ＋
       </button>
-      <!-- Privacy Mode Toggle — icon only -->
+      <!-- Privacy Mode Toggle -->
       <div class="privacy-toggle" id="privacy-toggle" onclick="PrivacyMode.toggle()"
         data-title="Privacy Mode 🔒" data-description="Blurs parent phone numbers and private teacher logs when you project your screen to the class." data-tip-text="Toggle before presenting — sensitive data is hidden automatically."
         style="gap:0;padding:0;background:transparent;border:none"
         title="Toggle Privacy Mode">
         <button class="header-btn" id="priv-icon-btn"
-          style="font-size:17px" data-tip="Privacy Mode — blurs student names and scores. Use during parent meetings or screen sharing." title="Privacy Mode">🔓</button>
+          style="font-size:16px" data-tip="Privacy Mode — blurs student names and scores." title="Privacy Mode">🔓</button>
       </div>
     </div>
   </header>
+
+  <!-- Mobile Tool Strip — Mood + Lesson mode, visible only on ≤600px via CSS -->
+  <!-- Hidden on desktop/tablet (display:none by default, shown by mobile media query) -->
+  <div id="mobile-tool-strip">
+    <div class="mood-bar" data-title="Class Mood" data-description="Record today's classroom atmosphere.">
+      <button class="mood-btn" data-mood="focused"   title="Focused"    onclick="MoodTracker.set('focused',this)">🎯</button>
+      <button class="mood-btn" data-mood="energetic" title="Energetic"  onclick="MoodTracker.set('energetic',this)">⚡</button>
+      <button class="mood-btn" data-mood="calm"      title="Calm"       onclick="MoodTracker.set('calm',this)">😌</button>
+      <button class="mood-btn" data-mood="distracted"title="Distracted" onclick="MoodTracker.set('distracted',this)">😵</button>
+      <button class="mood-btn" data-mood="restless"  title="Restless"   onclick="MoodTracker.set('restless',this)">🌪</button>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border);flex-shrink:0"></div>
+    <div class="lesson-mode-bar" id="mobile-lesson-bar" data-title="Lesson Mode" data-description="Sets the lesson type for AI behavior weighting.">
+      <button class="lesson-btn active" data-lesson="general"  title="General"    onclick="LessonMode.set('general',this)">📖</button>
+      <button class="lesson-btn"        data-lesson="speaking" title="Speaking"   onclick="LessonMode.set('speaking',this)">🎤</button>
+      <button class="lesson-btn"        data-lesson="reading"  title="Reading"    onclick="LessonMode.set('reading',this)">📚</button>
+      <button class="lesson-btn"        data-lesson="group"    title="Group Work" onclick="LessonMode.set('group',this)">👥</button>
+      <button class="lesson-btn"        data-lesson="test"     title="Test/Exam"  onclick="LessonMode.set('test',this)">📝</button>
+    </div>
+    <div class="date-chip" id="mobile-date-chip"></div>
+  </div>
 
   <!-- SIDEBAR -->
   <nav class="app-sidebar">
@@ -3959,15 +3754,21 @@ body.privacy-mode .hide-privacy{display:none!important}
             Changes save locally first, sync to Supabase automatically, and other devices update live via Realtime (<code style="font-size:10px">students</code> + <code style="font-size:10px">behaviors</code> tables). No manual upload.
           </div>
 
+          <!-- file:// warning — only shown when opened as a local file -->
+          <div id="sb-file-warning" style="display:none;padding:8px 10px;background:rgba(243,156,18,.12);border:1px solid rgba(243,156,18,.35);border-radius:6px;font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.6">
+            <strong style="color:var(--orange)">⚠️ Opened as a local file:</strong>
+            Sync works best when served via HTTP. For full PWA + sync support, open via your web server or place the file in your Capacitor <code style="font-size:10px">www/</code> folder and run <code style="font-size:10px">npx cap run android</code>.
+          </div>
+
           <div class="form-group">
             <label class="label" for="sb-url">Supabase Project URL</label>
             <input class="input" id="sb-url" placeholder="https://xxxx.supabase.co"
-                   data-tip="Your Supabase project URL — found in Project Settings → API"/>
+                   data-tip="Your Supabase project URL — found in Project Settings → API. Must start with https://"/>
           </div>
           <div class="form-group">
             <label class="label" for="sb-anon-key">Supabase Anon Key</label>
             <input class="input" id="sb-anon-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
-                   data-tip="Your Supabase anon/public key — found in Project Settings → API"/>
+                   data-tip="Your Supabase anon/public key — found in Project Settings → API. Starts with eyJ…"/>
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
@@ -4015,12 +3816,11 @@ body.privacy-mode .hide-privacy{display:none!important}
         <div class="screen-header">
           <div class="screen-title" data-tip="AI Intelligence Engine — Comparisons, Lesson Plans, Interventions">🧠 AI Intelligence <span class="ai-nav-badge" style="margin-left:6px;font-size:10px;padding:2px 7px">ELT</span></div>
           <div class="lesson-mode-bar" id="ai-lesson-bar" style="margin-left:auto">
-            <span style="font-size:9px;color:var(--text-muted);margin-right:1px">Lesson</span>
-            <button class="lesson-btn" data-lesson="general"  onclick="LessonMode.set('general',this)"  title="General">📖 General</button>
-            <button class="lesson-btn" data-lesson="speaking" onclick="LessonMode.set('speaking',this)" title="Speaking">🎤 Speaking</button>
-            <button class="lesson-btn" data-lesson="reading"  onclick="LessonMode.set('reading',this)"  title="Reading">📚 Reading</button>
-            <button class="lesson-btn" data-lesson="group"    onclick="LessonMode.set('group',this)"    title="Group Work">👥 Group</button>
-            <button class="lesson-btn" data-lesson="test"     onclick="LessonMode.set('test',this)"     title="Test/Exam">📝 Test</button>
+            <button class="lesson-btn" data-lesson="general"  onclick="LessonMode.set('general',this)"  title="General">📖</button>
+            <button class="lesson-btn" data-lesson="speaking" onclick="LessonMode.set('speaking',this)" title="Speaking">🎤</button>
+            <button class="lesson-btn" data-lesson="reading"  onclick="LessonMode.set('reading',this)"  title="Reading">📚</button>
+            <button class="lesson-btn" data-lesson="group"    onclick="LessonMode.set('group',this)"    title="Group Work">👥</button>
+            <button class="lesson-btn" data-lesson="test"     onclick="LessonMode.set('test',this)"     title="Test/Exam">📝</button>
           </div>
         </div>
 
@@ -4298,6 +4098,22 @@ body.privacy-mode .hide-privacy{display:none!important}
 
 "use strict";
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSOLE SHIM — Android WebView / Capacitor compatibility
+// Some Android WebView builds (especially older Capacitor targets) expose
+// console.log but NOT console.info, console.warn, or console.error.
+// This shim must run FIRST — before any module that calls console.info/warn/error.
+// ═══════════════════════════════════════════════════════════════════════════════
+(function(){
+  var c = window.console = window.console || {};
+  // Ensure all console methods exist and fall back gracefully
+  ['log','info','warn','error','debug','group','groupEnd','groupCollapsed','time','timeEnd','assert','trace'].forEach(function(m){
+    if(typeof c[m] !== 'function'){
+      c[m] = c.log || function(){};
+    }
+  });
+})();
+
 // ©-═════════════════════════════════════════════════════════════════════════════
 // EduPulse — AI Classroom Intelligence Platform
 // Copyright © 2025 ALAA BANI SALAMEH. All rights reserved.
@@ -4486,21 +4302,20 @@ const CONFIG = {
 // ─────────────────────────────────────────────────────────────────────────────
 const StorageManager = {
   _cache: {},
-  DATA_VERSION: 3,  // increment when schema changes requiring migration
+  DATA_VERSION: 4,  // v4: name-based student deduplication migration
   VERSION_KEY:  'ep_data_version',
 
   // -─ Version check / migration guard ────────────────────────────────────────
-  // Called once at boot. If version mismatch detected, runs migrations.
   checkVersion(){
     const stored = parseInt(localStorage.getItem(this.VERSION_KEY) || '0', 10);
     if(stored === this.DATA_VERSION) return;
 
     // Run any needed migrations
     if(stored < 2){
-      // v2: nothing to migrate (initial version)
+      // v2: nothing to migrate
     }
     if(stored < 3){
-      // v3: ensure all student objects have the 'group' field (added in v3)
+      // v3: ensure 'group' and 'longestStreak' fields on all students
       try{
         const classes = JSON.parse(localStorage.getItem('ep_classes') || '[]');
         classes.forEach(cls => {
@@ -4514,6 +4329,58 @@ const StorageManager = {
           if(changed) localStorage.setItem(key, JSON.stringify(students));
         });
       }catch(e){ console.warn('[StorageManager] v3 migration failed:', e); }
+    }
+    if(stored < 4){
+      // v4: deduplicate students by name — fixes the "60 students" sync-race bug
+      // where a user re-added students while a pull was in-flight, causing both
+      // the original (IDs 1-27) and re-added (IDs 28-54) copies to be kept.
+      // Strategy: for each class, keep only the FIRST occurrence of each name.
+      //   If duplicates are found, keep the one with the LOWER id (original).
+      try{
+        const classes = JSON.parse(localStorage.getItem('ep_classes') || '[]');
+        classes.forEach(cls => {
+          const key      = `ep_students_${cls.id}`;
+          const raw      = localStorage.getItem(key);
+          if(!raw) return;
+          const students = JSON.parse(raw);
+          if(!Array.isArray(students)) return;
+
+          const normName = n => (n||'').trim().toLowerCase().replace(/\s+/g,' ');
+          // Sort by id ascending so we keep the original (lower id) on conflict
+          const sorted   = [...students].sort((a,b) => (a.id||0)-(b.id||0));
+          const seen     = new Map(); // normalizedName → kept student
+          const dupeIds  = new Set();
+
+          sorted.forEach(s => {
+            if(s.deleted) return; // keep soft-deleted as-is
+            const key = normName(s.name);
+            if(seen.has(key)){
+              dupeIds.add(s.id);  // this is a duplicate — will be removed
+            } else {
+              seen.set(key, s);
+            }
+          });
+
+          if(dupeIds.size > 0){
+            const deduped = students.filter(s => !dupeIds.has(s.id));
+            localStorage.setItem(`ep_students_${cls.id}`, JSON.stringify(deduped));
+            Logger.info('Storage',
+              `v4 dedup: removed ${dupeIds.size} duplicate student(s) from class ${cls.id}`);
+            // Also remove orphaned events for the deleted duplicate IDs
+            const evKey  = `ep_events_${cls.id}`;
+            const rawEv  = localStorage.getItem(evKey);
+            if(rawEv){
+              const events   = JSON.parse(rawEv);
+              const filtered = events.filter(ev => !dupeIds.has(ev.studentId));
+              if(filtered.length < events.length){
+                localStorage.setItem(evKey, JSON.stringify(filtered));
+                Logger.info('Storage',
+                  `v4 dedup: removed ${events.length - filtered.length} orphaned events`);
+              }
+            }
+          }
+        });
+      }catch(e){ console.warn('[StorageManager] v4 dedup migration failed:', e); }
     }
 
     localStorage.setItem(this.VERSION_KEY, String(this.DATA_VERSION));
@@ -4593,16 +4460,46 @@ const StorageManager = {
     try{ return Models.validateStudentArray(raw); }catch(e){ return raw; }
   },
   saveStudents(s){
+    // Dedup safety: if array has duplicate IDs (caused by any merge/push race),
+    // keep the last occurrence of each ID before writing.
+    // This is the final safety net — it should never be needed if merge is correct.
+    const deduped = (() => {
+      try{
+        if(!Array.isArray(s) || s.length < 2) return s;
+        const seen = new Map();
+        // Iterate in reverse so the first (earlier) add wins over duplicates
+        for(let i = s.length - 1; i >= 0; i--){
+          const key = String(s[i].id);
+          if(!seen.has(key)) seen.set(key, s[i]);
+        }
+        const result = Array.from(seen.values()).reverse();
+        if(result.length < s.length){
+          Logger.warn('Storage', `saveStudents: removed ${s.length - result.length} duplicate ID(s)`);
+        }
+        return result;
+      }catch(e){ return s; }
+    })();
+
     // Validate before saving — prevents corrupt writes
     try{
-      const valid = Models.validateStudentArray(s);
+      const valid = Models.validateStudentArray(deduped);
       return this.set(this._k(CONFIG.STORAGE_KEYS.STUDENTS), valid);
     }catch(e){
       Logger.warn('Storage', 'saveStudents validation failed', e.message);
-      return this.set(this._k(CONFIG.STORAGE_KEYS.STUDENTS), s);
+      return this.set(this._k(CONFIG.STORAGE_KEYS.STUDENTS), deduped);
     }
   },
   getEvents(){
+    const raw = this.get(this._k(CONFIG.STORAGE_KEYS.EVENTS), []);
+    let events;
+    try{ events = Models.validateBehaviorLogArray(raw); }catch(e){ events = raw; }
+    // DeletionManager integration: auto-exclude soft-deleted events.
+    // getAllEvents() is available for trash UI and restore flows.
+    if(typeof DeletionManager !== 'undefined') return events.filter(ev => !ev.deleted);
+    return events;
+  },
+  // getAllEvents() — includes deleted events, used by DeletionManager only
+  getAllEvents(){
     const raw = this.get(this._k(CONFIG.STORAGE_KEYS.EVENTS), []);
     try{ return Models.validateBehaviorLogArray(raw); }catch(e){ return raw; }
   },
@@ -4691,6 +4588,691 @@ const StorageManager = {
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE: DELETION MANAGER  (v1.0 — EduPulse Smart Deletion System)
+//
+// Architecture: 7-phase data lifecycle system.
+//   Phase 1 — Soft Delete Engine    : marks records deleted=true, never wipes
+//   Phase 2 — Trash System          : ep_trash_index, restore, permanentDelete
+//   Phase 3 — Undo System           : 10-second undo window, delayed cloud sync
+//   Phase 4 — Archive Mode          : hidden classes, data preserved
+//   Phase 5 — Safety Guard          : impact analysis before large deletions
+//   Phase 6 — Deletion Journal      : ep_deletion_log, full audit trail
+//   Phase 7 — Sync-Safe Delete      : markDeleted → waitUndoWindow → sync
+//
+// Integration rules:
+//   - NEVER calls localStorage directly (always through StorageManager)
+//   - NEVER modifies StorageManager internals
+//   - Backward compatible — existing data without deletion flags works as-is
+//   - All reads through StudentManager.getAll() / StorageManager.getEvents()
+//     automatically exclude soft-deleted records via _isActive() helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+const DeletionManager = (() => {
+  'use strict';
+
+  // ── Storage keys ─────────────────────────────────────────────────────────────
+  const TRASH_KEY   = 'ep_trash_index';
+  const JOURNAL_KEY = 'ep_deletion_log';
+  const ARCHIVE_KEY = 'ep_archived_classes';
+
+  // ── Undo window (ms) ─────────────────────────────────────────────────────────
+  const UNDO_WINDOW_MS = 10_000;
+
+  // ── Phase 3 — Undo stack ─────────────────────────────────────────────────────
+  // { id, type, classId, snapshot, timer, syncTimer, toastId }
+  const _undoStack = [];
+
+  // ═══════════════════════════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════════════════════════
+
+  function _cid() {
+    try { return ClassManager.activeId() || 'default'; } catch (e) { return 'default'; }
+  }
+
+  function _now() { return Date.now(); }
+
+  function _actor() {
+    try {
+      return StorageManager.getSettings().teacher || 'teacher';
+    } catch (e) { return 'teacher'; }
+  }
+
+  // Deletion flag shape — merged into any entity
+  function _deletionFlags(reason) {
+    return {
+      deleted:    true,
+      deletedAt:  _now(),
+      deletedBy:  _actor(),
+      deleteReason: reason || 'user',
+    };
+  }
+
+  // ── Phase 1: is-active filter used by UI and analytics ───────────────────────
+  // Public so other modules can call DeletionManager.isActive(record)
+  function isActive(record) {
+    return record && !record.deleted;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 6 — DELETION JOURNAL
+  // ═══════════════════════════════════════════════════════════
+
+  function _journal(action, entityType, entityId, classId, extra) {
+    try {
+      const raw  = localStorage.getItem(JOURNAL_KEY);
+      const log  = raw ? JSON.parse(raw) : [];
+      log.push({
+        ts:         _now(),
+        action,          // 'soft_delete' | 'restore' | 'permanent' | 'archive' | 'unarchive'
+        entityType,      // 'student' | 'event' | 'class'
+        entityId:   String(entityId),
+        classId:    classId || _cid(),
+        actor:      _actor(),
+        ...extra,
+      });
+      // Keep last 500 entries
+      if (log.length > 500) log.splice(0, log.length - 500);
+      localStorage.setItem(JOURNAL_KEY, JSON.stringify(log));
+    } catch (e) {
+      Logger.warn('DeletionManager', 'Journal write failed', e.message);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 2 — TRASH INDEX  (ep_trash_index)
+  // ═══════════════════════════════════════════════════════════
+
+  function _readTrash() {
+    try {
+      const raw = localStorage.getItem(TRASH_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+
+  function _writeTrash(items) {
+    try {
+      localStorage.setItem(TRASH_KEY, JSON.stringify(items));
+    } catch (e) {
+      Logger.warn('DeletionManager', 'Trash write failed', e.message);
+    }
+  }
+
+  function _addToTrash(entityType, entityId, classId, originalKey) {
+    const trash = _readTrash();
+    // Avoid duplicates
+    const exists = trash.findIndex(t => t.entityType === entityType && String(t.entityId) === String(entityId) && t.classId === classId);
+    const entry = {
+      entityType,
+      entityId:     String(entityId),
+      classId,
+      originalKey,
+      deletedAt:    _now(),
+      deletedBy:    _actor(),
+    };
+    if (exists >= 0) trash[exists] = entry;
+    else trash.push(entry);
+    _writeTrash(trash);
+  }
+
+  function _removeFromTrash(entityType, entityId, classId) {
+    const trash = _readTrash().filter(t =>
+      !(t.entityType === entityType && String(t.entityId) === String(entityId) && t.classId === classId)
+    );
+    _writeTrash(trash);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 1 — SOFT DELETE ENGINE
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * softDeleteStudent(id, reason?)
+   * Marks student deleted=true. Does NOT call StudentManager.remove().
+   * Returns { ok, student } or { ok:false, error }.
+   */
+  function softDeleteStudent(id, reason) {
+    try {
+      const students = StorageManager.getStudents();
+      const idx = students.findIndex(s => s.id === id);
+      if (idx < 0) return { ok: false, error: 'Student not found' };
+
+      const original = { ...students[idx] };
+      students[idx] = { ...students[idx], ..._deletionFlags(reason || 'user') };
+      StorageManager.saveStudents(students);
+      StudentManager.inv();
+
+      _addToTrash('student', id, _cid(), StorageManager._k(CONFIG.STORAGE_KEYS.STUDENTS));
+      _journal('soft_delete', 'student', id, _cid(), { name: original.name });
+
+      Logger.info('DeletionManager', `Soft-deleted student ${id} (${original.name})`);
+      return { ok: true, student: students[idx] };
+    } catch (e) {
+      Logger.error('DeletionManager', 'softDeleteStudent failed', e.message);
+      return { ok: false, error: e.message };
+    }
+  }
+
+  /**
+   * softDeleteEvents(predicate, reason?)
+   * Soft-deletes all events matching predicate(event) => bool.
+   * Returns count of affected events.
+   */
+  function softDeleteEvents(predicate, reason) {
+    try {
+      const events  = StorageManager.getEvents();
+      let   count   = 0;
+      const updated = events.map(ev => {
+        if (!ev.deleted && predicate(ev)) {
+          count++;
+          _journal('soft_delete', 'event', ev.id, _cid(), { studentId: ev.studentId });
+          return { ...ev, ..._deletionFlags(reason || 'user') };
+        }
+        return ev;
+      });
+      if (count) StorageManager.saveEvents(updated);
+      EventCache && EventCache.invalidate && EventCache.invalidate();
+      return count;
+    } catch (e) {
+      Logger.error('DeletionManager', 'softDeleteEvents failed', e.message);
+      return 0;
+    }
+  }
+
+  /**
+   * softDeleteStudentEvents(studentId, reason?)
+   * Convenience: soft-delete all events for one student.
+   */
+  function softDeleteStudentEvents(studentId, reason) {
+    return softDeleteEvents(ev => String(ev.studentId) === String(studentId), reason);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 3 — UNDO SYSTEM
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * moveToTrash(entityType, id, snapshot, opts?)
+   *
+   * Main entry point for all UI-triggered deletes.
+   * 1. Soft-deletes the entity
+   * 2. Shows 10-second undo toast
+   * 3. Defers cloud sync until undo window expires
+   * 4. On undo: restores entity, clears toast
+   * 5. On expiry: triggers permanent removal + cloud sync
+   *
+   * opts: { reason, label, onCommit, onRestore }
+   */
+  function moveToTrash(entityType, id, snapshot, opts) {
+    opts = opts || {};
+    const cid = _cid();
+
+    // ── Snapshot the state before deletion ───────────────────
+    const entry = {
+      id:         `del_${_now()}_${id}`,
+      entityType,
+      entityId:   id,
+      classId:    cid,
+      snapshot,           // full copy of the record(s) before deletion
+      timer:      null,
+      syncTimer:  null,
+      toastId:    null,
+      committed:  false,
+    };
+
+    _undoStack.push(entry);
+
+    // ── Show undo toast ───────────────────────────────────────
+    const label = opts.label || `${entityType === 'student' ? 'Student' : 'Events'} deleted`;
+    entry.toastId = NotificationEngine.showUndo(
+      label,
+      () => _triggerUndo(entry.id),
+      UNDO_WINDOW_MS
+    );
+
+    // ── Schedule commit after undo window ─────────────────────
+    entry.timer = setTimeout(() => {
+      _commitDelete(entry, opts);
+    }, UNDO_WINDOW_MS + 200);  // 200ms buffer so undo toast has time to fire
+
+    return entry.id;
+  }
+
+  function _triggerUndo(entryId) {
+    const idx = _undoStack.findIndex(e => e.id === entryId);
+    if (idx < 0) return false;
+    const entry = _undoStack[idx];
+    if (entry.committed) return false;
+
+    clearTimeout(entry.timer);
+    clearTimeout(entry.syncTimer);
+    _undoStack.splice(idx, 1);
+
+    // Restore based on entity type
+    _restoreSnapshot(entry);
+    _journal('restore', entry.entityType, entry.entityId, entry.classId, { via: 'undo_toast' });
+    Logger.info('DeletionManager', `Undo: restored ${entry.entityType} ${entry.entityId}`);
+    NotificationEngine.info('Restored', `${entry.entityType === 'student' ? 'Student' : 'Records'} restored successfully.`);
+    return true;
+  }
+
+  function _commitDelete(entry, opts) {
+    if (entry.committed) return;
+    entry.committed = true;
+
+    // Remove from undo stack
+    const idx = _undoStack.findIndex(e => e.id === entry.id);
+    if (idx >= 0) _undoStack.splice(idx, 1);
+
+    // Phase 7: now safe to sync to cloud
+    entry.syncTimer = setTimeout(() => {
+      try {
+        if (typeof DataService !== 'undefined' &&
+            typeof SyncEngine !== 'undefined' && SyncEngine._supabase) {
+          DataService.pushLocalSnapshot(entry.classId).catch(() => {});
+        }
+      } catch (e) {}
+    }, 500);
+
+    if (typeof opts.onCommit === 'function') opts.onCommit(entry);
+    _journal('committed', entry.entityType, entry.entityId, entry.classId);
+  }
+
+  function _restoreSnapshot(entry) {
+    try {
+      if (entry.entityType === 'student') {
+        const students = StorageManager.getStudents();
+        const idx      = students.findIndex(s => s.id === entry.entityId);
+        const restored = { ...entry.snapshot, deleted: false, deletedAt: null, deletedBy: null, deleteReason: null };
+        if (idx >= 0) students[idx] = restored;
+        else          students.push(restored);
+        StorageManager.saveStudents(students);
+        StudentManager.inv();
+      } else if (entry.entityType === 'events') {
+        const events  = StorageManager.getEvents();
+        const snapIds = new Set((entry.snapshot || []).map(e => e.id));
+        const merged  = events.map(ev => {
+          if (!snapIds.has(ev.id)) return ev;
+          return { ...ev, deleted: false, deletedAt: null, deletedBy: null, deleteReason: null };
+        });
+        StorageManager.saveEvents(merged);
+        EventCache && EventCache.invalidate && EventCache.invalidate();
+      }
+      _removeFromTrash(entry.entityType, entry.entityId, entry.classId);
+      try { Analytics && Analytics.invalidate && Analytics.invalidate(); } catch (e) {}
+      try { InsightEngine && InsightEngine.invalidate && InsightEngine.invalidate(); } catch (e) {}
+      try { UI && UI.renderStudents && UI.renderStudents(); } catch (e) {}
+      try { UI && UI._renderStudentQuickGrid && UI._renderStudentQuickGrid(); } catch (e) {}
+      try { UI && UI._refreshHeaderStats && UI._refreshHeaderStats(); } catch (e) {}
+    } catch (e) {
+      Logger.error('DeletionManager', '_restoreSnapshot failed', e.message);
+    }
+  }
+
+  // ── Public: restore from trash (manual, e.g. from Trash UI) ─────────────────
+  function restore(entityType, entityId, classId) {
+    // Check undo stack first (still in window)
+    const live = _undoStack.find(e => String(e.entityId) === String(entityId) && e.entityType === entityType);
+    if (live) return _triggerUndo(live.id);
+
+    // Restore from soft-delete flag directly
+    try {
+      if (entityType === 'student') {
+        const students = StorageManager.getStudents();
+        const idx = students.findIndex(s => String(s.id) === String(entityId));
+        if (idx < 0) return false;
+        students[idx] = { ...students[idx], deleted: false, deletedAt: null, deletedBy: null, deleteReason: null };
+        StorageManager.saveStudents(students);
+        StudentManager.inv();
+      } else if (entityType === 'events') {
+        const events  = StorageManager.getEvents();
+        const updated = events.map(ev =>
+          String(ev.studentId) === String(entityId)
+            ? { ...ev, deleted: false, deletedAt: null, deletedBy: null, deleteReason: null }
+            : ev
+        );
+        StorageManager.saveEvents(updated);
+        EventCache && EventCache.invalidate && EventCache.invalidate();
+      }
+      _removeFromTrash(entityType, entityId, classId || _cid());
+      _journal('restore', entityType, entityId, classId || _cid(), { via: 'manual' });
+      try { UI && UI.renderStudents && UI.renderStudents(); } catch (e) {}
+      try { UI && UI._refreshHeaderStats && UI._refreshHeaderStats(); } catch (e) {}
+      NotificationEngine.success('Restored', 'Record restored from trash.');
+      return true;
+    } catch (e) {
+      Logger.error('DeletionManager', 'restore failed', e.message);
+      return false;
+    }
+  }
+
+  // ── Public: permanent delete (after user confirms from trash view) ───────────
+  function permanentDelete(entityType, entityId, classId) {
+    try {
+      classId = classId || _cid();
+      if (entityType === 'student') {
+        const students = StorageManager.getStudents().filter(s => String(s.id) !== String(entityId));
+        StorageManager.saveStudents(students);
+        StudentManager.inv();
+        // Also permanently remove events for this student
+        const events = StorageManager.getEvents().filter(ev => String(ev.studentId) !== String(entityId));
+        StorageManager.saveEvents(events);
+        EventCache && EventCache.invalidate && EventCache.invalidate();
+        // Remove DNA profile
+        try { localStorage.removeItem(`ep_dna_${classId}_${entityId}`); } catch (e) {}
+      } else if (entityType === 'events') {
+        const events = StorageManager.getEvents().filter(ev =>
+          !(String(ev.studentId) === String(entityId) && ev.deleted)
+        );
+        StorageManager.saveEvents(events);
+        EventCache && EventCache.invalidate && EventCache.invalidate();
+      }
+      _removeFromTrash(entityType, entityId, classId);
+      _journal('permanent', entityType, entityId, classId);
+      try { Analytics && Analytics.invalidate && Analytics.invalidate(); } catch (e) {}
+      try { InsightEngine && InsightEngine.invalidate && InsightEngine.invalidate(); } catch (e) {}
+      try { UI && UI.renderStudents && UI.renderStudents(); } catch (e) {}
+      try { UI && UI._refreshHeaderStats && UI._refreshHeaderStats(); } catch (e) {}
+      // Sync immediately after permanent delete
+      setTimeout(() => {
+        try {
+          if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase)
+            DataService.pushLocalSnapshot(classId).catch(() => {});
+        } catch (e) {}
+      }, 300);
+      Logger.info('DeletionManager', `Permanently deleted ${entityType} ${entityId}`);
+      return true;
+    } catch (e) {
+      Logger.error('DeletionManager', 'permanentDelete failed', e.message);
+      return false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 4 — ARCHIVE MODE
+  // ═══════════════════════════════════════════════════════════
+
+  function _readArchived() {
+    try {
+      const raw = localStorage.getItem(ARCHIVE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+
+  function _writeArchived(list) {
+    try { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  /**
+   * archiveClass(classId)
+   * Marks a class as archived: hidden from UI, data preserved, excluded from sync load.
+   */
+  function archiveClass(classId) {
+    if (!classId) return false;
+    const list = _readArchived();
+    if (!list.includes(classId)) {
+      list.push(classId);
+      _writeArchived(list);
+    }
+    _journal('archive', 'class', classId, classId);
+    Logger.info('DeletionManager', `Archived class ${classId}`);
+    NotificationEngine.info('Class Archived', 'Class hidden from UI. Data preserved. You can restore it from Data Hub.');
+    return true;
+  }
+
+  function unarchiveClass(classId) {
+    const list = _readArchived().filter(id => id !== classId);
+    _writeArchived(list);
+    _journal('unarchive', 'class', classId, classId);
+    Logger.info('DeletionManager', `Unarchived class ${classId}`);
+    NotificationEngine.success('Class Restored', 'Class is visible again.');
+    return true;
+  }
+
+  function isClassArchived(classId) {
+    return _readArchived().includes(classId);
+  }
+
+  function getArchivedClasses() {
+    return _readArchived();
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 5 — SAFETY GUARD
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * analyzeImpact(scope, classId?)
+   * scope: 'student' | 'all_events' | 'class' | 'all_students'
+   * Returns { warningLevel, affectedRecords, recommendation, details }
+   */
+  function analyzeImpact(scope, targetId, classId) {
+    classId = classId || _cid();
+    try {
+      const students = StorageManager.getStudents().filter(isActive);
+      const events   = StorageManager.getEvents().filter(isActive);
+      let   affected = 0;
+      let   details  = {};
+      let   level    = 'low';
+
+      if (scope === 'student') {
+        const studentEvents = events.filter(ev => String(ev.studentId) === String(targetId));
+        const student       = students.find(s => s.id === targetId);
+        affected = 1 + studentEvents.length;
+        details  = {
+          studentName:  student ? student.name : String(targetId),
+          eventCount:   studentEvents.length,
+          posCount:     studentEvents.filter(e => e.pts > 0).length,
+          negCount:     studentEvents.filter(e => e.pts < 0).length,
+        };
+        level = studentEvents.length > 50 ? 'high' : studentEvents.length > 10 ? 'medium' : 'low';
+
+      } else if (scope === 'all_events') {
+        affected = events.length;
+        details  = { eventCount: events.length, studentCount: students.length };
+        level    = events.length > 500 ? 'high' : events.length > 100 ? 'medium' : 'low';
+
+      } else if (scope === 'all_students') {
+        affected = students.length + events.length;
+        details  = { studentCount: students.length, eventCount: events.length };
+        level    = students.length > 20 ? 'high' : students.length > 5 ? 'medium' : 'low';
+
+      } else if (scope === 'class') {
+        affected = students.length + events.length;
+        details  = {
+          studentCount:  students.length,
+          eventCount:    events.length,
+          totalDataSizeKB: Math.round(JSON.stringify({ students, events }).length / 1024),
+        };
+        level = 'high'; // class deletion is always high-impact
+      }
+
+      const recs = {
+        low:    'Safe to proceed. Consider downloading a backup first.',
+        medium: 'Moderate impact. Download a backup before continuing.',
+        high:   'High impact deletion. A backup is strongly recommended. Use Archive instead if possible.',
+      };
+
+      return {
+        warningLevel:    level,
+        affectedRecords: affected,
+        recommendation:  recs[level],
+        details,
+      };
+    } catch (e) {
+      return { warningLevel: 'high', affectedRecords: -1, recommendation: 'Impact unknown — proceed with caution.', details: {} };
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PHASE 6 — JOURNAL READ
+  // ═══════════════════════════════════════════════════════════
+
+  function getJournal(limit) {
+    try {
+      const raw = localStorage.getItem(JOURNAL_KEY);
+      const log = raw ? JSON.parse(raw) : [];
+      return limit ? log.slice(-limit).reverse() : log.slice().reverse();
+    } catch (e) { return []; }
+  }
+
+  function clearJournal() {
+    try { localStorage.removeItem(JOURNAL_KEY); } catch (e) {}
+    Logger.info('DeletionManager', 'Deletion journal cleared');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // TRASH UI DATA
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * getTrashItems()
+   * Returns all trash entries enriched with current record data.
+   * Used to render the Trash View UI.
+   */
+  function getTrashItems() {
+    const trash    = _readTrash();
+    const students = StorageManager.getStudents(); // includes deleted ones
+    const events   = StorageManager.getEvents();
+
+    return trash.map(t => {
+      let record = null;
+      if (t.entityType === 'student') {
+        record = students.find(s => String(s.id) === String(t.entityId)) || null;
+      } else if (t.entityType === 'events') {
+        const evs = events.filter(ev => String(ev.studentId) === String(t.entityId) && ev.deleted);
+        record = { count: evs.length, studentId: t.entityId };
+      }
+      return { ...t, record };
+    }).filter(t => t.record); // only show items that still exist
+  }
+
+  /**
+   * getTrashCount()
+   * Quick count for badge display.
+   */
+  function getTrashCount() {
+    return _readTrash().length;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PUBLIC API SURFACE
+  // ═══════════════════════════════════════════════════════════
+
+  return {
+    // Phase 1 — visibility filter (call on any array before rendering)
+    isActive,
+    filterActive: (arr) => (arr || []).filter(isActive),
+
+    // Phase 1 — soft delete
+    softDeleteStudent,
+    softDeleteStudentEvents,
+    softDeleteEvents,
+
+    // Phase 2 — trash
+    getTrashItems,
+    getTrashCount,
+
+    // Phase 2+3 — main delete entry point (shows undo toast + defers sync)
+    moveToTrash,
+
+    // Phase 2 — restore and permanent
+    restore,
+    permanentDelete,
+
+    // Phase 3 — undo
+    undoStack: _undoStack,
+    triggerUndo: _triggerUndo,
+
+    // Phase 4 — archive
+    archiveClass,
+    unarchiveClass,
+    isClassArchived,
+    getArchivedClasses,
+
+    // Phase 5 — safety guard
+    analyzeImpact,
+
+    // Phase 6 — journal
+    getJournal,
+    clearJournal,
+
+    // ── UI entry points (call from buttons) ────────────────────────────────
+    /**
+     * openTrashView()
+     * Opens a modal listing all soft-deleted items with Restore / Delete Forever buttons.
+     * Connect to: any "Trash" button, e.g. in DataHub or Settings.
+     */
+    openTrashView() {
+      const items = getTrashItems();
+      const rows = items.length === 0
+        ? `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+             🗑 Trash is empty — deleted items appear here for 30 days
+           </div>`
+        : items.map(t => {
+            const isStudent = t.entityType === 'student';
+            const name  = isStudent ? (t.record?.name || 'Unknown') : `${t.record?.count || 0} events — student #${t.entityId}`;
+            const icon  = isStudent ? (t.record?.avatar || '?') : '📋';
+            const color = isStudent ? (t.record?.color || 'var(--accent)') : 'var(--orange)';
+            const when  = new Date(t.deletedAt).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                         background:var(--bg-elevated);border:1px solid var(--border);
+                         border-radius:8px;margin-bottom:6px">
+              <div style="width:36px;height:36px;border-radius:50%;background:${color}22;
+                   color:${color};font-size:14px;display:flex;align-items:center;
+                   justify-content:center;flex-shrink:0">${icon}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Deleted ${when} · by ${t.deletedBy || 'user'}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn btn-ghost btn-xs" style="font-size:10px"
+                  onclick="DeletionManager.restore('${t.entityType}','${t.entityId}','${t.classId}');App.closeModal();setTimeout(()=>DeletionManager.openTrashView(),80)">
+                  ↩ Restore
+                </button>
+                <button class="btn btn-xs" style="font-size:10px;color:var(--red);border-color:var(--red)"
+                  onclick="if(confirm('Permanently delete? This cannot be undone.')){DeletionManager.permanentDelete('${t.entityType}','${t.entityId}','${t.classId}');App.closeModal();setTimeout(()=>DeletionManager.openTrashView(),80)}">
+                  ✕ Delete
+                </button>
+              </div>
+            </div>`;
+          }).join('');
+
+      const journalEntries = getJournal(8);
+      const journalRows = journalEntries.length === 0
+        ? `<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:8px">No entries yet</div>`
+        : journalEntries.map(e => {
+            const d = new Date(e.ts).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+            const actionColor = { soft_delete:'var(--orange)', restore:'var(--green)', permanent:'var(--red)', archive:'var(--purple)', committed:'var(--text-muted)' };
+            return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:10px;font-weight:700;color:${actionColor[e.action]||'var(--text-secondary)'};min-width:70px">${e.action}</span>
+              <span style="font-size:10px;color:var(--text-secondary);flex:1">${e.entityType} #${e.entityId}</span>
+              <span style="font-size:10px;color:var(--text-muted)">${d}</span>
+            </div>`;
+          }).join('');
+
+      UI._openModal({
+        title: '🗑 Trash & Deletion Journal',
+        size:  'md',
+        body: `
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:8px">
+            Items in trash (${items.length})
+          </div>
+          <div style="max-height:280px;overflow-y:auto;margin-bottom:16px">${rows}</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:6px">
+            Recent deletion activity
+          </div>
+          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 10px;max-height:180px;overflow-y:auto">
+            ${journalRows}
+          </div>`,
+        actions: [
+          { label: 'Close', class: 'btn-ghost', onclick: 'App.closeModal()' },
+        ],
+      });
+    },
+  };
+})();
+
 // -────────────────────────────────────────────────────────────────────────────
 // MODULE 2: STUDENT MANAGER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4724,6 +5306,21 @@ const StudentManager = {
     if(!name||!name.trim()) throw new Error('Name required');
     const s=this._load();
     if(s.length>=CONFIG.MAX_STUDENTS) throw new Error('Class is full');
+
+    // ── Duplicate name guard ─────────────────────────────────────────────────
+    // Prevent re-adding a student whose name already exists (case-insensitive,
+    // ignoring extra spaces). This is the primary defence against the double-add
+    // problem caused by sync appearing to fail.
+    const normalizedNew = name.trim().toLowerCase().replace(/\s+/g,' ');
+    const duplicate = s.find(st => {
+      if(st.deleted) return false;  // soft-deleted don't block re-add
+      return st.name.trim().toLowerCase().replace(/\s+/g,' ') === normalizedNew;
+    });
+    if(duplicate){
+      Logger.warn('StudentManager', `Duplicate name blocked: "${name.trim()}" (id=${duplicate.id})`);
+      return duplicate;  // return existing student so callers can handle gracefully
+    }
+    // ────────────────────────────────────────────────────────────────────────
     const now=new Date().toISOString();
     const student={
       id:         this._nextId++,
@@ -4756,7 +5353,15 @@ const StudentManager = {
     return student;
   },
 
-  getAll(){ return this._load(); },
+  // DeletionManager integration: automatically excludes soft-deleted records.
+  // Callers never see deleted=true students — backward compatible.
+  getAll(){
+    const all = this._load();
+    if(typeof DeletionManager === 'undefined') return all;
+    return all.filter(s => !s.deleted);
+  },
+  // getAllIncludingDeleted() — for trash UI and restore flows only
+  getAllIncludingDeleted(){ return this._load(); },
   getById(id){
     const s=this._load().find(s=>s.id===id);
     if(!s) return null;
@@ -9103,42 +9708,70 @@ const UI = {
   },
 
   _doDeleteStudent(id){
-    const st = StudentManager.getById(id);
+    const st = StudentManager.getById(id) || StudentManager.getAllIncludingDeleted?.().find(s=>s.id===id);
     if(!st) return;
     const mode = window._delStudentMode || 'logs';
+    window._delStudentMode = null;
+    App.closeModal();
 
     if(mode === 'logs'){
-      // Clear only behavior events for this student
-      const remaining = StorageManager.getEvents().filter(e => e.studentId != id);
-      StorageManager.saveEvents(remaining);
-      EventCache.invalidate();
-      Analytics.invalidate();
-      InsightEngine.invalidate();
-      App.closeModal();
-      NotificationEngine.success('Behavior Logs Cleared',`All behavior history for ${st.name} has been removed. The student remains in your roster.`);
+      // ── Soft-delete events only; student stays in roster ──────────────────
+      const snapshotEvents = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => String(ev.studentId) === String(id) && !ev.deleted)
+        : StorageManager.getEvents().filter(ev => String(ev.studentId) === String(id));
+
+      DeletionManager.softDeleteStudentEvents(id, 'user_logs_clear');
+
+      EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate();
+
+      DeletionManager.moveToTrash('events', id,
+        snapshotEvents,
+        {
+          label: `Behavior logs cleared — ${st.name}`,
+          onCommit: () => {
+            // Phase 7: cloud sync deferred until undo window closes
+            try{
+              if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+                DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+            }catch(e){}
+          },
+        }
+      );
     } else {
-      // Full permanent removal
-      StudentManager.remove(id);
-      if(this._selectedStudentId===id){
-        this._selectedStudentId=null;
-        const ph=document.getElementById('bp-placeholder');
-        const ct=document.getElementById('bp-content');
+      // ── Soft-delete student + events through DeletionManager ───────────────
+      const snapshotStudent = { ...st };
+      const snapshotEvents  = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => String(ev.studentId) === String(id) && !ev.deleted)
+        : StorageManager.getEvents().filter(ev => String(ev.studentId) === String(id));
+
+      // Impact guard
+      const impact = DeletionManager.analyzeImpact('student', id);
+      DeletionManager.softDeleteStudent(id, 'user');
+      DeletionManager.softDeleteStudentEvents(id, 'user_cascade');
+
+      if(this._selectedStudentId === id){
+        this._selectedStudentId = null;
+        const ph = document.getElementById('bp-placeholder');
+        const ct = document.getElementById('bp-content');
         if(ph) ph.style.display='flex';
         if(ct) ct.style.display='none';
       }
-      App.closeModal();
-      NotificationEngine.warning('Student Removed',`${st.name} and all associated data have been permanently deleted.`);
+
+      DeletionManager.moveToTrash('student', id,
+        { student: snapshotStudent, events: snapshotEvents },
+        {
+          label: `${st.name} moved to trash`,
+          onCommit: () => {
+            // Phase 3→7: after undo window, permanently remove and sync
+            DeletionManager.permanentDelete('student', id, ClassManager.activeId());
+          },
+        }
+      );
     }
 
-    window._delStudentMode = null;
     this.renderStudents();
     this._renderStudentQuickGrid();
     this._refreshHeaderStats();
-    // Keep cloud in sync
-    try{
-      if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
-        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
-    }catch(e){}
   },
 
   // -─ Analytics screen ───────────────────────────────────────────────
@@ -9431,6 +10064,12 @@ const UI = {
         if(uEl && !uEl.value) uEl.value = c.url || '';
         if(kEl && !kEl.value) kEl.value = c.key || '';
       }
+    }catch(e){}
+
+    // Show file:// origin warning if opened directly from filesystem
+    try{
+      const warn = document.getElementById('sb-file-warning');
+      if(warn) warn.style.display = location.protocol === 'file:' ? 'block' : 'none';
     }catch(e){}
     // Refresh the sync activity log panel
     if(typeof SyncEngine !== 'undefined') SyncEngine._renderSettingsLog();
@@ -9844,7 +10483,11 @@ const App = {
   _initDate(){
     const d=new Date();
     const opts={weekday:'short',month:'short',day:'numeric'};
-    document.getElementById('header-date').textContent=d.toLocaleDateString('en-US',opts);
+    const dateStr = d.toLocaleDateString('en-US',opts);
+    document.getElementById('header-date').textContent = dateStr;
+    // Also sync the mobile tool strip date chip
+    const mobileChip = document.getElementById('mobile-date-chip');
+    if(mobileChip) mobileChip.textContent = dateStr;
   },
 
   openAddStudent(){
@@ -10123,27 +10766,67 @@ const App = {
     const mode = window._rstMode || 'logs';
     App.closeModal();
     window._rstMode = null;
+    const cid = ClassManager.activeId();
 
     if(mode === 'logs'){
-      StorageManager.saveEvents([]);
-      EventCache.invalidate();
-      Analytics.invalidate();
-      InsightEngine.invalidate();
-      NotificationEngine.success('Behavior Logs Cleared',`All behavior events for "${clsName}" have been removed. Students and scores are untouched.`);
+      // Snapshot active events before soft-delete
+      const snapshotEvents = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => !ev.deleted)
+        : StorageManager.getEvents();
+
+      DeletionManager.softDeleteEvents(() => true, 'class_reset_logs');
+      EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate();
+
+      DeletionManager.moveToTrash('events', '__all__', snapshotEvents, {
+        label: `Behavior logs cleared — ${clsName}`,
+        onCommit: () => {
+          try{
+            if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+              DataService.pushLocalSnapshot(cid).catch(()=>{});
+          }catch(e){}
+        },
+      });
+      NotificationEngine.success('Behavior Logs Cleared',`All behavior events for "${clsName}" removed. Undo available for 10 seconds.`);
+
     } else if(mode === 'scores'){
-      StorageManager.saveEvents([]);
+      const snapshotStudents = StorageManager.getStudents().map(s=>({...s}));
+      const snapshotEvents   = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => !ev.deleted)
+        : StorageManager.getEvents();
+
+      DeletionManager.softDeleteEvents(() => true, 'class_reset_scores');
       EventCache.invalidate();
-      const students = StudentManager.getAll().map(s=>({
+      const students = StudentManager.getAllIncludingDeleted
+        ? StudentManager.getAllIncludingDeleted().filter(s=>!s.deleted)
+        : StorageManager.getStudents();
+      const zeroed = students.map(s=>({
         ...s, score:0, weeklyScore:0, streak:0, badges:[], achievements:[],
       }));
-      StorageManager.saveStudents(students);
+      StorageManager.saveStudents(zeroed);
       StudentManager.inv();
-      Analytics.invalidate();
-      InsightEngine.invalidate();
-      NotificationEngine.success('Class Reset',`All scores and behavior logs for "${clsName}" have been reset to zero.`);
+      Analytics.invalidate(); InsightEngine.invalidate();
+
+      DeletionManager.moveToTrash('events', '__scores_reset__', { students: snapshotStudents, events: snapshotEvents }, {
+        label: `Scores reset — ${clsName}`,
+        onCommit: () => {
+          try{
+            if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+              DataService.pushLocalSnapshot(cid).catch(()=>{});
+          }catch(e){}
+        },
+      });
+      NotificationEngine.success('Class Reset',`Scores and logs for "${clsName}" reset to zero. Undo available for 10 seconds.`);
+
     } else {
+      // Full wipe — analyze impact first (Phase 5 safety guard)
+      const impact = DeletionManager.analyzeImpact('all_students', null, cid);
+      Logger.info('DeletionManager', `Class full reset — impact: ${impact.warningLevel}, ${impact.affectedRecords} records`);
+
       StorageManager.clearCurrentClass();
       StudentManager.removeAll();
+      DeletionManager['_journal'] && DeletionManager['_journal']?.call
+        ? (() => {})()   // journal called inside permanentDelete below
+        : null;
       NotificationEngine.info('Class Cleared',`All students and data for "${clsName}" have been permanently removed.`);
     }
 
@@ -10152,8 +10835,8 @@ const App = {
     try{ GamificationEngine.invalidateLeaderboard(); }catch(e){}
     // Push the cleared state to Supabase so all devices see the reset
     try{
-      if(typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase){
-        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+      if(mode !== 'logs' && mode !== 'scores' && typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase){
+        DataService.pushLocalSnapshot(cid).catch(()=>{});
       }
     }catch(e){}
     ClassManager._renderSwitcher();
@@ -10587,31 +11270,52 @@ const QuickEdit = {
     const st = StudentManager.getById(id); if(!st) return;
     const mode = window._qeDelMode || 'logs';
     window._qeDelMode = null;
+    App.closeModal();
 
     if(mode === 'logs'){
-      const remaining = StorageManager.getEvents().filter(e => e.studentId != id);
-      StorageManager.saveEvents(remaining);
+      const snapshotEvents = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => String(ev.studentId)===String(id) && !ev.deleted)
+        : StorageManager.getEvents().filter(ev => String(ev.studentId)===String(id));
+
+      DeletionManager.softDeleteStudentEvents(id, 'user_logs_clear');
       EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate();
-      App.closeModal();
-      NotificationEngine.success('Behavior Logs Cleared', `All behavior history for ${st.name} has been removed.`);
+
+      DeletionManager.moveToTrash('events', id, snapshotEvents, {
+        label: `Behavior logs cleared — ${st.name}`,
+        onCommit: () => {
+          try{
+            if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
+              DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
+          }catch(e){}
+        },
+      });
     } else {
-      const name = st.name;
-      StudentManager.remove(id);
+      const snapshotStudent = { ...st };
+      const snapshotEvents  = StorageManager.getAllEvents
+        ? StorageManager.getAllEvents().filter(ev => String(ev.studentId)===String(id) && !ev.deleted)
+        : StorageManager.getEvents().filter(ev => String(ev.studentId)===String(id));
+
+      DeletionManager.softDeleteStudent(id, 'user');
+      DeletionManager.softDeleteStudentEvents(id, 'user_cascade');
+
       if(UI._selectedStudentId === id){
         UI._selectedStudentId = null;
         const ph = document.getElementById('bp-placeholder');
         const ct = document.getElementById('bp-content');
         if(ph) ph.style.display='flex'; if(ct) ct.style.display='none';
       }
-      App.closeModal();
-      NotificationEngine.warning('Student Removed', `${name} and all associated data have been permanently deleted.`);
+
+      DeletionManager.moveToTrash('student', id,
+        { student: snapshotStudent, events: snapshotEvents },
+        {
+          label: `${st.name} moved to trash`,
+          onCommit: () => {
+            DeletionManager.permanentDelete('student', id, ClassManager.activeId());
+          },
+        }
+      );
     }
     UI._renderStudentFullGrid(); UI._renderStudentQuickGrid(); UI._refreshHeaderStats();
-    // Keep cloud in sync
-    try{
-      if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase)
-        DataService.pushLocalSnapshot(ClassManager.activeId()).catch(()=>{});
-    }catch(e){}
   },
 };
 
@@ -10807,6 +11511,14 @@ const ClassManager = {
   _loadList(){
     try{ return JSON.parse(localStorage.getItem(this._KEY_LIST)||'[]'); }
     catch{ return []; }
+  },
+  // Returns only non-archived classes — used by all active-class UI
+  _loadActiveList(){
+    const all = this._loadList();
+    if(typeof DeletionManager === 'undefined') return all;
+    const archived = DeletionManager.getArchivedClasses();
+    if(!archived.length) return all;
+    return all.filter(cls => !archived.includes(cls.id));
   },
   _saveList(list){
     localStorage.setItem(this._KEY_LIST, JSON.stringify(list));
@@ -11246,7 +11958,8 @@ const DataService = (() => {
   const DS = {
     _debounceStudents:  null,
     _debounceEvents:    null,
-    _flushInProgress:   false,   // FIX: concurrency guard — prevents double-flush
+    _flushInProgress:   false,   // concurrency guard — prevents double-flush
+    _pullInProgress:    false,   // concurrency guard — prevents pull-during-pull
     STUDENT_DEBOUNCE_MS: 450,
     EVENT_DEBOUNCE_MS:   800,
 
@@ -11367,31 +12080,89 @@ const DataService = (() => {
       const client = _getClient();
       if (!client) return;
 
+      // Prevent re-entrant pulls (called from scheduleRefresh while push is running)
+      if (this._pullInProgress) return;
+      this._pullInProgress = true;
       try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
 
       try {
         const [stRes, beRes] = await Promise.all([
-          client.from('students').select('data').eq('class_id', cid),
-          client.from('behaviors').select('data').eq('class_id', cid),
+          client.from('students').select('data,updated_at').eq('class_id', cid),
+          client.from('behaviors').select('data,updated_at').eq('class_id', cid),
         ]);
         if (stRes.error) throw stRes.error;
         if (beRes.error) throw beRes.error;
 
-        const students = (stRes.data || []).map(r => r.data).filter(Boolean);
-        const events   = (beRes.data || []).map(r => r.data).filter(Boolean);
+        const remoteStudents = (stRes.data || []).map(r => r.data).filter(Boolean);
+        const remoteEvents   = (beRes.data || []).map(r => r.data).filter(Boolean);
 
-        // Cloud is empty but local has data => keep local (first sync on new device)
-        if (!students.length && !events.length) {
+        // Cloud is empty AND local has data → keep local (first connect on existing device)
+        if (!remoteStudents.length && !remoteEvents.length) {
           try {
             const local = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]');
             if (Array.isArray(local) && local.length) return;
           } catch (_) {}
         }
 
-        localStorage.setItem(_studentsKey(cid), JSON.stringify(students));
-        localStorage.setItem(_eventsKey(cid),   JSON.stringify(events));
+        // ── MERGE: never blindly replace — merge remote + local by ID ──────────
+        // Strategy:
+        //   • Remote wins for same ID (server is source of truth)
+        //   • Local-only IDs kept IF no matching name already in remote
+        //     → this is the critical fix for the re-add duplication bug:
+        //       user re-adds same students (gets new IDs) while pull was in-flight;
+        //       merge must NOT keep the re-added copies when remote already has them.
+        //   • Final dedup by both ID and normalized name
+        const _normName = n => (n||'').trim().toLowerCase().replace(/\s+/g,' ');
 
-        // FIX: bust ALL in-memory caches — not just StorageManager
+        const mergeById = (remote, localRaw, isStudents) => {
+          try {
+            const local = JSON.parse(localRaw || '[]');
+            const remoteMap  = new Map(remote.map(r => [String(r.id), r]));
+            // Name map for students only — prevents same person with different ID
+            const remoteNames = isStudents
+              ? new Set(remote.filter(r=>!r.deleted).map(r => _normName(r.name)))
+              : null;
+
+            // Start with all remote records (server wins for conflicts)
+            const merged = [...remote];
+
+            // Add local-only records:
+            //   - ID must not already be in remote
+            //   - For students: name must not already be in remote (dedup re-adds)
+            for (const localRec of (Array.isArray(local) ? local : [])) {
+              const id = String(localRec.id);
+              if (remoteMap.has(id)) continue; // remote wins on same ID
+              if (isStudents && !localRec.deleted && remoteNames &&
+                  remoteNames.has(_normName(localRec.name))) {
+                // Same name already in remote with a different ID — skip the
+                // locally re-added duplicate
+                Logger.warn('DataService',
+                  `Merge: skipping local duplicate name "${localRec.name}" (local id=${id})`);
+                continue;
+              }
+              merged.push(localRec);
+            }
+
+            // Final dedup by ID (safety net)
+            const seen = new Set();
+            return merged.filter(r => {
+              const key = String(r.id);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+          } catch (_) {
+            return remote;
+          }
+        };
+
+        const mergedStudents = mergeById(remoteStudents, localStorage.getItem(_studentsKey(cid)), true);
+        const mergedEvents   = mergeById(remoteEvents,   localStorage.getItem(_eventsKey(cid)),   false);
+
+        localStorage.setItem(_studentsKey(cid), JSON.stringify(mergedStudents));
+        localStorage.setItem(_eventsKey(cid),   JSON.stringify(mergedEvents));
+
+        // Bust ALL in-memory caches
         try { StorageManager.invAll();       } catch (e) {}
         try { StudentManager.inv();          } catch (e) {}
         try { Analytics.invalidate();        } catch (e) {}
@@ -11399,6 +12170,7 @@ const DataService = (() => {
         try { EventCache.invalidate();       } catch (e) {}
 
       } finally {
+        this._pullInProgress = false;
         try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = false; } catch (e) {}
       }
     },
@@ -11498,6 +12270,20 @@ const EduPulseSyncBrain = (() => {
   const MAX_RETRY_ATTEMPTS      = 5;
   const RETRY_BASE_DELAY_MS     = 2000;
 
+  // ── Environment guard ───────────────────────────────────────────────────────
+  // Realtime WebSockets require an HTTP/HTTPS origin.
+  // On file:// the browser blocks any outbound WS connection immediately.
+  // On Capacitor the origin is capacitor:// or file:// depending on version.
+  function _canUseRealtime() {
+    try {
+      const proto = location.protocol;
+      if (proto === 'file:')       return false;
+      if (proto === 'capacitor:')  return false;  // Capacitor v3+ uses capacitor://
+      // Capacitor v2 serves from http://localhost — that IS fine for WebSocket
+      return true;
+    } catch (e) { return false; }
+  }
+
   // ── Cache invalidation ──────────────────────────────────────────────────────
   function _invalidateCaches() {
     try { StorageManager.invAll();    } catch (e) {}
@@ -11564,6 +12350,8 @@ const EduPulseSyncBrain = (() => {
 
     // ── App-resume sync ──────────────────────────────────────────────────────
     async _appResumeSync() {
+      // Skip on file:// — Supabase REST calls also fail from file:// origin
+      if (!_canUseRealtime()) return;
       const now = Date.now();
       // Anti-spam: skip if a sync ran recently
       if (now - this._lastFocusSyncAt < MIN_FOCUS_SYNC_INTERVAL) return;
@@ -11599,26 +12387,36 @@ const EduPulseSyncBrain = (() => {
     _onChannelStatus(status) {
       if (status === 'SUBSCRIBED') {
         this._retryCount = 0;
-        this._setConnStatus('connected', '\uD83D\uDFE2 Live');
+        this._setConnStatus('connected', '🟢 Live');
         try { DataService.flushOfflineQueue(); } catch (e) {}
         this.scheduleRefresh();
         return;
       }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        // On file:// origin WebSocket will always fail — don't retry endlessly
+        if (!_canUseRealtime()) {
+          this._setConnStatus('offline', '🔴 Local only (open via HTTP for live sync)');
+          return;
+        }
         if (navigator.onLine) {
-          this._setConnStatus('connecting', '\uD83D\uDFE1 Reconnecting\u2026');
+          this._setConnStatus('connecting', '🟡 Reconnecting…');
           this._scheduleResubscribe();
         } else {
-          this._setConnStatus('offline', '\uD83D\uDD34 Offline');
+          this._setConnStatus('offline', '🔴 Offline');
         }
       }
     },
 
     // Exponential back-off channel recovery
     _scheduleResubscribe() {
+      // Never retry on file:// — WebSocket is fundamentally blocked there
+      if (!_canUseRealtime()) {
+        this._setConnStatus('offline', '🔴 Local only (open via HTTP for live sync)');
+        return;
+      }
       if (this._retryCount >= MAX_RETRY_ATTEMPTS) {
         console.warn('[EduPulseSyncBrain] max reconnect attempts reached');
-        this._setConnStatus('offline', '\uD83D\uDD34 Could not reconnect');
+        this._setConnStatus('offline', '🔴 Could not reconnect');
         return;
       }
       clearTimeout(this._resubscribeTimer);
@@ -11626,10 +12424,11 @@ const EduPulseSyncBrain = (() => {
       this._retryCount++;
       this._resubscribeTimer = setTimeout(() => {
         if (!this._client || !navigator.onLine) return;
+        if (!_canUseRealtime()) return;
         if (typeof RealtimeService !== 'undefined' && RealtimeService._channel) {
           try { if (RealtimeService._channel.state === 'joined') return; } catch (e) {}
         }
-        console.info('[EduPulseSyncBrain] re-subscribing attempt ' + this._retryCount);
+        console.log('[EduPulseSyncBrain] re-subscribing attempt ' + this._retryCount);
         if (typeof RealtimeService !== 'undefined') {
           RealtimeService.subscribe(this._client, {
             onDatabaseChange: () => EPSB.scheduleRefresh(),
@@ -11650,7 +12449,18 @@ const EduPulseSyncBrain = (() => {
     init(client) {
       this._client     = client;
       this._retryCount = 0;
-      this._setConnStatus('connecting', '\uD83D\uDFE1 Connecting\u2026');
+
+      // On file:// WebSocket connections are blocked by the browser — skip
+      // Realtime entirely and show a clear status instead of retrying 5 times.
+      if (!_canUseRealtime()) {
+        this._setConnStatus('offline', '🔴 Local only (open via HTTP for live sync)');
+        console.log('[EduPulseSyncBrain] Realtime skipped — file:// origin does not support WebSocket. Open via HTTP/HTTPS for live sync.');
+        // Still flush offline queue (REST calls work fine even from file://)
+        try { DataService.flushOfflineQueue().catch(() => {}); } catch (e) {}
+        return;
+      }
+
+      this._setConnStatus('connecting', '🟡 Connecting…');
 
       if (typeof RealtimeService !== 'undefined') {
         RealtimeService.subscribe(client, {
@@ -11683,7 +12493,7 @@ const EduPulseSyncBrain = (() => {
             cap.Plugins.App.addListener('appStateChange', state => {
               if (state && state.isActive) this._appResumeSync();
             });
-            console.info('[EduPulseSyncBrain] Capacitor appStateChange attached');
+            console.log('[EduPulseSyncBrain] Capacitor appStateChange attached');
           } catch (e) {
             console.warn('[EduPulseSyncBrain] Capacitor listener error:', e);
           }
@@ -11755,17 +12565,37 @@ const SyncEngine = {
       const saved = localStorage.getItem('ep_sb_creds');
       if(saved){
         const c = JSON.parse(saved);
-        setTimeout(() => this._bootSupabase(c), 800);
+        // Validate before attempting boot — prevents "Invalid supabaseUrl" crash on startup
+        const urlOk = c && c.url && /^https?:\/\/.+/.test(c.url.trim());
+        const keyOk = c && c.key && c.key.trim().length > 10;
+        if(urlOk && keyOk){
+          setTimeout(() => this._bootSupabase(c), 800);
+        } else {
+          // Corrupt or empty credentials — remove silently
+          localStorage.removeItem('ep_sb_creds');
+          SyncLogger.log('info', '⚠️ Removed invalid saved credentials — please re-enter in Settings → Sync');
+        }
       }
-    }catch(e){}
+    }catch(e){
+      // Malformed JSON in ep_sb_creds — clean it up
+      try{ localStorage.removeItem('ep_sb_creds'); }catch(_){}
+    }
     SyncLogger.log('info','⚡ SyncEngine (Supabase Realtime) ready');
   },
 
   connectSupabase(url, key){
-    const u = url || document.getElementById('sb-url')?.value?.trim();
-    const k = key || document.getElementById('sb-anon-key')?.value?.trim();
+    const u = (url || document.getElementById('sb-url')?.value || '').trim();
+    const k = (key || document.getElementById('sb-anon-key')?.value || '').trim();
     if(!u){ NotificationEngine.warning('Supabase','Enter the Project URL first'); return; }
+    if(!/^https?:\/\/.+/.test(u)){
+      NotificationEngine.warning('Invalid URL','URL must start with https:// — copy it from Supabase → Project Settings → API');
+      return;
+    }
     if(!k){ NotificationEngine.warning('Supabase','Enter the Anon Key first'); return; }
+    if(k.length < 20){
+      NotificationEngine.warning('Invalid Key','The anon key is too short — copy the full key from Supabase → Project Settings → API');
+      return;
+    }
     const creds = { url: u.replace(/\/$/, ''), key: k };
     localStorage.setItem('ep_sb_creds', JSON.stringify(creds));
     SyncLogger.log('info', `🔌 Connecting to Supabase: ${u}`);
@@ -11773,6 +12603,19 @@ const SyncEngine = {
   },
 
   _bootSupabase(creds){
+    // Guard: validate before touching the SDK — prevents the "Invalid supabaseUrl" error
+    if(!creds || !creds.url || !creds.key){
+      this._sbError('Missing Supabase credentials — enter URL and anon key in Settings → Sync');
+      return;
+    }
+    const urlClean = creds.url.trim().replace(/\/$/, '');
+    if(!/^https?:\/\/.+/.test(urlClean)){
+      localStorage.removeItem('ep_sb_creds');   // wipe the bad value
+      this._sbError('Invalid Supabase URL — must start with https://. Enter the correct URL in Settings → Sync');
+      return;
+    }
+    creds = { url: urlClean, key: creds.key.trim() };
+
     const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
 
     const finish = (createClientFn) => {
@@ -11793,7 +12636,51 @@ const SyncEngine = {
         this._setupRealtimeReconnect(client, creds);
         const cid = ClassManager.activeId();
         if(typeof DataService !== 'undefined'){
-          DataService.pushLocalSnapshot(cid).then(() => DataService.flushOfflineQueue()).catch(()=>{});
+          // ── Boot sync sequence ──────────────────────────────────────────────
+          // CRITICAL ORDER:
+          //   1. Show sync indicator → user knows data is loading
+          //   2. PULL first → server is source of truth (prevents duplication)
+          //   3. Refresh ALL UI → user sees existing students BEFORE they can add more
+          //   4. PUSH second → upload any offline-created records
+          //   5. Flush queue → send pending offline ops
+          //
+          // The loading overlay prevents the user from adding students while the
+          // pull is in-flight (root cause of the "60 students" duplication bug).
+
+          // Show a non-blocking "Syncing..." banner for 2s max
+          const _banner = document.createElement('div');
+          _banner.id = 'ep-boot-sync-banner';
+          _banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;' +
+            'background:var(--accent);color:#fff;font-size:12px;font-weight:700;' +
+            'text-align:center;padding:7px 12px;letter-spacing:.5px;' +
+            'transition:opacity .4s';
+          _banner.textContent = '🔄 Syncing class data — please wait…';
+          document.body.appendChild(_banner);
+
+          DataService.pullClassData(cid)
+            .then(() => {
+              // Bust caches and refresh UI immediately after pull
+              try{ StorageManager.invAll(); }catch(e){}
+              try{ StudentManager.inv(); }catch(e){}
+              try{ Analytics.invalidate(); }catch(e){}
+              try{ InsightEngine.invalidate(); }catch(e){}
+              try{ EventCache.invalidate(); }catch(e){}
+              try{ UI.renderStudents(); }catch(e){}
+              try{ UI.renderDashboard(); }catch(e){}
+              try{ UI._renderStudentQuickGrid(); }catch(e){}
+              try{ UI._refreshHeaderStats(); }catch(e){}
+              SyncLogger.log('info', '📥 Boot pull complete — UI refreshed');
+              // Remove banner after UI is up-to-date
+              setTimeout(()=>{
+                _banner.style.opacity='0';
+                setTimeout(()=>{ try{ _banner.remove(); }catch(e){} }, 420);
+              }, 600);
+            })
+            .then(() => DataService.pushLocalSnapshot(cid))
+            .then(() => DataService.flushOfflineQueue())
+            .catch(()=>{
+              try{ _banner.remove(); }catch(e){}
+            });
         }
         this._lastSyncTime = Date.now();
         this._computeRealState();
@@ -11850,9 +12737,10 @@ const SyncEngine = {
     const cid = ClassManager.activeId();
     this.isSyncRunning = true;
     try{
+      // Pull first (merge remote → local), then push local-only delta
+      await DataService.pullClassData(cid);
       await DataService.pushLocalSnapshot(cid);
       await DataService.flushOfflineQueue();
-      await DataService.pullClassData(cid);
       if(typeof EduPulseSyncBrain !== 'undefined') await EduPulseSyncBrain._runRefresh();
       this._lastSyncTime = Date.now();
       SyncBrain._recordHistory('sync','success','snapshot');
@@ -12002,6 +12890,9 @@ const SyncEngine = {
   // Handles silent WebSocket drops caused by mobile network switches (WiFi → 4G).
   // Polls every 15 s; also re-checks when the tab becomes visible again.
   _setupRealtimeReconnect(client, creds){
+    // Don't start the reconnect monitor on file:// — WebSocket isn't supported there
+    if(location.protocol === 'file:' || location.protocol === 'capacitor:') return;
+
     // Tear down any previous monitor for this client slot
     if(this._reconnectTimer)      clearInterval(this._reconnectTimer);
     if(this._reconnectVisHandler) document.removeEventListener('visibilitychange', this._reconnectVisHandler);
@@ -12261,7 +13152,7 @@ const EduPulseGuardian = {
     const entry = { ts: Date.now(), msg };
     this._diagnostics.unshift(entry);
     if(this._diagnostics.length > 50) this._diagnostics.length = 50;
-    console.info('[Guardian]', msg);
+    console.log('[Guardian]', msg);
     try{
       const store = JSON.parse(localStorage.getItem('ep_guardian_log') || '[]');
       store.unshift(entry);
@@ -15728,6 +16619,8 @@ const DataHub = {
         { label: 'Delete Selected',
           class: 'btn-danger', id: 'dh-confirm-btn',
           onclick: 'DataHub._executePurge()' },
+        { label: `🗑 Trash (${DeletionManager.getTrashCount()})`,
+          class: 'btn-ghost', onclick: 'App.closeModal();setTimeout(()=>DeletionManager.openTrashView(),80)' },
       ],
     });
 
@@ -20172,10 +21065,18 @@ const PWAManager = {
     // as a single HTML file (file:// origin has no server to serve manifest.json)
     this._injectManifest();
 
-    // Service Worker cannot register on file:// (null origin) — skip entirely
+    // ── Service Worker registration ─────────────────────────────────────────
+    // Skip SW in environments where it cannot work:
+    //   • file:// origin          — null security origin, SW not allowed
+    //   • Capacitor / Cordova     — native WebView, no SW support
+    //   • blob-request:// protocol — Capacitor remaps blob: → blob-request:// which
+    //                                the SW registry rejects with "protocol not supported"
+    const _isCapacitor = !!(window.Capacitor || window.cordova || window.PhoneGap);
+    const _isFileProto = location.protocol === 'file:';
+
     if('serviceWorker' in navigator){
-      if(location.protocol === 'file:'){
-        console.info('[PWA] Service Worker skipped — file:// origin. Serve via HTTP for full PWA support.');
+      if(_isFileProto || _isCapacitor){
+        console.log('[PWA] Service Worker skipped — ' + (_isCapacitor ? 'Capacitor/native WebView' : 'file:// origin') + '. No SW needed in this environment.');
       } else {
         navigator.serviceWorker.register('sw.js')
           .then(reg  => console.log('[PWA] SW registered:', reg.scope))
@@ -20228,15 +21129,21 @@ const PWAManager = {
       let link   = document.querySelector('link[rel="manifest"]');
       if(!link){ link = document.createElement('link'); link.rel='manifest'; document.head.appendChild(link); }
       link.href  = url;
-      console.info('[PWA] Manifest injected via blob URL (no manifest.json file needed)');
+      console.log('[PWA] Manifest injected via blob URL (no manifest.json file needed)');
     }catch(e){
       console.warn('[PWA] Manifest injection failed:', e.message);
     }
   },
 
   // Inline Service Worker fallback — caches CDN assets for offline use
+  // Only runs on http/https origins where SW is supported (not Capacitor, not file://)
   _registerInlineSW(){
     try{
+      // Guard: only run on http/https — blob-request:// from Capacitor will fail
+      if(!/^https?:/.test(location.protocol)){
+        console.log('[PWA] Inline SW skipped — unsupported protocol: ' + location.protocol);
+        return;
+      }
       const swCode = `
 const CACHE='edupulse-v1';
 const PRECACHE=[
@@ -20250,10 +21157,10 @@ const PRECACHE=[
    hosts must reach the network directly so that APK WebViews don't see a stale
    or blocked response. */
 const BYPASS_PATTERNS=[
-  /supabase\.co/,
-  /supabase\.in/,
-  /supabase\.net/,
-  /cdn\.jsdelivr\.net\/npm\/@supabase/,
+  /supabase\\.co/,
+  /supabase\\.in/,
+  /supabase\\.net/,
+  /cdn\\.jsdelivr\\.net\\/npm\\/@supabase/,
   /realtime-ws/,
 ];
 const shouldBypass=url=>BYPASS_PATTERNS.some(p=>p.test(url));
@@ -20268,8 +21175,14 @@ self.addEventListener('fetch',e=>{
   e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>r)));
 });`;
       const blob = new Blob([swCode],{type:'application/javascript'});
-      navigator.serviceWorker.register(URL.createObjectURL(blob))
-        .then(r=>console.info('[PWA] Inline SW registered:',r.scope))
+      const swUrl = URL.createObjectURL(blob);
+      // Guard against blob-request:// (Capacitor remaps blob: URLs)
+      if(!swUrl.startsWith('blob:')){
+        console.log('[PWA] Inline SW skipped — blob URL remapped by WebView: ' + swUrl.slice(0,30));
+        return;
+      }
+      navigator.serviceWorker.register(swUrl)
+        .then(r=>console.log('[PWA] Inline SW registered:',r.scope))
         .catch(e=>console.warn('[PWA] Inline SW failed:',e.message));
     }catch(e){ console.warn('[PWA] Inline SW error:',e.message); }
   },
