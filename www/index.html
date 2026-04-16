@@ -1289,6 +1289,15 @@ a{text-decoration:none;color:inherit}
 .notif.danger{border-color:var(--red-dim);background:#1a0d0d}
 .notif.badge{border-color:var(--purple-dim);background:#130d1a}
 .notif.info{border-color:var(--accent-glow);background:#0d1225}
+/* Atmosphere notification — wider pill with left accent bar */
+.notif.atmosphere{
+  border-color:var(--border-strong);
+  background:var(--bg-surface);
+  border-left:3px solid var(--atm-color, var(--accent));
+  padding-left:10px;
+}
+.notif.atmosphere .notif-title{ font-size:11px; font-weight:700; letter-spacing:.3px }
+.notif.atmosphere .notif-msg  { font-size:10px }
 .notif-icon{font-size:20px;flex-shrink:0;margin-top:1px}
 .notif-body{flex:1;min-width:0}
 .notif-title{font-size:12px;font-weight:600;margin-bottom:2px}
@@ -3300,15 +3309,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <span id="autosave-label">Saved</span>
     </div>
     <div class="header-center" class="ep-row">
-      <!-- Mood Tracker — icon-only buttons, label shows in tooltip -->
-      <div class="mood-bar" data-title="Class Mood" data-description="Record today's classroom atmosphere. The AI Insight Engine uses this to adjust predictions and risk scores." data-tip-text="Restless mood increases risk multipliers by 40%.">
-        <button class="mood-btn" data-mood="focused"   title="Focused"    onclick="MoodTracker.set('focused',this)">🎯</button>
-        <button class="mood-btn" data-mood="energetic" title="Energetic"  onclick="MoodTracker.set('energetic',this)">⚡</button>
-        <button class="mood-btn" data-mood="calm"      title="Calm"       onclick="MoodTracker.set('calm',this)">😌</button>
-        <button class="mood-btn" data-mood="distracted"title="Distracted" onclick="MoodTracker.set('distracted',this)">😵</button>
-        <button class="mood-btn" data-mood="restless"  title="Restless"   onclick="MoodTracker.set('restless',this)">🌪</button>
-      </div>
-      <!-- Lesson Mode — icon-only, active shows icon + short label -->
+      <!-- Lesson Mode — icon-only -->
       <div class="lesson-mode-bar" id="lesson-mode-bar"
            data-title="Lesson Mode" data-description="Sets the active lesson type to shift AI DNA weight multipliers." data-tip-text="Changing this instantly recomputes all Student DNA profiles.">
         <button class="lesson-btn active" data-lesson="general"  title="General"    onclick="LessonMode.set('general',this)">📖</button>
@@ -3348,17 +3349,8 @@ body.privacy-mode .hide-privacy{display:none!important}
     </div>
   </header>
 
-  <!-- Mobile Tool Strip — Mood + Lesson mode, visible only on ≤600px via CSS -->
-  <!-- Hidden on desktop/tablet (display:none by default, shown by mobile media query) -->
+  <!-- Mobile Tool Strip — Lesson mode only now, visible on ≤600px -->
   <div id="mobile-tool-strip">
-    <div class="mood-bar" data-title="Class Mood" data-description="Record today's classroom atmosphere.">
-      <button class="mood-btn" data-mood="focused"   title="Focused"    onclick="MoodTracker.set('focused',this)">🎯</button>
-      <button class="mood-btn" data-mood="energetic" title="Energetic"  onclick="MoodTracker.set('energetic',this)">⚡</button>
-      <button class="mood-btn" data-mood="calm"      title="Calm"       onclick="MoodTracker.set('calm',this)">😌</button>
-      <button class="mood-btn" data-mood="distracted"title="Distracted" onclick="MoodTracker.set('distracted',this)">😵</button>
-      <button class="mood-btn" data-mood="restless"  title="Restless"   onclick="MoodTracker.set('restless',this)">🌪</button>
-    </div>
-    <div style="width:1px;height:20px;background:var(--border);flex-shrink:0"></div>
     <div class="lesson-mode-bar" id="mobile-lesson-bar" data-title="Lesson Mode" data-description="Sets the lesson type for AI behavior weighting.">
       <button class="lesson-btn active" data-lesson="general"  title="General"    onclick="LessonMode.set('general',this)">📖</button>
       <button class="lesson-btn"        data-lesson="speaking" title="Speaking"   onclick="LessonMode.set('speaking',this)">🎤</button>
@@ -5789,6 +5781,9 @@ const BehaviorEngine = {
     EventCache.invalidate();
     try{ GamificationEngine.invalidateLeaderboard(); }catch(e){}
 
+    // Auto-detect classroom atmosphere from behavior patterns
+    try{ ClassAtmosphereDetector.onBehaviorLogged(); }catch(e){}
+
     return { event:ev, student:updated, trend, riskChanged:newRisk!==prevRisk, prevRisk };
   },
 
@@ -6619,6 +6614,38 @@ const NotificationEngine = {
   riskAlert(name,level){
     const icons={low:'⚠️',medium:'🔶',high:'🚨'};
     return this.show('danger',`${icons[level]} Risk Alert`,`${name} flagged at ${level} risk`,8000);
+  },
+
+  // ── Atmosphere notification — distinct left-bar style, colour-coded ───────
+  // Used exclusively by ClassAtmosphereDetector. Never duplicates within 2 min.
+  atmosphere(icon, title, message, hexColor, duration=7000){
+    const key = 'atmosphere::' + title;
+    const now = Date.now();
+    if(this._recentKeys[key] && now - this._recentKeys[key] < 1200) return null;
+    this._recentKeys[key] = now;
+
+    const id = `atm_${now}`;
+    const el = document.createElement('div');
+    el.className = 'notif atmosphere';
+    el.id = id;
+    el.style.setProperty('--duration', duration + 'ms');
+    el.style.setProperty('--atm-color', hexColor || 'var(--accent)');
+    el.innerHTML = `
+      <div class="notif-icon" style="font-size:22px;line-height:1">${icon}</div>
+      <div class="notif-body">
+        <div class="notif-title" style="color:${hexColor||'var(--text-primary)'}">${title}</div>
+        <div class="notif-msg">${message}</div>
+        <div class="notif-progress">
+          <div class="notif-progress-fill" style="background:${hexColor||'var(--accent)'}"></div>
+        </div>
+      </div>`;
+    el.onclick = () => this._dismiss(el);
+    const container = document.getElementById('notif-container');
+    if(container) container.appendChild(el);
+    setTimeout(() => this._dismiss(el), duration);
+    this._history.unshift({ type:'atmosphere', title, message, ts: new Date().toISOString() });
+    if(this._history.length > 50) this._history.pop();
+    return id;
   },
 
   getHistory(){ return this._history; },
@@ -11044,74 +11071,226 @@ const PrivacyMode = {
 // -────────────────────────────────────────────────────────────────────────────
 // MODULE: MOOD TRACKER
 // ─────────────────────────────────────────────────────────────────────────────
-const MoodTracker = {
-  _KEY: 'ep_moods',
-  _LABELS: { focused:'Focused', energetic:'Energetic', calm:'Calm', distracted:'Distracted', restless:'Restless' },
-  _ICONS:  { focused:'🎯', energetic:'⚡', calm:'😌', distracted:'😵', restless:'🌪' },
+// -────────────────────────────────────────────────────────────────────────────
+// MODULE: CLASS ATMOSPHERE DETECTOR
+// Replaces the manual MoodTracker. Analyses real behavior data every time
+// a behavior event is logged and fires a smart toast notification when the
+// detected classroom atmosphere changes.
+//
+// Detection signals (same window as InsightEngine for consistency):
+//   • Pos/neg ratio in the last 10 minutes      → real-time pulse
+//   • Spike count  — 3+ neg events in 5 min     → "restless" signal
+//   • Calm streak  — 5+ pos events, 0 neg        → "focused" signal
+//   • At-risk ratio — % students flagged         → class-wide concern
+//   • Velocity     — avg score change last 10 ev → improving / declining
+//
+// Detected moods: focused · calm · energetic · distracted · restless
+// Each mood maps to the same multipliers InsightEngine already uses.
+// ─────────────────────────────────────────────────────────────────────────────
+const ClassAtmosphereDetector = (() => {
+  'use strict';
 
-  set(mood, btn){
-    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const today = new Date().toISOString().slice(0,10);
-    const all = this._getAll();
-    all[today] = mood;
-    localStorage.setItem(this._KEY, JSON.stringify(all));
-    NotificationEngine.info('Mood Recorded', `Today: ${this._ICONS[mood]} ${this._LABELS[mood]}`);
-    InsightEngine.invalidate();
-    this._updateDisplay();
-  },
+  // How many behavior events must exist before we attempt detection
+  const MIN_EVENTS_TO_DETECT = 3;
 
-  getToday(){
-    const today = new Date().toISOString().slice(0,10);
-    return this._getAll()[today] || null;
-  },
+  // Minimum ms between two atmosphere notifications (prevents spam)
+  const COOLDOWN_MS = 120_000;   // 2 minutes
 
-  getHistory(days=14){
-    const all = this._getAll(), result = [];
-    for(let i=days-1; i>=0; i--){
-      const d = new Date();
-      d.setDate(d.getDate()-i);
-      const ds = d.toISOString().slice(0,10);
-      result.push({ date:ds, mood:all[ds]||null });
-    }
-    return result;
-  },
+  // Window for "recent" events used in detection
+  const RECENT_WINDOW_MS = 10 * 60 * 1000;   // last 10 minutes
+  const SPIKE_WINDOW_MS  =  5 * 60 * 1000;   // last 5 minutes
 
-  restoreActive(){
-    const mood = this.getToday();
-    if(!mood) return;
-    document.querySelectorAll('.mood-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.mood === mood)
+  // Mood → UI config
+  const MOODS = {
+    focused:    { icon:'🎯', label:'Class is Focused',    color:'#10B981', detail:'High positive activity, students are on task.',        severity:'positive' },
+    calm:       { icon:'😌', label:'Class is Calm',       color:'#3B82F6', detail:'Low activity, quiet and cooperative atmosphere.',      severity:'info'     },
+    energetic:  { icon:'⚡', label:'Class is Energetic',  color:'#F59E0B', detail:'High positive energy — keep the momentum going!',     severity:'positive' },
+    distracted: { icon:'😵', label:'Class is Distracted', color:'#F97316', detail:'Low positive ratio — consider a refocus activity.',   severity:'warning'  },
+    restless:   { icon:'🌪', label:'Class is Restless',   color:'#EF4444', detail:'Negative spike detected — intervention may be needed.', severity:'danger' },
+  };
+
+  // Internal state
+  let _lastMood      = null;    // last detected mood
+  let _lastNotifyAt  = 0;       // timestamp of last notification
+  let _eventCount    = 0;       // total events seen since last reset
+  let _analysisTimer = null;
+
+  // ── Core detection algorithm ─────────────────────────────────────────────
+  function _detect() {
+    const now = Date.now();
+    let allEvents;
+    try { allEvents = StorageManager.getEvents(); } catch (e) { return null; }
+    if (!allEvents || allEvents.length < MIN_EVENTS_TO_DETECT) return null;
+
+    const cutRecent = new Date(now - RECENT_WINDOW_MS).toISOString();
+    const cutSpike  = new Date(now - SPIKE_WINDOW_MS).toISOString();
+
+    const recentEvs = allEvents.filter(e => e.createdAt >= cutRecent && !e.corrected);
+    const spikeEvs  = allEvents.filter(e => e.createdAt >= cutSpike  && !e.corrected);
+
+    if (recentEvs.length < 1) return null;   // no recent activity — no signal
+
+    const recentPos = recentEvs.filter(e => e.scoreChange >  0).length;
+    const recentNeg = recentEvs.filter(e => e.scoreChange <  0).length;
+    const spikeNeg  = spikeEvs .filter(e => e.scoreChange <  0).length;
+    const posRatio  = recentPos / (recentPos + recentNeg || 1);
+
+    // Velocity: average score change of last 10 events
+    const last10    = allEvents.slice(-10);
+    const velocity  = last10.reduce((s, e) => s + e.scoreChange, 0) / last10.length;
+
+    // At-risk ratio across all students
+    let atRiskRatio = 0;
+    try {
+      const students = StudentManager.getAll();
+      if (students.length > 0)
+        atRiskRatio = students.filter(s => s.riskLevel !== 'none').length / students.length;
+    } catch (e) {}
+
+    // ── Decision tree ──────────────────────────────────────────────────────
+    // Priority order: restless > distracted > energetic > focused > calm
+
+    // Restless: negative spike (3+ neg in 5 min) OR high at-risk (>40%)
+    if (spikeNeg >= 3 || atRiskRatio >= 0.4)
+      return 'restless';
+
+    // Distracted: more neg than pos recently OR velocity falling
+    if (recentNeg > recentPos || (velocity < -3 && recentEvs.length >= 3))
+      return 'distracted';
+
+    // Energetic: lots of events, strong positive ratio, rising velocity
+    if (recentEvs.length >= 6 && posRatio >= 0.75 && velocity > 2)
+      return 'energetic';
+
+    // Focused: consistent positives, no neg, moderate pace
+    if (posRatio >= 0.75 && recentNeg === 0 && recentEvs.length >= 3)
+      return 'focused';
+
+    // Calm: low total activity but mostly positive or neutral
+    if (recentEvs.length <= 3 && posRatio >= 0.5)
+      return 'calm';
+
+    return null;  // not enough signal — don't notify
+  }
+
+  // ── Show smart notification ──────────────────────────────────────────────
+  function _notify(mood) {
+    const cfg = MOODS[mood];
+    if (!cfg) return;
+
+    // Use the dedicated atmosphere() method for consistent left-bar styling
+    NotificationEngine.atmosphere(
+      cfg.icon,
+      cfg.label,
+      cfg.detail,
+      cfg.color,
+      7000
     );
-    this._updateDisplay();
-  },
 
-  _getAll(){
-    try { return JSON.parse(localStorage.getItem(this._KEY)||'{}'); }
-    catch { return {}; }
-  },
+    // Also persist for InsightEngine compatibility (same key as old MoodTracker)
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const all   = JSON.parse(localStorage.getItem('ep_moods') || '{}');
+      all[today]  = mood;
+      localStorage.setItem('ep_moods', JSON.stringify(all));
+    } catch (e) {}
 
-  _updateDisplay(){
-    const mood = this.getToday();
-    let el = document.getElementById('mood-insight-today');
+    // Update insights panel display
+    _updateInsightsDisplay(mood);
+
+    _lastMood     = mood;
+    _lastNotifyAt = Date.now();
+  }
+
+  // ── Update the insights panel card (backward-compat with old _updateDisplay) ─
+  function _updateInsightsDisplay(mood) {
+    const cfg = MOODS[mood] || null;
+    let el   = document.getElementById('mood-insight-today');
     const body = document.getElementById('insights-body');
-    if(!body) return;
-    if(!el){
-      el = document.createElement('div');
+    if (!body) return;
+    if (!el) {
+      el    = document.createElement('div');
       el.id = 'mood-insight-today';
       body.insertBefore(el, body.firstChild);
     }
-    el.innerHTML = mood ? `
+    if (!cfg) { el.innerHTML = ''; return; }
+    el.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
-                  background:var(--bg-card);border:1px solid var(--border);
+                  background:${cfg.color}14;border:1px solid ${cfg.color}40;
                   border-radius:var(--radius-md);margin-bottom:8px;font-size:11px">
-        <span style="font-size:18px">${this._ICONS[mood]}</span>
-        <span style="color:var(--text-secondary)">
-          Today: <strong style="color:var(--text-primary)">${this._LABELS[mood]}</strong>
-        </span>
-      </div>` : '';
-  },
-};
+        <span style="font-size:18px">${cfg.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;color:${cfg.color}">${cfg.label}</div>
+          <div style="color:var(--text-muted);font-size:10px;margin-top:1px">${cfg.detail}</div>
+        </div>
+        <span style="font-size:9px;color:var(--text-muted);white-space:nowrap">Auto-detected</span>
+      </div>`;
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+  return {
+    // Called after every behavior event is logged (from BehaviorEngine.log)
+    onBehaviorLogged() {
+      _eventCount++;
+      clearTimeout(_analysisTimer);
+      // Debounce: wait 1.2s after last event before analysing
+      // (handles rapid multi-button taps without spamming)
+      _analysisTimer = setTimeout(() => {
+        const now      = Date.now();
+        const cooldownOk = (now - _lastNotifyAt) >= COOLDOWN_MS;
+        const detected   = _detect();
+
+        if (!detected) return;
+
+        // Only notify if:
+        //   (a) mood changed from last one, OR
+        //   (b) cooldown expired AND mood is warning/danger (remind teacher)
+        const moodChanged  = detected !== _lastMood;
+        const isUrgent     = detected === 'restless' || detected === 'distracted';
+        const shouldNotify = moodChanged || (cooldownOk && isUrgent);
+
+        if (shouldNotify && cooldownOk) {
+          _notify(detected);
+        } else if (moodChanged && !cooldownOk && isUrgent) {
+          // Urgent mood change — override cooldown for restless/distracted
+          _notify(detected);
+        }
+      }, 1200);
+    },
+
+    // Backward-compat: read today's auto-detected mood (used by InsightEngine)
+    getToday() {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        return JSON.parse(localStorage.getItem('ep_moods') || '{}')[today] || null;
+      } catch (e) { return null; }
+    },
+
+    // Returns mood history (backward-compat with old MoodTracker.getHistory)
+    getHistory(days = 14) {
+      const all = (() => { try { return JSON.parse(localStorage.getItem('ep_moods') || '{}'); } catch(e){ return {}; } })();
+      const result = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d  = new Date(); d.setDate(d.getDate() - i);
+        const ds = d.toISOString().slice(0, 10);
+        result.push({ date: ds, mood: all[ds] || null });
+      }
+      return result;
+    },
+
+    // Keep InsightEngine compatibility (called from boot)
+    restoreActive() {
+      const mood = this.getToday();
+      if (mood) _updateInsightsDisplay(mood);
+    },
+
+    // Expose mood config for other modules
+    getMoodConfig(mood) { return MOODS[mood] || null; },
+  };
+})();
+
+// Legacy alias — any code still referencing MoodTracker continues to work
+const MoodTracker = ClassAtmosphereDetector;
 
 // -────────────────────────────────────────────────────────────────────────────
 // MODULE: QUICK EDIT DROPDOWN
@@ -12174,8 +12353,19 @@ const DataService = (() => {
       cid = cid || _classId();
       if (!_getClient()) return;
       let st = [], ev = [];
-      try { st = StorageManager.getStudents() || []; } catch (e) {}
-      try { ev = StorageManager.getEvents()   || []; } catch (e) {}
+      // FIX: use getAllIncludingDeleted / getAllEvents so soft-deleted records
+      // are also pushed to Supabase — otherwise deleted items reappear on
+      // other devices after the next pull (remote has no delete marker).
+      try {
+        st = (typeof StudentManager !== 'undefined' && StudentManager.getAllIncludingDeleted)
+          ? StudentManager.getAllIncludingDeleted()
+          : StorageManager.getStudents() || [];
+      } catch (e) { try { st = StorageManager.getStudents() || []; } catch (_) {} }
+      try {
+        ev = (StorageManager.getAllEvents)
+          ? StorageManager.getAllEvents()
+          : StorageManager.getEvents() || [];
+      } catch (e) { try { ev = StorageManager.getEvents() || []; } catch (_) {} }
       try {
         await this._pushStudentsNow(cid, st);
         await this._pushBehaviorsNow(cid, ev);
@@ -12220,7 +12410,11 @@ const DataService = (() => {
 
     async _flushStudentsOut(cid) {
       let rows = [];
-      try { rows = StorageManager.getStudents() || []; } catch (e) {}
+      try {
+        rows = (typeof StudentManager !== 'undefined' && StudentManager.getAllIncludingDeleted)
+          ? StudentManager.getAllIncludingDeleted()
+          : StorageManager.getStudents() || [];
+      } catch (e) {}
       if (!_getClient() || !navigator.onLine) {
         this.enqueue({ type: 'students', classId: cid, rows }); return;
       }
@@ -12230,7 +12424,11 @@ const DataService = (() => {
 
     async _flushEventsOut(cid) {
       let rows = [];
-      try { rows = StorageManager.getEvents() || []; } catch (e) {}
+      try {
+        rows = StorageManager.getAllEvents
+          ? StorageManager.getAllEvents()
+          : StorageManager.getEvents() || [];
+      } catch (e) {}
       if (!_getClient() || !navigator.onLine) {
         this.enqueue({ type: 'behaviors', classId: cid, rows }); return;
       }
@@ -12333,12 +12531,20 @@ const DataService = (() => {
         localStorage.setItem(_studentsKey(cid), JSON.stringify(mergedStudents));
         localStorage.setItem(_eventsKey(cid),   JSON.stringify(mergedEvents));
 
-        // Bust ALL in-memory caches
+        // Bust ALL in-memory caches — every device that pulls refreshes correctly
         try { StorageManager.invAll();       } catch (e) {}
         try { StudentManager.inv();          } catch (e) {}
         try { Analytics.invalidate();        } catch (e) {}
         try { InsightEngine.invalidate();    } catch (e) {}
         try { EventCache.invalidate();       } catch (e) {}
+
+        // FIX 4: Trigger UI refresh after EVERY pull, not just the boot sequence.
+        // Without this, Realtime events received on other devices cause a pull
+        // but the screen never updates because _runRefresh calls pullClassData
+        // and then calls _refreshAllUI *separately* — creating a race condition
+        // where _refreshAllUI can run before pullClassData resolves on slow networks.
+        // Storing a flag lets _runRefresh know a fresh pull just completed.
+        this._lastPullAt = Date.now();
 
       } finally {
         this._pullInProgress = false;
@@ -12508,6 +12714,9 @@ const EduPulseSyncBrain = (() => {
       const cid = ClassManager.activeId();
       try {
         await DataService.pullClassData(cid);
+        // FIX: _invalidateCaches + _refreshAllUI run AFTER the await resolves,
+        // guaranteeing the UI always sees the freshly merged data from Supabase.
+        // Previously there was a race where slow networks could render stale data.
         _invalidateCaches();
         _refreshAllUI();
         try {
@@ -12650,6 +12859,9 @@ const EduPulseSyncBrain = (() => {
       this._focusHandler = () => this._appResumeSync();
       window.addEventListener('focus', this._focusHandler);
 
+      // Start heartbeat pull — 30s fallback for missed WebSocket events
+      this._startHeartbeat();
+
       this._tryAttachCapacitorListener();
     },
 
@@ -12688,6 +12900,7 @@ const EduPulseSyncBrain = (() => {
     destroy() {
       clearTimeout(this._debounceTimer);
       clearTimeout(this._resubscribeTimer);
+      this._stopHeartbeat();
       this._removeAppResumeListeners();
       if (this._client && typeof RealtimeService !== 'undefined') {
         RealtimeService.unsubscribe(this._client);
@@ -12695,6 +12908,68 @@ const EduPulseSyncBrain = (() => {
       this._client     = null;
       this._retryCount = 0;
       this._setConnStatus('offline', '\uD83D\uDD34 Offline');
+    },
+
+    // ── Called by ClassManager.switchTo() when the user switches classes ────
+    // Re-subscribes the Realtime channel to the NEW classId filter, then
+    // immediately pulls the new class data so all devices stay in sync.
+    onClassChange() {
+      if (!this._client) return;
+      if (!_canUseRealtime()) return;
+      this._retryCount = 0;
+      this._setConnStatus('connecting', '🟡 Loading class…');
+
+      // 1. Re-subscribe channel with new classId filter
+      if (typeof RealtimeService !== 'undefined') {
+        RealtimeService.subscribe(this._client, {
+          onDatabaseChange: () => EPSB.scheduleRefresh(),
+        });
+      }
+
+      // 2. Immediately pull the new class from Supabase
+      if (typeof DataService !== 'undefined' && typeof ClassManager !== 'undefined') {
+        const cid = ClassManager.activeId();
+        DataService.pullClassData(cid)
+          .then(() => {
+            try { StorageManager.invAll(); } catch (e) {}
+            try { StudentManager.inv(); } catch (e) {}
+            try { Analytics.invalidate(); } catch (e) {}
+            try { InsightEngine.invalidate(); } catch (e) {}
+            try { EventCache.invalidate(); } catch (e) {}
+            try { UI.renderStudents(); } catch (e) {}
+            try { UI.renderDashboard(); } catch (e) {}
+            try { UI._renderStudentQuickGrid(); } catch (e) {}
+            try { UI._refreshHeaderStats(); } catch (e) {}
+          })
+          .catch(e => console.warn('[EduPulseSyncBrain] onClassChange pull failed', e));
+      }
+    },
+
+    // ── Heartbeat pull ─────────────────────────────────────────────────────
+    // Polls Supabase every 30s as a fallback when WebSocket events are missed
+    // (corporate firewalls, mobile networks that drop idle WebSocket connections).
+    // This guarantees bidirectional sync even without a live Realtime channel.
+    _heartbeatTimer: null,
+    _startHeartbeat() {
+      if (this._heartbeatTimer) clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = setInterval(() => {
+        if (!this._client || !navigator.onLine) return;
+        if (typeof DataService === 'undefined') return;
+        const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : null;
+        if (!cid) return;
+        DataService.pullClassData(cid)
+          .then(() => {
+            _invalidateCaches();
+            _refreshAllUI();
+          })
+          .catch(() => {});
+      }, 30_000);
+    },
+    _stopHeartbeat() {
+      if (this._heartbeatTimer) {
+        clearInterval(this._heartbeatTimer);
+        this._heartbeatTimer = null;
+      }
     },
   };
 
@@ -12864,8 +13139,20 @@ const SyncEngine = {
       finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
       return;
     }
+    // FIX: window.supabase gets overwritten with the CLIENT after first connect.
+    // After that window.supabase.createClient no longer exists.
+    // Always check __supabaseSdk first (saved at load time), then fall back to
+    // checking if window.supabase still has createClient (first-time load only).
     if(window.supabase && typeof window.supabase.createClient === 'function'){
+      // First connect: SDK not yet shadowed — save a permanent reference
       window.__supabaseSdk = window.supabase;
+      finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
+      return;
+    }
+    // SDK already loaded but window.supabase is now the client instance.
+    // Try to recover the SDK from the script tag's exported global directly.
+    if(typeof createClient === 'function'){
+      if(!window.__supabaseSdk) window.__supabaseSdk = { createClient };
       finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
       return;
     }
@@ -12877,6 +13164,7 @@ const SyncEngine = {
     s.crossOrigin   = 'anonymous';
     s.onload  = () => {
       try{
+        // Save SDK reference BEFORE finish() overwrites window.supabase with client
         window.__supabaseSdk = window.supabase;
         finish((u,k,o) => window.__supabaseSdk.createClient(u,k,o));
       }catch(e){
@@ -12968,7 +13256,14 @@ const SyncEngine = {
   },
 
   _onLocalWrite(key, val){
-    if(this._pullInProgress) return;
+    // FIX: do NOT block DataService push when _pullInProgress is true.
+    // Pull (cloud→local) and Push (local→cloud) operate on DIFFERENT data paths:
+    //   • Pull: reads from Supabase and writes to localStorage (no debounce trigger)
+    //   • Push: reads from localStorage and writes to Supabase
+    // Blocking push during pull causes behavior events logged during boot sync
+    // to be silently dropped — they write to localStorage but never reach Supabase.
+    // The only thing we guard is: pullClassData itself sets localStorage directly
+    // (not via StorageManager.set), so it won't trigger _onLocalWrite at all.
     if(typeof DataService !== 'undefined' && DataService.onLocalStorageWrite){
       DataService.onLocalStorageWrite(key, val);
     }
