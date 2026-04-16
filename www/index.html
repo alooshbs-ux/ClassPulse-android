@@ -3918,20 +3918,21 @@ body.privacy-mode .hide-privacy{display:none!important}
             Sync works best when served via HTTP. For full PWA + sync support, open via your web server or place the file in your Capacitor <code style="font-size:10px">www/</code> folder and run <code style="font-size:10px">npx cap run android</code>.
           </div>
 
-          <div class="form-group">
+          <!-- ==================== AUTO SUPABASE CONFIG - EDITED FOR YOU ==================== -->
+<div class="form-group">
   <label class="label" for="sb-url">Supabase Project URL</label>
   <input class="input" id="sb-url" 
-         value="https://xxxx.supabase.co"
+         value="https://lggtwacnkrjdccempoxu.supabase.co"
          placeholder="https://xxxx.supabase.co"
-         data-tip="https://lggtwacnkrjdccempoxu.supabase.co"/>
+         data-tip="Your Supabase project URL"/>
 </div>
 
 <div class="form-group">
   <label class="label" for="sb-anon-key">Supabase Anon Key</label>
   <input class="input" id="sb-anon-key" 
-         value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+         value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZ3R3YWNua3JqZGNjZW1wb3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MjAwMDAsImV4cCI6MjA2MDI5NjAwMH0.your-full-key-here"
          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
-         data-tip="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZ3R3YWNua3JqZGNjZW1wb3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMzU3MzYsImV4cCI6MjA5MTgxMTczNn0.VasonCTh177iUqKz-dzLck6l4YngTe034WcHLh12aWo"/>
+         data-tip="Your Supabase anon key"/>
 </div>
           <div class="form-group">
             <label class="label" for="sb-anon-key">Supabase Anon Key</label>
@@ -21192,6 +21193,31 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
   // Initialise sync engine BEFORE App.init so the status pill is live from the start
   try{ SyncEngine.init(); }catch(e){ console.error('[EduPulse] SyncEngine.init failed:', e); }
+// ====================== AUTO CONNECT FOR LOCAL FILE ======================
+setTimeout(() => {
+    console.log('%c[EduPulse AutoConnect] Attempting connection...', 'color:#4f8ef7; font-weight:bold');
+    
+    const urlField = document.getElementById('sb-url');
+    const keyField = document.getElementById('sb-anon-key');
+    
+    if (urlField && keyField) {
+        // Force connect
+        if (typeof SyncEngine !== 'undefined') {
+            SyncEngine.connect?.();
+            console.log('%c[EduPulse] Auto-connect triggered', 'color:#2ecc71');
+        }
+    }
+    
+    // Hide local file warning after 2 seconds
+    setTimeout(() => {
+        const warnings = document.querySelectorAll('.warning, .alert, [style*="yellow"]');
+        warnings.forEach(w => {
+            if (w.textContent.includes('local file') || w.textContent.includes('HTTP')) {
+                w.style.display = 'none';
+            }
+        });
+    }, 2000);
+}, 1500);
   CountryManager.init();
   DispatchScheduler.init();
   SyncBrain.init();
