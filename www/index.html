@@ -5137,8 +5137,29 @@ const DeletionManager = (() => {
       // Sync immediately after permanent delete
       setTimeout(() => {
         try {
-          if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase)
-            DataService.pushLocalSnapshot(classId).catch(() => {});
+          if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase) {
+            const client = window.supabase;
+            if (entityType === 'student' && client && typeof client.from === 'function') {
+              // Hard-delete the student row and their behavior rows from Supabase
+              Promise.all([
+                client.from('students') .delete().eq('id', String(entityId)),
+                client.from('behaviors').delete().eq('class_id', classId)
+                  .in('id', (() => {
+                    try {
+                      const evs = StorageManager.getAllEvents
+                        ? StorageManager.getAllEvents()
+                        : StorageManager.getEvents();
+                      return evs
+                        .filter(ev => String(ev.studentId) === String(entityId))
+                        .map(ev => String(ev.id));
+                    } catch (_) { return []; }
+                  })()),
+              ]).then(() => DataService.pushLocalSnapshot(classId))
+                .catch(() => DataService.pushLocalSnapshot(classId).catch(() => {}));
+            } else {
+              DataService.pushLocalSnapshot(classId).catch(() => {});
+            }
+          }
         } catch (e) {}
       }, 300);
       Logger.info('DeletionManager', `Permanently deleted ${entityType} ${entityId}`);
@@ -11872,6 +11893,14 @@ const ClassManager = {
   },
   _saveList(list){
     localStorage.setItem(this._KEY_LIST, JSON.stringify(list));
+    // Notify DataService so the class list is synced to Supabase
+    // (ClassManager calls localStorage directly, bypassing StorageManager.set hook)
+    try {
+      if (typeof SyncEngine !== 'undefined' && SyncEngine._ready &&
+          typeof DataService !== 'undefined') {
+        DataService._scheduleFlushClasses();
+      }
+    } catch (e) {}
   },
 
   // -─ Switch class ──────────────────────────────────────────────────────────
@@ -12091,7 +12120,7 @@ const ClassManager = {
     if(!cls) return;
     App.closeModal();
 
-    // Remove namespaced data
+    // Remove namespaced data from localStorage
     localStorage.removeItem(`ep_students_${classId}`);
     localStorage.removeItem(`ep_events_${classId}`);
     localStorage.removeItem(`ep_settings_${classId}`);
@@ -12102,6 +12131,18 @@ const ClassManager = {
 
     const remaining = classes.filter(c=>c.id!==classId);
     this._saveList(remaining);
+
+    // ── Remove from Supabase (delete all rows for this classId + the class row) ─
+    if(typeof SyncEngine !== 'undefined' && SyncEngine._supabase){
+      const client = window.supabase;
+      if(client && typeof client.from === 'function'){
+        Promise.all([
+          client.from('students') .delete().eq('class_id', classId),
+          client.from('behaviors').delete().eq('class_id', classId),
+          client.from('classes')  .delete().eq('id',       classId),
+        ]).catch(e => console.warn('[ClassManager] Supabase class delete failed:', e));
+      }
+    }
 
     if(classId === this._activeId){
       this.switchTo(remaining[0].id);
@@ -12271,189 +12312,172 @@ const DataService = (() => {
   'use strict';
 
   const QUEUE_KEY = 'ep_rt_pending_ops';
-  const MAX_QUEUE = 200;   // hard cap — prevents unbounded localStorage growth
+  const MAX_QUEUE = 200;
 
   function _getClient() {
     const c = window.supabase;
     return c && typeof c.from === 'function' ? c : null;
   }
-
   function _classId() {
     try { return ClassManager.activeId(); } catch (e) { return 'default'; }
   }
-
   function _studentsKey(cid) { return 'ep_students_' + cid; }
   function _eventsKey(cid)   { return 'ep_events_'   + cid; }
-
   function _readQueue() {
-    try {
-      const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-      return Array.isArray(q) ? q : [];
-    } catch (e) { return []; }
+    try { const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); return Array.isArray(q) ? q : []; }
+    catch (e) { return []; }
   }
-
   function _writeQueue(arr) {
-    // Enforce hard cap — keep most-recent ops when over limit
     if (arr.length > MAX_QUEUE) arr = arr.slice(arr.length - MAX_QUEUE);
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(arr)); } catch (e) {}
   }
-
   function _updateBadge() {
-    try {
-      if (typeof SyncBrain !== 'undefined' && SyncBrain._updatePendingBadge)
-        SyncBrain._updatePendingBadge();
-    } catch (e) {}
+    try { if (typeof SyncBrain !== 'undefined' && SyncBrain._updatePendingBadge) SyncBrain._updatePendingBadge(); } catch (e) {}
   }
 
   const DS = {
+    // ── Debounce handles ───────────────────────────────────────────────────────
     _debounceStudents:  null,
     _debounceEvents:    null,
-    _flushInProgress:   false,   // concurrency guard — prevents double-flush
-    _pullInProgress:    false,   // concurrency guard — prevents pull-during-pull
-    STUDENT_DEBOUNCE_MS: 450,
-    EVENT_DEBOUNCE_MS:   800,
+    _debounceClasses:   null,
+    _debounceSettings:  null,
+    _debounceSeating:   null,
+    _debounceDNA:       null,
+    _debounceAppState:  null,
+    _flushInProgress:   false,
+    _pullInProgress:    false,
 
-    // ── Queue helpers ─────────────────────────────────────────────────────────
+    STUDENT_DEBOUNCE_MS:  450,
+    EVENT_DEBOUNCE_MS:    800,
+    CLASSES_DEBOUNCE_MS:  600,
+    SETTINGS_DEBOUNCE_MS: 800,
+    SEATING_DEBOUNCE_MS: 1000,
+    DNA_DEBOUNCE_MS:     1200,
+    APP_STATE_DEBOUNCE_MS: 800,
+
+    // ── Offline queue ─────────────────────────────────────────────────────────
     getQueueLength() { return _readQueue().length; },
 
     enqueue(op) {
       const q = _readQueue();
-      // FIX: snapshot classId NOW — class-switch won't corrupt queued ops
       q.push(Object.assign({}, op, { ts: Date.now(), classId: op.classId || _classId() }));
       _writeQueue(q);
       _updateBadge();
     },
 
-    // ── Flush offline queue on reconnect ─────────────────────────────────────
     async flushOfflineQueue() {
-      if (this._flushInProgress) return;   // FIX: prevent concurrent flushes
+      if (this._flushInProgress) return;
       if (!_getClient() || !navigator.onLine) return;
       const q = _readQueue();
       if (!q.length) return;
-
       this._flushInProgress = true;
-      _writeQueue([]);                     // optimistic clear
+      _writeQueue([]);
       const failed = [];
       for (const op of q) {
         try {
           if      (op.type === 'students')  await this._pushStudentsNow(op.classId, op.rows);
           else if (op.type === 'behaviors') await this._pushBehaviorsNow(op.classId, op.rows);
+          else if (op.type === 'classes')   await this._pushClassesNow(op.rows);
+          else if (op.type === 'settings')  await this._pushSettingsNow(op.classId, op.rows);
+          else if (op.type === 'seating')   await this._pushSeatingNow(op.classId, op.rows);
+          else if (op.type === 'dna')       await this._pushDNANow(op.rows);
+          else if (op.type === 'app_state') await this._pushAppStateNow(op.rows);
         } catch (e) { failed.push(op); }
       }
       if (failed.length) {
-        const rest = _readQueue();         // pick up ops added while flushing
+        const rest = _readQueue();
         _writeQueue(failed.concat(rest));
       }
       this._flushInProgress = false;
       _updateBadge();
     },
 
-    // ── Push full local snapshot to cloud ─────────────────────────────────────
-    async pushLocalSnapshot(cid) {
-      cid = cid || _classId();
-      if (!_getClient()) return;
-      let st = [], ev = [];
-      // FIX: use getAllIncludingDeleted / getAllEvents so soft-deleted records
-      // are also pushed to Supabase — otherwise deleted items reappear on
-      // other devices after the next pull (remote has no delete marker).
-      try {
-        st = (typeof StudentManager !== 'undefined' && StudentManager.getAllIncludingDeleted)
-          ? StudentManager.getAllIncludingDeleted()
-          : StorageManager.getStudents() || [];
-      } catch (e) { try { st = StorageManager.getStudents() || []; } catch (_) {} }
-      try {
-        ev = (StorageManager.getAllEvents)
-          ? StorageManager.getAllEvents()
-          : StorageManager.getEvents() || [];
-      } catch (e) { try { ev = StorageManager.getEvents() || []; } catch (_) {} }
-      try {
-        await this._pushStudentsNow(cid, st);
-        await this._pushBehaviorsNow(cid, ev);
-      } catch (e) { console.warn('[DataService] pushLocalSnapshot', e); }
+    // ── Write hook — called by SyncEngine._onLocalWrite ──────────────────────
+    onLocalStorageWrite(key) {
+      const cid = _classId();
+      if (key === _studentsKey(cid))    { this._schedulePushStudents(cid);  return; }
+      if (key === _eventsKey(cid))      { this._schedulePushEvents(cid);    return; }
+      if (key === 'ep_classes')         { this._scheduleFlushClasses();     return; }
+      if (key === `ep_settings_${cid}`) { this._scheduleFlushSettings(cid); return; }
+      // Global app state keys
+      if (key === 'ep_lesson_mode' || key === 'ep_theme'    || key === 'ep_country'  ||
+          key === 'ep_quest'        || key === 'ep_moods'   || key === 'ep_reflections' ||
+          key === 'ep_year_archives'|| key === 'ep_weekly_reset'||
+          key === 'ep_archived_classes' || key === 'ep_dispatch_schedule') {
+        this._scheduleFlushAppState(); return;
+      }
     },
 
-    // ── Raw Supabase upserts (last-write-wins on id conflict) ─────────────────
-    async _pushStudentsNow(cid, students) {
-      const client = _getClient();
-      if (!client) throw new Error('No Supabase client');
-      const rows = (students || []).map(s => ({
-        id: String(s.id), class_id: cid, data: s, updated_at: Date.now(),
-      }));
-      if (!rows.length) return;
-      const res = await client.from('students').upsert(rows, { onConflict: 'id' });
-      if (res.error) throw res.error;
-    },
+    // Called by SeatingChart.save()
+    onSeatingWrite(cid) { this._scheduleFlushSeating(cid); },
+    // Called by StudentDNA._save()
+    onDNAWrite(cid)     { this._scheduleFlushDNA(cid);     },
 
-    async _pushBehaviorsNow(cid, events) {
-      const client = _getClient();
-      if (!client) throw new Error('No Supabase client');
-      const rows = (events || []).map(ev => ({
-        id: String(ev.id), class_id: cid, data: ev, updated_at: Date.now(),
-      }));
-      if (!rows.length) return;
-      const res = await client.from('behaviors').upsert(rows, { onConflict: 'id' });
-      if (res.error) throw res.error;
-    },
-
-    // ── Debounced push triggered by localStorage writes ───────────────────────
+    // ── STUDENTS ─────────────────────────────────────────────────────────────
     _schedulePushStudents(cid) {
       clearTimeout(this._debounceStudents);
-      this._debounceStudents = setTimeout(
-        () => this._flushStudentsOut(cid), this.STUDENT_DEBOUNCE_MS);
+      this._debounceStudents = setTimeout(() => this._flushStudentsOut(cid), this.STUDENT_DEBOUNCE_MS);
     },
-
-    _schedulePushEvents(cid) {
-      clearTimeout(this._debounceEvents);
-      this._debounceEvents = setTimeout(
-        () => this._flushEventsOut(cid), this.EVENT_DEBOUNCE_MS);
-    },
-
     async _flushStudentsOut(cid) {
       let rows = [];
       try {
         rows = (typeof StudentManager !== 'undefined' && StudentManager.getAllIncludingDeleted)
-          ? StudentManager.getAllIncludingDeleted()
-          : StorageManager.getStudents() || [];
+          ? StudentManager.getAllIncludingDeleted() : StorageManager.getStudents() || [];
       } catch (e) {}
-      if (!_getClient() || !navigator.onLine) {
-        this.enqueue({ type: 'students', classId: cid, rows }); return;
-      }
+      if (!_getClient() || !navigator.onLine) { this.enqueue({ type:'students', classId:cid, rows }); return; }
       try { await this._pushStudentsNow(cid, rows); }
-      catch (e) { this.enqueue({ type: 'students', classId: cid, rows }); }
+      catch (e) { this.enqueue({ type:'students', classId:cid, rows }); }
+    },
+    async _pushStudentsNow(cid, students) {
+      const client = _getClient();
+      if (!client) throw new Error('No client');
+      const rows = (students||[]).map(s => ({ id:String(s.id), class_id:cid, data:s, updated_at:Date.now() }));
+      if (!rows.length) return;
+      const res = await client.from('students').upsert(rows, { onConflict:'id' });
+      if (res.error) throw res.error;
     },
 
+    // ── BEHAVIORS ─────────────────────────────────────────────────────────────
+    _schedulePushEvents(cid) {
+      clearTimeout(this._debounceEvents);
+      this._debounceEvents = setTimeout(() => this._flushEventsOut(cid), this.EVENT_DEBOUNCE_MS);
+    },
     async _flushEventsOut(cid) {
       let rows = [];
-      try {
-        rows = StorageManager.getAllEvents
-          ? StorageManager.getAllEvents()
-          : StorageManager.getEvents() || [];
-      } catch (e) {}
-      if (!_getClient() || !navigator.onLine) {
-        this.enqueue({ type: 'behaviors', classId: cid, rows }); return;
-      }
+      try { rows = StorageManager.getAllEvents ? StorageManager.getAllEvents() : StorageManager.getEvents() || []; } catch (e) {}
+      if (!_getClient() || !navigator.onLine) { this.enqueue({ type:'behaviors', classId:cid, rows }); return; }
       try { await this._pushBehaviorsNow(cid, rows); }
-      catch (e) { this.enqueue({ type: 'behaviors', classId: cid, rows }); }
+      catch (e) { this.enqueue({ type:'behaviors', classId:cid, rows }); }
+    },
+    async _pushBehaviorsNow(cid, events) {
+      const client = _getClient();
+      if (!client) throw new Error('No client');
+      const rows = (events||[]).map(ev => ({ id:String(ev.id), class_id:cid, data:ev, updated_at:Date.now() }));
+      if (!rows.length) return;
+      const res = await client.from('behaviors').upsert(rows, { onConflict:'id' });
+      if (res.error) throw res.error;
     },
 
-    // Called by SyncEngine._onLocalWrite() on every StorageManager.set()
-    onLocalStorageWrite(key) {
-      const cid = _classId();
-      if (key === _studentsKey(cid)) { this._schedulePushStudents(cid); return; }
-      if (key === _eventsKey(cid))   { this._schedulePushEvents(cid);   return; }
+    // ── FULL SNAPSHOT (push everything for current class) ────────────────────
+    async pushLocalSnapshot(cid) {
+      cid = cid || _classId();
+      if (!_getClient()) return;
+      let st = [], ev = [];
+      try { st = (typeof StudentManager !== 'undefined' && StudentManager.getAllIncludingDeleted)
+              ? StudentManager.getAllIncludingDeleted() : StorageManager.getStudents() || []; } catch (e) {}
+      try { ev = StorageManager.getAllEvents ? StorageManager.getAllEvents() : StorageManager.getEvents() || []; } catch (e) {}
+      try { await this._pushStudentsNow(cid, st); await this._pushBehaviorsNow(cid, ev); }
+      catch (e) { console.warn('[DataService] pushLocalSnapshot', e); }
     },
 
-    // ── Pull latest data from cloud into localStorage then bust ALL caches ─────
+    // ── PULL CLASS DATA ───────────────────────────────────────────────────────
     async pullClassData(cid) {
       cid = cid || _classId();
       const client = _getClient();
       if (!client) return;
-
-      // Prevent re-entrant pulls (called from scheduleRefresh while push is running)
       if (this._pullInProgress) return;
       this._pullInProgress = true;
       try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
-
       try {
         const [stRes, beRes] = await Promise.all([
           client.from('students').select('data,updated_at').eq('class_id', cid),
@@ -12461,99 +12485,243 @@ const DataService = (() => {
         ]);
         if (stRes.error) throw stRes.error;
         if (beRes.error) throw beRes.error;
-
-        const remoteStudents = (stRes.data || []).map(r => r.data).filter(Boolean);
-        const remoteEvents   = (beRes.data || []).map(r => r.data).filter(Boolean);
-
-        // Cloud is empty AND local has data → keep local (first connect on existing device)
+        const remoteStudents = (stRes.data||[]).map(r=>r.data).filter(Boolean);
+        const remoteEvents   = (beRes.data||[]).map(r=>r.data).filter(Boolean);
         if (!remoteStudents.length && !remoteEvents.length) {
-          try {
-            const local = JSON.parse(localStorage.getItem(_studentsKey(cid)) || '[]');
-            if (Array.isArray(local) && local.length) return;
-          } catch (_) {}
+          try { const local = JSON.parse(localStorage.getItem(_studentsKey(cid))||'[]'); if (Array.isArray(local)&&local.length) return; } catch (_) {}
         }
-
-        // ── MERGE: never blindly replace — merge remote + local by ID ──────────
-        // Strategy:
-        //   • Remote wins for same ID (server is source of truth)
-        //   • Local-only IDs kept IF no matching name already in remote
-        //     → this is the critical fix for the re-add duplication bug:
-        //       user re-adds same students (gets new IDs) while pull was in-flight;
-        //       merge must NOT keep the re-added copies when remote already has them.
-        //   • Final dedup by both ID and normalized name
         const _normName = n => (n||'').trim().toLowerCase().replace(/\s+/g,' ');
-
         const mergeById = (remote, localRaw, isStudents) => {
           try {
-            const local = JSON.parse(localRaw || '[]');
-            const remoteMap  = new Map(remote.map(r => [String(r.id), r]));
-            // Name map for students only — prevents same person with different ID
-            const remoteNames = isStudents
-              ? new Set(remote.filter(r=>!r.deleted).map(r => _normName(r.name)))
-              : null;
-
-            // Start with all remote records (server wins for conflicts)
+            const local = JSON.parse(localRaw||'[]');
+            const remoteMap   = new Map(remote.map(r=>[String(r.id),r]));
+            const remoteNames = isStudents ? new Set(remote.filter(r=>!r.deleted).map(r=>_normName(r.name))) : null;
             const merged = [...remote];
-
-            // Add local-only records:
-            //   - ID must not already be in remote
-            //   - For students: name must not already be in remote (dedup re-adds)
-            for (const localRec of (Array.isArray(local) ? local : [])) {
+            for (const localRec of (Array.isArray(local)?local:[])) {
               const id = String(localRec.id);
-              if (remoteMap.has(id)) continue; // remote wins on same ID
-              if (isStudents && !localRec.deleted && remoteNames &&
-                  remoteNames.has(_normName(localRec.name))) {
-                // Same name already in remote with a different ID — skip the
-                // locally re-added duplicate
-                Logger.warn('DataService',
-                  `Merge: skipping local duplicate name "${localRec.name}" (local id=${id})`);
-                continue;
-              }
+              if (remoteMap.has(id)) continue;
+              if (isStudents && !localRec.deleted && remoteNames && remoteNames.has(_normName(localRec.name))) continue;
               merged.push(localRec);
             }
-
-            // Final dedup by ID (safety net)
             const seen = new Set();
-            return merged.filter(r => {
-              const key = String(r.id);
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-          } catch (_) {
-            return remote;
-          }
+            return merged.filter(r => { const k=String(r.id); if(seen.has(k)) return false; seen.add(k); return true; });
+          } catch (_) { return remote; }
         };
-
         const mergedStudents = mergeById(remoteStudents, localStorage.getItem(_studentsKey(cid)), true);
         const mergedEvents   = mergeById(remoteEvents,   localStorage.getItem(_eventsKey(cid)),   false);
-
         localStorage.setItem(_studentsKey(cid), JSON.stringify(mergedStudents));
         localStorage.setItem(_eventsKey(cid),   JSON.stringify(mergedEvents));
-
-        // Bust ALL in-memory caches — every device that pulls refreshes correctly
-        try { StorageManager.invAll();       } catch (e) {}
-        try { StudentManager.inv();          } catch (e) {}
-        try { Analytics.invalidate();        } catch (e) {}
-        try { InsightEngine.invalidate();    } catch (e) {}
-        try { EventCache.invalidate();       } catch (e) {}
-
-        // FIX 4: Trigger UI refresh after EVERY pull, not just the boot sequence.
-        // Without this, Realtime events received on other devices cause a pull
-        // but the screen never updates because _runRefresh calls pullClassData
-        // and then calls _refreshAllUI *separately* — creating a race condition
-        // where _refreshAllUI can run before pullClassData resolves on slow networks.
-        // Storing a flag lets _runRefresh know a fresh pull just completed.
+        try { StorageManager.invAll(); } catch (e) {}
+        try { StudentManager.inv();    } catch (e) {}
+        try { Analytics.invalidate();  } catch (e) {}
+        try { InsightEngine.invalidate(); } catch (e) {}
+        try { EventCache.invalidate(); } catch (e) {}
         this._lastPullAt = Date.now();
-
       } finally {
         this._pullInProgress = false;
         try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = false; } catch (e) {}
       }
     },
-
-    // FIX: short alias — syncBrain calls DataService.pull(cid)
     pull(cid) { return this.pullClassData(cid); },
+
+    // ── CLASSES ───────────────────────────────────────────────────────────────
+    _scheduleFlushClasses() {
+      clearTimeout(this._debounceClasses);
+      this._debounceClasses = setTimeout(() => this._flushClassesOut(), this.CLASSES_DEBOUNCE_MS);
+    },
+    async _flushClassesOut() {
+      let rows = [];
+      try { rows = JSON.parse(localStorage.getItem('ep_classes')||'[]'); } catch (e) {}
+      if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'classes', rows }); return; }
+      try { await this._pushClassesNow(rows); }
+      catch (e) { this.enqueue({ type:'classes', rows }); }
+    },
+    async _pushClassesNow(classList) {
+      const client = _getClient(); if (!client) throw new Error('No client');
+      const rows = (classList||[]).map(cls => ({ id:String(cls.id), data:cls, updated_at:Date.now() }));
+      if (!rows.length) return;
+      const res = await client.from('classes').upsert(rows, { onConflict:'id' });
+      if (res.error) throw res.error;
+    },
+    async pullClasses() {
+      const client = _getClient(); if (!client) return;
+      try {
+        const res = await client.from('classes').select('data,updated_at');
+        if (res.error) throw res.error;
+        const remote = (res.data||[]).map(r=>r.data).filter(Boolean);
+        if (!remote.length) return;
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem('ep_classes')||'[]'); } catch (_) {}
+        const rMap = new Map(remote.map(c=>[String(c.id),c]));
+        const merged = [...remote];
+        for (const lc of local) { if (!rMap.has(String(lc.id))) merged.push(lc); }
+        merged.sort((a,b)=>(a.created||'').localeCompare(b.created||''));
+        localStorage.setItem('ep_classes', JSON.stringify(merged));
+      } catch (e) { console.warn('[DataService] pullClasses', e); }
+    },
+
+    // ── SETTINGS ──────────────────────────────────────────────────────────────
+    _scheduleFlushSettings(cid) {
+      clearTimeout(this._debounceSettings);
+      this._debounceSettings = setTimeout(() => this._flushSettingsOut(cid), this.SETTINGS_DEBOUNCE_MS);
+    },
+    async _flushSettingsOut(cid) {
+      cid = cid || _classId();
+      let data = {};
+      try { data = StorageManager.getSettings(); } catch (e) {}
+      if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'settings', classId:cid, rows:data }); return; }
+      try { await this._pushSettingsNow(cid, data); }
+      catch (e) { this.enqueue({ type:'settings', classId:cid, rows:data }); }
+    },
+    async _pushSettingsNow(cid, data) {
+      const client = _getClient(); if (!client) throw new Error('No client');
+      const res = await client.from('settings').upsert([{ id:String(cid), data, updated_at:Date.now() }], { onConflict:'id' });
+      if (res.error) throw res.error;
+    },
+    async pullSettings(cid) {
+      cid = cid || _classId();
+      const client = _getClient(); if (!client) return;
+      try {
+        const res = await client.from('settings').select('data').eq('id',cid).maybeSingle();
+        if (res.error||!res.data) return;
+        const remote = res.data.data; if (!remote) return;
+        let local = {}; try { local = StorageManager.getSettings(); } catch (_) {}
+        StorageManager.saveSettings(Object.assign({}, local, remote));
+      } catch (e) { console.warn('[DataService] pullSettings', e); }
+    },
+
+    // ── SEATING ───────────────────────────────────────────────────────────────
+    _scheduleFlushSeating(cid) {
+      clearTimeout(this._debounceSeating);
+      this._debounceSeating = setTimeout(() => this._flushSeatingOut(cid), this.SEATING_DEBOUNCE_MS);
+    },
+    async _flushSeatingOut(cid) {
+      cid = cid || _classId();
+      let layout = {};
+      try { const raw = localStorage.getItem(`ep_seating_${cid}`); layout = raw ? JSON.parse(raw) : {}; } catch (e) {}
+      if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'seating', classId:cid, rows:layout }); return; }
+      try { await this._pushSeatingNow(cid, layout); }
+      catch (e) { this.enqueue({ type:'seating', classId:cid, rows:layout }); }
+    },
+    async _pushSeatingNow(cid, layout) {
+      const client = _getClient(); if (!client) throw new Error('No client');
+      const res = await client.from('seating').upsert([{ id:String(cid), data:layout, updated_at:Date.now() }], { onConflict:'id' });
+      if (res.error) throw res.error;
+    },
+    async pullSeating(cid) {
+      cid = cid || _classId();
+      const client = _getClient(); if (!client) return;
+      try {
+        const res = await client.from('seating').select('data').eq('id',cid).maybeSingle();
+        if (res.error||!res.data) return;
+        const layout = res.data.data;
+        if (layout) localStorage.setItem(`ep_seating_${cid}`, JSON.stringify(layout));
+      } catch (e) { console.warn('[DataService] pullSeating', e); }
+    },
+
+    // ── DNA ───────────────────────────────────────────────────────────────────
+    _scheduleFlushDNA(cid) {
+      clearTimeout(this._debounceDNA);
+      this._debounceDNA = setTimeout(() => this._flushDNAOut(cid), this.DNA_DEBOUNCE_MS);
+    },
+    async _flushDNAOut(cid) {
+      cid = cid || _classId();
+      const rows = [];
+      try {
+        Object.keys(localStorage).filter(k=>k.startsWith(`ep_dna_${cid}_`)).forEach(k => {
+          try {
+            const sid = k.replace(`ep_dna_${cid}_`,'');
+            const data = JSON.parse(localStorage.getItem(k));
+            if (data) rows.push({ id:`${cid}_${sid}`, class_id:cid, data, updated_at:Date.now() });
+          } catch (_) {}
+        });
+      } catch (e) {}
+      if (!rows.length) return;
+      if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'dna', classId:cid, rows }); return; }
+      try { await this._pushDNANow(rows); }
+      catch (e) { this.enqueue({ type:'dna', classId:cid, rows }); }
+    },
+    async _pushDNANow(rows) {
+      const client = _getClient(); if (!client) throw new Error('No client');
+      if (!rows.length) return;
+      const res = await client.from('dna').upsert(rows, { onConflict:'id' });
+      if (res.error) throw res.error;
+    },
+    async pullDNA(cid) {
+      cid = cid || _classId();
+      const client = _getClient(); if (!client) return;
+      try {
+        const res = await client.from('dna').select('id,data').eq('class_id',cid);
+        if (res.error) throw res.error;
+        (res.data||[]).forEach(row => {
+          if (!row.data) return;
+          const sid = row.id.replace(`${cid}_`,'');
+          localStorage.setItem(`ep_dna_${cid}_${sid}`, JSON.stringify(row.data));
+        });
+      } catch (e) { console.warn('[DataService] pullDNA', e); }
+    },
+
+    // ── APP STATE (global preferences + teacher data) ────────────────────────
+    // Covers ALL keys that are not class-specific or device-specific:
+    //   lesson_mode, theme, country, quest, moods, reflections,
+    //   year_archives, weekly_reset, archived_classes, dispatch_schedule
+    _scheduleFlushAppState() {
+      clearTimeout(this._debounceAppState);
+      this._debounceAppState = setTimeout(() => this._flushAppStateOut(), this.APP_STATE_DEBOUNCE_MS);
+    },
+    _gatherAppState() {
+      const s = {};
+      const g = (k,parse) => { try { const v=localStorage.getItem(k); if(v) s[k.replace('ep_','')]=parse?JSON.parse(v):v; } catch(_){} };
+      g('ep_lesson_mode',  false);
+      g('ep_theme',        false);
+      g('ep_country',      false);
+      g('ep_quest',        true);
+      g('ep_moods',        true);
+      g('ep_reflections',  true);
+      g('ep_year_archives',true);
+      g('ep_weekly_reset', false);
+      g('ep_archived_classes', true);
+      g('ep_dispatch_schedule', true);
+      return s;
+    },
+    async _flushAppStateOut() {
+      const data = this._gatherAppState();
+      if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'app_state', rows:data }); return; }
+      try { await this._pushAppStateNow(data); }
+      catch (e) { this.enqueue({ type:'app_state', rows:data }); }
+    },
+    async _pushAppStateNow(data) {
+      const client = _getClient(); if (!client) throw new Error('No client');
+      const res = await client.from('app_state').upsert([{ id:'global', data, updated_at:Date.now() }], { onConflict:'id' });
+      if (res.error) throw res.error;
+    },
+    async pullAppState() {
+      const client = _getClient(); if (!client) return;
+      try {
+        const res = await client.from('app_state').select('data').eq('id','global').maybeSingle();
+        if (res.error||!res.data) return;
+        const r = res.data.data; if (!r) return;
+
+        const set = (k,v,stringify) => {
+          try { localStorage.setItem(k, stringify ? JSON.stringify(v) : v); } catch(_) {}
+        };
+
+        if (r.lesson_mode)  { set('ep_lesson_mode', r.lesson_mode, false);
+          try { LessonMode._current=r.lesson_mode; LessonMode._applyUI(); } catch(_){} }
+        if (r.theme)        { set('ep_theme', r.theme, false);
+          try { ThemeManager._apply(r.theme, false); } catch(_){} }
+        if (r.country)        set('ep_country', r.country, false);
+        if (r.quest)        { set('ep_quest', r.quest, true);
+          try { QuestEngine.render(); } catch(_){} }
+        if (r.moods)          set('ep_moods', r.moods, true);
+        if (r.reflections)  { set('ep_reflections', r.reflections, true);
+          try { SessionReflection.render(); } catch(_){} }
+        if (r.year_archives)  set('ep_year_archives', r.year_archives, true);
+        if (r.weekly_reset)   set('ep_weekly_reset',  r.weekly_reset,  false);
+        if (r.archived_classes) set('ep_archived_classes', r.archived_classes, true);
+        if (r.dispatch_schedule) set('ep_dispatch_schedule', r.dispatch_schedule, true);
+      } catch (e) { console.warn('[DataService] pullAppState', e); }
+    },
   };
 
   return DS;
@@ -12597,6 +12765,51 @@ const RealtimeService = (() => {
             { event: '*', schema: 'public', table: 'behaviors',
               filter: 'class_id=eq.' + cid },
             payload => { if (onDatabaseChange) onDatabaseChange({ table: 'behaviors', payload }); })
+        // Classes table — any class change on any device re-syncs the class list
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'classes' },
+            payload => {
+              if (typeof DataService !== 'undefined') {
+                DataService.pullClasses().then(() => {
+                  try { ClassManager.init(); } catch (e) {}
+                  try { ClassManager._renderSwitcher(); } catch (e) {}
+                }).catch(() => {});
+              }
+            })
+        // Settings — re-pull when any device saves settings for this class
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'settings',
+              filter: 'id=eq.' + cid },
+            () => {
+              if (typeof DataService !== 'undefined')
+                DataService.pullSettings(cid).catch(() => {});
+            })
+        // Seating — re-pull when seating layout changes on any device
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'seating',
+              filter: 'id=eq.' + cid },
+            () => {
+              if (typeof DataService !== 'undefined')
+                DataService.pullSeating(cid).then(() => {
+                  try { if (typeof SeatingChart !== 'undefined') SeatingChart.render(); } catch (e) {}
+                }).catch(() => {});
+            })
+        // DNA — re-pull AI profiles when they update on any device
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'dna',
+              filter: 'class_id=eq.' + cid },
+            () => {
+              if (typeof DataService !== 'undefined') {
+                DataService.pullDNA(cid).catch(() => {});
+              }
+            })
+        // App state — lesson mode, theme, quest, moods, reflections etc.
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'app_state' },
+            () => {
+              if (typeof DataService !== 'undefined')
+                DataService.pullAppState().catch(() => {});
+            })
         .subscribe(status => {
           if (typeof EduPulseSyncBrain !== 'undefined' &&
               typeof EduPulseSyncBrain._onChannelStatus === 'function') {
@@ -12713,12 +12926,18 @@ const EduPulseSyncBrain = (() => {
       if (typeof DataService === 'undefined' || typeof ClassManager === 'undefined') return;
       const cid = ClassManager.activeId();
       try {
-        await DataService.pullClassData(cid);
-        // FIX: _invalidateCaches + _refreshAllUI run AFTER the await resolves,
-        // guaranteeing the UI always sees the freshly merged data from Supabase.
-        // Previously there was a race where slow networks could render stale data.
+        // Pull ALL synced data types in parallel for complete bidirectional sync
+        await Promise.all([
+          DataService.pullClassData(cid),
+          DataService.pullClasses().catch(() => {}),
+          DataService.pullSettings(cid).catch(() => {}),
+          DataService.pullSeating(cid).catch(() => {}),
+          DataService.pullDNA(cid).catch(() => {}),
+          DataService.pullAppState().catch(() => {}),
+        ]);
         _invalidateCaches();
         _refreshAllUI();
+        try { ClassManager._renderSwitcher(); } catch (e) {}
         try {
           if (typeof SyncEngine !== 'undefined' && SyncEngine._computeRealState)
             SyncEngine._computeRealState();
@@ -12957,10 +13176,18 @@ const EduPulseSyncBrain = (() => {
         if (typeof DataService === 'undefined') return;
         const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : null;
         if (!cid) return;
-        DataService.pullClassData(cid)
+        Promise.all([
+          DataService.pullClassData(cid),
+          DataService.pullClasses().catch(() => {}),
+          DataService.pullSettings(cid).catch(() => {}),
+          DataService.pullSeating(cid).catch(() => {}),
+          DataService.pullDNA(cid).catch(() => {}),
+          DataService.pullAppState().catch(() => {}),
+        ])
           .then(() => {
             _invalidateCaches();
             _refreshAllUI();
+            try { ClassManager._renderSwitcher(); } catch (e) {}
           })
           .catch(() => {});
       }, 30_000);
@@ -13122,7 +13349,22 @@ const SyncEngine = {
                 setTimeout(()=>{ try{ _banner.remove(); }catch(e){} }, 420);
               }, 600);
             })
+            // Also pull+push class list so all devices see the same classes
+            .then(() => DataService.pullClasses())
+            .then(() => DataService.pullSettings(cid).catch(()=>{}))
+            .then(() => DataService.pullSeating(cid).catch(()=>{}))
+            .then(() => DataService.pullDNA(cid).catch(()=>{}))
+            .then(() => DataService.pullAppState().catch(()=>{}))
+            .then(() => {
+              try{ ClassManager.init(); }catch(e){}
+              try{ ClassManager._renderSwitcher(); }catch(e){}
+            })
             .then(() => DataService.pushLocalSnapshot(cid))
+            .then(() => DataService._flushClassesOut())
+            .then(() => DataService._flushSettingsOut(cid))
+            .then(() => DataService._flushSeatingOut(cid))
+            .then(() => DataService._flushDNAOut(cid))
+            .then(() => DataService._flushAppStateOut())
             .then(() => DataService.flushOfflineQueue())
             .catch(()=>{
               try{ _banner.remove(); }catch(e){}
@@ -13817,6 +14059,7 @@ const LessonMode = {
     if(!this.WEIGHTS[mode]) return;
     this._current = mode;
     localStorage.setItem(this._KEY, mode);
+    try{ if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase) DataService._scheduleFlushAppState(); }catch(_){}
     // Update all lesson buttons across header and AI screen
     document.querySelectorAll('.lesson-btn').forEach(b=>{
       b.classList.toggle('active', b.dataset.lesson === mode);
@@ -13903,6 +14146,11 @@ const StudentDNA = {
       const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : '';
       localStorage.setItem(`${this._KEY_PREFIX}${cid}_${studentId}`, JSON.stringify(profile));
       this._cache[studentId] = profile;
+      // Notify DataService so DNA profile syncs to Supabase
+      try {
+        if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase)
+          DataService.onDNAWrite(cid);
+      } catch (e) {}
     }catch(e){}
   },
 
@@ -15687,7 +15935,7 @@ const QuestEngine = {
     try{ return Object.assign(this._defaults(), JSON.parse(localStorage.getItem(this._KEY)||'{}')); }
     catch{ return this._defaults(); }
   },
-  save(q){ localStorage.setItem(this._KEY, JSON.stringify(q)); },
+  save(q){ localStorage.setItem(this._KEY, JSON.stringify(q)); try{ if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase) DataService._scheduleFlushAppState(); }catch(_){} },
 
   getProgress(){
     const q     = this.load();
@@ -15815,7 +16063,14 @@ const SeatingChart = {
     try{ return JSON.parse(localStorage.getItem(this._getKey())||'{}'); }
     catch{ return {}; }
   },
-  save(layout){ localStorage.setItem(this._getKey(), JSON.stringify(layout)); },
+  save(layout){
+    localStorage.setItem(this._getKey(), JSON.stringify(layout));
+    // Notify DataService so seating layout syncs to Supabase
+    try {
+      if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase)
+        DataService.onSeatingWrite(typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default');
+    } catch (e) {}
+  },
 
   // layout: { [seatIndex]: studentId | null }
   getLayout(){
@@ -17641,6 +17896,7 @@ const ThemeManager = {
       document.body.classList.remove('day-mode');
       localStorage.setItem(this._KEY, 'night');
     }
+    try{ if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase) DataService._scheduleFlushAppState(); }catch(_){}
     this._updateBtn(mode);
     if(notify){
       try{
@@ -17815,6 +18071,7 @@ const SessionReflection = {
   _save(arr){
     try{ localStorage.setItem(this._KEY, JSON.stringify(arr)); }
     catch(e){ Logger.warn('SessionReflection', 'save failed', e.message); }
+    try{ if(typeof DataService!=='undefined' && typeof SyncEngine!=='undefined' && SyncEngine._supabase) DataService._scheduleFlushAppState(); }catch(_){}
   },
 
   add(text){
@@ -21722,3 +21979,4 @@ self.addEventListener('fetch',e=>{
 </div>
 </body>
 </html>
+
