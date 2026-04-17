@@ -12315,8 +12315,11 @@ const DataService = (() => {
   const MAX_QUEUE = 200;
 
   function _getClient() {
+    // Check both the instance stored on SyncEngine AND window.supabase
+    if (typeof SyncEngine !== 'undefined' && SyncEngine._supabase &&
+        typeof SyncEngine._supabase.from === 'function') return SyncEngine._supabase;
     const c = window.supabase;
-    return c && typeof c.from === 'function' ? c : null;
+    return (c && typeof c.from === 'function') ? c : null;
   }
   function _classId() {
     try { return ClassManager.activeId(); } catch (e) { return 'default'; }
@@ -12335,25 +12338,12 @@ const DataService = (() => {
     try { if (typeof SyncBrain !== 'undefined' && SyncBrain._updatePendingBadge) SyncBrain._updatePendingBadge(); } catch (e) {}
   }
 
+  // ── Concurrency guard: prevent overlapping pushes of the same table ─────
+  const _pushing = {};   // { 'students_cid': true, 'behaviors_cid': true, ... }
+
   const DS = {
-    // ── Debounce handles ───────────────────────────────────────────────────────
-    _debounceStudents:  null,
-    _debounceEvents:    null,
-    _debounceClasses:   null,
-    _debounceSettings:  null,
-    _debounceSeating:   null,
-    _debounceDNA:       null,
-    _debounceAppState:  null,
     _flushInProgress:   false,
     _pullInProgress:    false,
-
-    STUDENT_DEBOUNCE_MS:  450,
-    EVENT_DEBOUNCE_MS:    800,
-    CLASSES_DEBOUNCE_MS:  600,
-    SETTINGS_DEBOUNCE_MS: 800,
-    SEATING_DEBOUNCE_MS: 1000,
-    DNA_DEBOUNCE_MS:     1200,
-    APP_STATE_DEBOUNCE_MS: 800,
 
     // ── Offline queue ─────────────────────────────────────────────────────────
     getQueueLength() { return _readQueue().length; },
@@ -12384,40 +12374,72 @@ const DataService = (() => {
           else if (op.type === 'app_state') await this._pushAppStateNow(op.rows);
         } catch (e) { failed.push(op); }
       }
-      if (failed.length) {
-        const rest = _readQueue();
-        _writeQueue(failed.concat(rest));
-      }
+      if (failed.length) { const rest = _readQueue(); _writeQueue(failed.concat(rest)); }
       this._flushInProgress = false;
       _updateBadge();
     },
 
-    // ── Write hook — called by SyncEngine._onLocalWrite ──────────────────────
+    // ── Write hook — IMMEDIATE flush, no debounce ────────────────────────────
     onLocalStorageWrite(key) {
       const cid = _classId();
-      if (key === _studentsKey(cid))    { this._schedulePushStudents(cid);  return; }
-      if (key === _eventsKey(cid))      { this._schedulePushEvents(cid);    return; }
-      if (key === 'ep_classes')         { this._scheduleFlushClasses();     return; }
-      if (key === `ep_settings_${cid}`) { this._scheduleFlushSettings(cid); return; }
-      // Global app state keys
-      if (key === 'ep_lesson_mode' || key === 'ep_theme'    || key === 'ep_country'  ||
-          key === 'ep_quest'        || key === 'ep_moods'   || key === 'ep_reflections' ||
-          key === 'ep_year_archives'|| key === 'ep_weekly_reset'||
+      if (key === _studentsKey(cid))    { this._immediateFlushStudents(cid);  return; }
+      if (key === _eventsKey(cid))      { this._immediateFlushEvents(cid);    return; }
+      if (key === 'ep_classes')         { this._immediateFlushClasses();      return; }
+      if (key === `ep_settings_${cid}`) { this._immediateFlushSettings(cid);  return; }
+      if (key === 'ep_lesson_mode' || key === 'ep_theme'      || key === 'ep_country'  ||
+          key === 'ep_quest'        || key === 'ep_moods'     || key === 'ep_reflections' ||
+          key === 'ep_year_archives'|| key === 'ep_weekly_reset' ||
           key === 'ep_archived_classes' || key === 'ep_dispatch_schedule') {
-        this._scheduleFlushAppState(); return;
+        this._immediateFlushAppState(); return;
       }
     },
 
-    // Called by SeatingChart.save()
-    onSeatingWrite(cid) { this._scheduleFlushSeating(cid); },
-    // Called by StudentDNA._save()
-    onDNAWrite(cid)     { this._scheduleFlushDNA(cid);     },
+    onSeatingWrite(cid) { this._immediateFlushSeating(cid); },
+    onDNAWrite(cid)     { this._immediateFlushDNA(cid);     },
+
+    // ── IMMEDIATE flush helpers (fire-and-forget, concurrency-safe) ──────────
+    _immediateFlushStudents(cid) {
+      const key = 'students_' + cid;
+      if (_pushing[key]) return;  // already in flight
+      _pushing[key] = true;
+      this._flushStudentsOut(cid).finally(() => { _pushing[key] = false; });
+    },
+    _immediateFlushEvents(cid) {
+      const key = 'behaviors_' + cid;
+      if (_pushing[key]) return;
+      _pushing[key] = true;
+      this._flushEventsOut(cid).finally(() => { _pushing[key] = false; });
+    },
+    _immediateFlushClasses() {
+      if (_pushing['classes']) return;
+      _pushing['classes'] = true;
+      this._flushClassesOut().finally(() => { _pushing['classes'] = false; });
+    },
+    _immediateFlushSettings(cid) {
+      const key = 'settings_' + cid;
+      if (_pushing[key]) return;
+      _pushing[key] = true;
+      this._flushSettingsOut(cid).finally(() => { _pushing[key] = false; });
+    },
+    _immediateFlushSeating(cid) {
+      const key = 'seating_' + cid;
+      if (_pushing[key]) return;
+      _pushing[key] = true;
+      this._flushSeatingOut(cid).finally(() => { _pushing[key] = false; });
+    },
+    _immediateFlushDNA(cid) {
+      const key = 'dna_' + cid;
+      if (_pushing[key]) return;
+      _pushing[key] = true;
+      this._flushDNAOut(cid).finally(() => { _pushing[key] = false; });
+    },
+    _immediateFlushAppState() {
+      if (_pushing['app_state']) return;
+      _pushing['app_state'] = true;
+      this._flushAppStateOut().finally(() => { _pushing['app_state'] = false; });
+    },
 
     // ── STUDENTS ─────────────────────────────────────────────────────────────
-    _schedulePushStudents(cid) {
-      clearTimeout(this._debounceStudents);
-      this._debounceStudents = setTimeout(() => this._flushStudentsOut(cid), this.STUDENT_DEBOUNCE_MS);
-    },
     async _flushStudentsOut(cid) {
       let rows = [];
       try {
@@ -12429,8 +12451,7 @@ const DataService = (() => {
       catch (e) { this.enqueue({ type:'students', classId:cid, rows }); }
     },
     async _pushStudentsNow(cid, students) {
-      const client = _getClient();
-      if (!client) throw new Error('No client');
+      const client = _getClient(); if (!client) throw new Error('No client');
       const rows = (students||[]).map(s => ({ id:String(s.id), class_id:cid, data:s, updated_at:Date.now() }));
       if (!rows.length) return;
       const res = await client.from('students').upsert(rows, { onConflict:'id' });
@@ -12438,10 +12459,6 @@ const DataService = (() => {
     },
 
     // ── BEHAVIORS ─────────────────────────────────────────────────────────────
-    _schedulePushEvents(cid) {
-      clearTimeout(this._debounceEvents);
-      this._debounceEvents = setTimeout(() => this._flushEventsOut(cid), this.EVENT_DEBOUNCE_MS);
-    },
     async _flushEventsOut(cid) {
       let rows = [];
       try { rows = StorageManager.getAllEvents ? StorageManager.getAllEvents() : StorageManager.getEvents() || []; } catch (e) {}
@@ -12450,15 +12467,14 @@ const DataService = (() => {
       catch (e) { this.enqueue({ type:'behaviors', classId:cid, rows }); }
     },
     async _pushBehaviorsNow(cid, events) {
-      const client = _getClient();
-      if (!client) throw new Error('No client');
+      const client = _getClient(); if (!client) throw new Error('No client');
       const rows = (events||[]).map(ev => ({ id:String(ev.id), class_id:cid, data:ev, updated_at:Date.now() }));
       if (!rows.length) return;
       const res = await client.from('behaviors').upsert(rows, { onConflict:'id' });
       if (res.error) throw res.error;
     },
 
-    // ── FULL SNAPSHOT (push everything for current class) ────────────────────
+    // ── FULL SNAPSHOT ─────────────────────────────────────────────────────────
     async pushLocalSnapshot(cid) {
       cid = cid || _classId();
       if (!_getClient()) return;
@@ -12473,8 +12489,7 @@ const DataService = (() => {
     // ── PULL CLASS DATA ───────────────────────────────────────────────────────
     async pullClassData(cid) {
       cid = cid || _classId();
-      const client = _getClient();
-      if (!client) return;
+      const client = _getClient(); if (!client) return;
       if (this._pullInProgress) return;
       this._pullInProgress = true;
       try { if (typeof SyncEngine !== 'undefined') SyncEngine._pullInProgress = true; } catch (e) {}
@@ -12525,10 +12540,6 @@ const DataService = (() => {
     pull(cid) { return this.pullClassData(cid); },
 
     // ── CLASSES ───────────────────────────────────────────────────────────────
-    _scheduleFlushClasses() {
-      clearTimeout(this._debounceClasses);
-      this._debounceClasses = setTimeout(() => this._flushClassesOut(), this.CLASSES_DEBOUNCE_MS);
-    },
     async _flushClassesOut() {
       let rows = [];
       try { rows = JSON.parse(localStorage.getItem('ep_classes')||'[]'); } catch (e) {}
@@ -12550,8 +12561,7 @@ const DataService = (() => {
         if (res.error) throw res.error;
         const remote = (res.data||[]).map(r=>r.data).filter(Boolean);
         if (!remote.length) return;
-        let local = [];
-        try { local = JSON.parse(localStorage.getItem('ep_classes')||'[]'); } catch (_) {}
+        let local = []; try { local = JSON.parse(localStorage.getItem('ep_classes')||'[]'); } catch (_) {}
         const rMap = new Map(remote.map(c=>[String(c.id),c]));
         const merged = [...remote];
         for (const lc of local) { if (!rMap.has(String(lc.id))) merged.push(lc); }
@@ -12561,14 +12571,9 @@ const DataService = (() => {
     },
 
     // ── SETTINGS ──────────────────────────────────────────────────────────────
-    _scheduleFlushSettings(cid) {
-      clearTimeout(this._debounceSettings);
-      this._debounceSettings = setTimeout(() => this._flushSettingsOut(cid), this.SETTINGS_DEBOUNCE_MS);
-    },
     async _flushSettingsOut(cid) {
       cid = cid || _classId();
-      let data = {};
-      try { data = StorageManager.getSettings(); } catch (e) {}
+      let data = {}; try { data = StorageManager.getSettings(); } catch (e) {}
       if (!_getClient()||!navigator.onLine) { this.enqueue({ type:'settings', classId:cid, rows:data }); return; }
       try { await this._pushSettingsNow(cid, data); }
       catch (e) { this.enqueue({ type:'settings', classId:cid, rows:data }); }
@@ -12591,10 +12596,6 @@ const DataService = (() => {
     },
 
     // ── SEATING ───────────────────────────────────────────────────────────────
-    _scheduleFlushSeating(cid) {
-      clearTimeout(this._debounceSeating);
-      this._debounceSeating = setTimeout(() => this._flushSeatingOut(cid), this.SEATING_DEBOUNCE_MS);
-    },
     async _flushSeatingOut(cid) {
       cid = cid || _classId();
       let layout = {};
@@ -12620,10 +12621,6 @@ const DataService = (() => {
     },
 
     // ── DNA ───────────────────────────────────────────────────────────────────
-    _scheduleFlushDNA(cid) {
-      clearTimeout(this._debounceDNA);
-      this._debounceDNA = setTimeout(() => this._flushDNAOut(cid), this.DNA_DEBOUNCE_MS);
-    },
     async _flushDNAOut(cid) {
       cid = cid || _classId();
       const rows = [];
@@ -12661,27 +12658,14 @@ const DataService = (() => {
       } catch (e) { console.warn('[DataService] pullDNA', e); }
     },
 
-    // ── APP STATE (global preferences + teacher data) ────────────────────────
-    // Covers ALL keys that are not class-specific or device-specific:
-    //   lesson_mode, theme, country, quest, moods, reflections,
-    //   year_archives, weekly_reset, archived_classes, dispatch_schedule
-    _scheduleFlushAppState() {
-      clearTimeout(this._debounceAppState);
-      this._debounceAppState = setTimeout(() => this._flushAppStateOut(), this.APP_STATE_DEBOUNCE_MS);
-    },
+    // ── APP STATE ─────────────────────────────────────────────────────────────
     _gatherAppState() {
       const s = {};
       const g = (k,parse) => { try { const v=localStorage.getItem(k); if(v) s[k.replace('ep_','')]=parse?JSON.parse(v):v; } catch(_){} };
-      g('ep_lesson_mode',  false);
-      g('ep_theme',        false);
-      g('ep_country',      false);
-      g('ep_quest',        true);
-      g('ep_moods',        true);
-      g('ep_reflections',  true);
-      g('ep_year_archives',true);
-      g('ep_weekly_reset', false);
-      g('ep_archived_classes', true);
-      g('ep_dispatch_schedule', true);
+      g('ep_lesson_mode',false); g('ep_theme',false); g('ep_country',false);
+      g('ep_quest',true); g('ep_moods',true); g('ep_reflections',true);
+      g('ep_year_archives',true); g('ep_weekly_reset',false);
+      g('ep_archived_classes',true); g('ep_dispatch_schedule',true);
       return s;
     },
     async _flushAppStateOut() {
@@ -12701,25 +12685,17 @@ const DataService = (() => {
         const res = await client.from('app_state').select('data').eq('id','global').maybeSingle();
         if (res.error||!res.data) return;
         const r = res.data.data; if (!r) return;
-
-        const set = (k,v,stringify) => {
-          try { localStorage.setItem(k, stringify ? JSON.stringify(v) : v); } catch(_) {}
-        };
-
-        if (r.lesson_mode)  { set('ep_lesson_mode', r.lesson_mode, false);
-          try { LessonMode._current=r.lesson_mode; LessonMode._applyUI(); } catch(_){} }
-        if (r.theme)        { set('ep_theme', r.theme, false);
-          try { ThemeManager._apply(r.theme, false); } catch(_){} }
-        if (r.country)        set('ep_country', r.country, false);
-        if (r.quest)        { set('ep_quest', r.quest, true);
-          try { QuestEngine.render(); } catch(_){} }
-        if (r.moods)          set('ep_moods', r.moods, true);
-        if (r.reflections)  { set('ep_reflections', r.reflections, true);
-          try { SessionReflection.render(); } catch(_){} }
-        if (r.year_archives)  set('ep_year_archives', r.year_archives, true);
-        if (r.weekly_reset)   set('ep_weekly_reset',  r.weekly_reset,  false);
-        if (r.archived_classes) set('ep_archived_classes', r.archived_classes, true);
-        if (r.dispatch_schedule) set('ep_dispatch_schedule', r.dispatch_schedule, true);
+        const set = (k,v,str) => { try { localStorage.setItem(k, str?JSON.stringify(v):v); } catch(_){} };
+        if (r.lesson_mode)  { set('ep_lesson_mode',r.lesson_mode,false); try{LessonMode._current=r.lesson_mode;LessonMode._applyUI();}catch(_){} }
+        if (r.theme)        { set('ep_theme',r.theme,false); try{ThemeManager._apply(r.theme,false);}catch(_){} }
+        if (r.country)        set('ep_country',r.country,false);
+        if (r.quest)        { set('ep_quest',r.quest,true); try{QuestEngine.render();}catch(_){} }
+        if (r.moods)          set('ep_moods',r.moods,true);
+        if (r.reflections)  { set('ep_reflections',r.reflections,true); try{SessionReflection.render();}catch(_){} }
+        if (r.year_archives)  set('ep_year_archives',r.year_archives,true);
+        if (r.weekly_reset)   set('ep_weekly_reset',r.weekly_reset,false);
+        if (r.archived_classes) set('ep_archived_classes',r.archived_classes,true);
+        if (r.dispatch_schedule) set('ep_dispatch_schedule',r.dispatch_schedule,true);
       } catch (e) { console.warn('[DataService] pullAppState', e); }
     },
   };
@@ -21979,4 +21955,5 @@ self.addEventListener('fetch',e=>{
 </div>
 </body>
 </html>
+
 
