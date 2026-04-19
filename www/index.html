@@ -1582,8 +1582,8 @@ a{text-decoration:none;color:inherit}
 .dna-name{font-size:16px;font-weight:700}
 .dna-subtitle{font-size:11px;color:var(--text-secondary);margin-top:3px}
 .dna-grid{
-  display:grid;grid-template-columns:1fr 1fr;
-  gap:10px;margin-bottom:14px;
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;margin-bottom:14px;
 }
 .dna-metric{
   background:var(--bg-elevated);border:1px solid var(--border);
@@ -2823,6 +2823,56 @@ body.privacy-mode .hide-privacy{display:none!important}
 }
 @media(max-width:600px){ #ep-onboard-start-btn{ bottom:80px; } }
 
+/* ─── Mobile responsive — New additions (Parts 1-5) ─────────────────────── */
+
+/* DNA Modal — 6 axes: 2 columns on mobile (was 3 on desktop) */
+@media(max-width:600px){
+  .dna-grid{ grid-template-columns:1fr 1fr; gap:6px; }
+  .dna-metric{ padding:8px 6px; }
+  .dna-metric .dm-val{ font-size:17px; }
+  .dna-metric .dm-label{ font-size:8px; letter-spacing:.3px; }
+  .dna-radar-wrap{ height:180px; margin-bottom:10px; }
+  /* Playstyle badge — compact on mobile */
+  .playstyle-badge{ padding:6px 8px; }
+  .playstyle-badge .ps-icon{ font-size:16px; }
+  .playstyle-badge .ps-name{ font-size:11px; }
+  .playstyle-badge .ps-desc{ display:none; } /* hide desc on very small screens */
+  /* i18n Settings section */
+  #i18n-settings-section .btn{ padding:6px 10px; font-size:11px; }
+  /* Atmosphere notification left bar */
+  .notif.atmosphere{ max-width:calc(100vw - 32px); left:16px; right:16px; }
+}
+
+/* Tablet — 6 axes: 3 columns (same as desktop, just smaller padding) */
+@media(max-width:768px) and (min-width:601px){
+  .dna-grid{ grid-template-columns:repeat(3,1fr); gap:7px; }
+  .dna-metric{ padding:9px 7px; }
+  .dna-radar-wrap{ height:200px; }
+}
+
+/* RTL — mobile adjustments */
+@media(max-width:600px){
+  [dir="rtl"] .notif{ left:16px; right:auto; }
+  [dir="rtl"] .modal { text-align:right; }
+  [dir="rtl"] .behavior-panel-header{ flex-direction:row-reverse; }
+  [dir="rtl"] #i18n-settings-section{ direction:rtl; }
+}
+
+/* Playstyle badge base class (used by renderBadge()) */
+.playstyle-badge{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px;
+  background:var(--bg-elevated); border:1px solid var(--border);
+  border-radius:10px; margin-top:8px;
+  touch-action:manipulation;
+}
+.playstyle-badge .ps-icon{ font-size:20px; flex-shrink:0; }
+.playstyle-badge .ps-body{ flex:1; min-width:0; }
+.playstyle-badge .ps-name{ font-size:12px; font-weight:700; color:var(--text-primary); }
+.playstyle-badge .ps-conf{ font-size:10px; color:var(--accent); margin-left:6px; font-weight:400; }
+.playstyle-badge .ps-desc{ font-size:10px; color:var(--text-muted); margin-top:1px; }
+.playstyle-badge .ps-sec { font-size:9px; color:var(--text-muted); margin-top:2px; }
+
 /* -══════════════════════════════════════════════════════════════
    PWA — Install Banner & Mobile Touch Enhancements
 ═══════════════════════════════════════════════════════════════ */
@@ -3155,6 +3205,16 @@ body.privacy-mode .hide-privacy{display:none!important}
   /* ── RTL / LTR direction support (Phase 4 — Arabic notes) ────────────────── */
   [dir="rtl"], .rtl { direction: rtl; text-align: right; }
   [dir="ltr"], .ltr { direction: ltr; text-align: left;  }
+  /* PART 5 — Full app RTL via CSS logical properties */
+  [dir="rtl"] .app-sidebar { border-right:none; border-left:1px solid var(--border); }
+  [dir="rtl"] .sidebar-nav-item { flex-direction:row-reverse; }
+  [dir="rtl"] .student-quick-card { text-align:right; }
+  [dir="rtl"] .notif { right:auto; left:16px; }
+  [dir="rtl"] .behavior-panel-header { flex-direction:row-reverse; }
+  [dir="rtl"] .modal { direction:rtl; }
+  [dir="rtl"] .modal .btn { direction:ltr; }
+  [dir="rtl"] .form-group label { text-align:right; display:block; }
+  [dir="rtl"] .dna-metric { direction:rtl; }
   .note-arabic  { direction: rtl; text-align: right; font-family: var(--font); }
   .note-english { direction: ltr; text-align: left;  font-family: var(--font); }
   textarea.input { direction: ltr; }
@@ -3259,7 +3319,7 @@ body.privacy-mode .hide-privacy{display:none!important}
     <div onclick="Drawer.close();App.navigate('students')"  class="drawer-nav-item">👥 Students</div>
     <div onclick="Drawer.close();App.navigate('seating')"   class="drawer-nav-item">🪑 Seating Chart</div>
     <div onclick="Drawer.close();App.navigate('analytics')" class="drawer-nav-item">📊 Analytics</div>
-    <div onclick="Drawer.close();App.navigate('leaderboard')" class="drawer-nav-item">🏆 Leaderboard</div>
+    <div onclick="Drawer.close();App.navigate('leaderboard')" class="drawer-nav-item"><span data-i18n="nav_leaderboard">🏆 Leaderboard</span></div>
     <div onclick="Drawer.close();App.navigate('reports')"   class="drawer-nav-item">📄 Reports</div>
     <div onclick="Drawer.close();App.navigate('ai')"        class="drawer-nav-item">🧠 AI Engine</div>
     <div onclick="Drawer.close();App.navigate('settings')"  class="drawer-nav-item">⚙️ Settings</div>
@@ -3365,7 +3425,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   <nav class="app-sidebar">
     <!-- Class Switcher -->
     <div class="class-switcher" id="class-switcher-wrap">
-      <div class="cs-label">My Classes</div>
+      <div class="cs-label" data-i18n="my_classes">My Classes</div>
       <div class="cs-current" onclick="ClassManager.toggleDropdown()" id="cs-toggle"
            data-tip="Switch between classes or add a new one">
         <div class="cs-dot" id="cs-active-dot" style="background:var(--accent)"></div>
@@ -3376,45 +3436,45 @@ body.privacy-mode .hide-privacy{display:none!important}
         <div id="cs-items-container"></div>
         <div class="cs-add-btn" onclick="ClassManager.openAddClass()"
              data-tip="Create a new class — all features carry over automatically">
-          <span style="font-size:16px">＋</span> Add New Class
+          <span style="font-size:16px">＋</span> <span data-i18n="add_new_class">Add New Class</span>
         </div>
       </div>
     </div>
 
-    <div class="nav-section-label" style="margin-top:8px">Navigation</div>
+    <div class="nav-section-label" data-i18n="nav_section" style="margin-top:8px">Navigation</div>
     <div class="nav-item active" data-screen="dashboard" onclick="App.navigate('dashboard')" data-title="Dashboard" data-description="Class overview with live behavior logging, activity feed, and real-time charts.">
-      <span class="nav-icon">🏠</span> Dashboard
+      <span class="nav-icon">🏠</span> <span data-i18n="nav_dashboard">Dashboard</span>
     </div>
     <div class="nav-item" data-screen="students" onclick="App.navigate('students')" data-title="Students" data-description="Browse all students, open detailed profiles, filter by risk level, and manage your class roster.">
-      <span class="nav-icon">👥</span> Students
+      <span class="nav-icon">👥</span> <span data-i18n="nav_students">Students</span>
       <span class="nav-badge green" id="nav-student-count">0</span>
     </div>
     <div class="nav-item" data-screen="analytics" onclick="App.navigate('analytics')" data-title="Analytics" data-description="14-day behavior trends, engagement timeline, score distribution, and a live hour-of-day heatmap.">
-      <span class="nav-icon">📊</span> Analytics
+      <span class="nav-icon">📊</span> <span data-i18n="nav_analytics">Analytics</span>
     </div>
     <div class="nav-item" data-screen="leaderboard" onclick="App.navigate('leaderboard')" data-title="Leaderboard" data-description="Live class ranking by total or weekly score. Supports All Time and This Week views.">
-      <span class="nav-icon">🏆</span> Leaderboard
+      <span class="nav-icon">🏆</span> <span data-i18n="nav_leaderboard">Leaderboard</span>
     </div>
     <div class="nav-item" data-screen="reports" onclick="App.navigate('reports')" data-title="Reports" data-description="Generate professional PDF reports and WhatsApp parent messages. Export full class data as CSV.">
-      <span class="nav-icon">📋</span> Reports
+      <span class="nav-icon">📋</span> <span data-i18n="nav_reports">Reports</span>
     </div>
     <div class="nav-item" data-screen="ai" onclick="App.navigate('ai')"
       data-title="AI Engine 🧠" data-description="Live engagement heatmap, risk predictions, Teacher Assistant recommendations, and DNA profile radar charts." data-tip-text="Updates every 5 seconds — no manual refresh needed.">
-      <span class="nav-icon">🧠</span> AI Engine
+      <span class="nav-icon">🧠</span> <span data-i18n="nav_ai">AI Engine</span>
       <span class="ai-nav-badge">LIVE</span>
     </div>
-    <div class="nav-section-label" style="margin-top:8px">Tools</div>
+    <div class="nav-section-label" data-i18n="tools_section" style="margin-top:8px">Tools</div>
     <div class="nav-item" onclick="ColdCallPicker.open()"
       data-title="Cold Call Picker 🎲" data-description="Randomly selects a student weighted toward low-engagement students to ensure fair participation." data-tip-text="Recently picked students receive a 35% weight reduction.">
-      <span class="nav-icon">🎲</span> Cold Call
+      <span class="nav-icon">🎲</span> <span data-i18n="nav_coldcall">Cold Call</span>
     </div>
     <div class="nav-item" data-screen="settings" onclick="App.navigate('settings')"
       data-title="Settings" data-description="Configure school name, teacher info, behavior point values, and connect Supabase for cloud sync.">
-      <span class="nav-icon">⚙️</span> Settings
+      <span class="nav-icon">⚙️</span> <span data-i18n="nav_settings">Settings</span>
     </div>
     <div class="nav-item" onclick="DataHub.open()" style="color:var(--orange)"
       data-title="Data Hub 🗃️" data-description="Manage, export, or selectively purge class data safelylass only. Other classes are not affected.">
-      <span class="nav-icon">🗑</span> Reset Class
+      <span class="nav-icon">🗑</span> <span data-i18n="nav_reset">Reset Class</span>
     </div>
     <div class="sidebar-footer">
       <div class="teacher-chip">
@@ -3535,11 +3595,11 @@ body.privacy-mode .hide-privacy{display:none!important}
         </div>
         <div class="screen-header">
           <div>
-            <div class="screen-title">Students <span class="screen-sub" id="students-sub">0 in class</span></div>
+            <div class="screen-title"><span data-i18n="nav_students">Students</span> <span class="screen-sub" id="students-sub">0 in class</span></div>
           </div>
           <div class="search-wrap" style="max-width:220px">
             <span class="search-icon">🔍</span>
-            <input class="input" id="students-search" placeholder="Search students..." oninput="UI.filterStudents(this.value)"/>
+            <input class="input" id="students-search" placeholder="${I18nManager.t('search_placeholder')}" oninput="UI.filterStudents(this.value)"/>
           </div>
           <select class="select" id="students-sort" onchange="UI.sortStudents(this.value)" data-tip="Sort students by score, name, streak, or risk level">
             <option value="score">Sort: Score ↓</option>
@@ -3571,7 +3631,7 @@ body.privacy-mode .hide-privacy{display:none!important}
     <div class="screen" id="screen-analytics">
       <div class="analytics-screen">
         <div class="screen-header">
-          <div class="screen-title" data-tip="Charts and trends for the entire class — behavior patterns, score distribution, heatmaps">Analytics</div>
+          <div class="screen-title" data-tip="Analytics"><span data-i18n="nav_analytics">Analytics</span></div>
           <button class="btn btn-ghost btn-sm" onclick="Analytics.refresh()">↺ Refresh</button>
           <button class="btn btn-primary btn-sm" onclick="ReportEngine.exportClassCSV()" data-title="Export CSV" data-description="Downloads all student data as a CSV file for use in Excel, Google Sheets, or your school's system.">↓ Export CSV</button>
         </div>
@@ -3626,7 +3686,7 @@ body.privacy-mode .hide-privacy{display:none!important}
     <div class="screen" id="screen-leaderboard">
       <div class="leaderboard-screen">
         <div class="screen-header">
-          <div class="screen-title" data-tip="Class rankings by total score or weekly score">🏆 Leaderboard</div>
+          <div class="screen-title" data-tip="Class rankings"><span data-i18n="nav_leaderboard">🏆 Leaderboard</span></div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <select class="select" id="lb-period" onchange="UI.renderLeaderboard()">
               <option value="total">All Time</option>
@@ -3650,7 +3710,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <div class="seating-screen">
         <div class="screen-header">
           <div>
-            <div class="screen-title" data-tip="Drag students into seats — log behavior directly from the seating view">🪑 Seating Chart</div>
+            <div class="screen-title" data-tip="Seating"><span data-i18n="nav_seating">🪑 Seating Chart</span></div>
             <div class="screen-sub" id="seating-sub">Visual classroom layout</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -3682,7 +3742,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <div class="reports-screen">
         <div class="screen-header">
           <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:8px">
-            <div class="screen-title" data-tip="Generate WhatsApp messages or PDF reports for individual students or the whole class">Reports</div>
+            <div class="screen-title" data-tip="Reports"><span data-i18n="nav_reports">Reports</span></div>
             <div style="display:flex;align-items:center;gap:6px">
               <span id="dispatch-schedule-badge"
                     style="display:none;font-size:10px;font-weight:700;color:var(--accent);
@@ -3805,10 +3865,10 @@ body.privacy-mode .hide-privacy{display:none!important}
     <!-- -─ SETTINGS ── -->
     <div class="screen" id="screen-settings">
       <div class="settings-screen">
-        <div class="screen-header"><div class="screen-title" data-tip="Configure school name, teacher name, sync settings, and class preferences">Settings</div></div>
+        <div class="screen-header"><div class="screen-title" data-tip="Settings"><span data-i18n="nav_settings">Settings</span></div></div>
         <!-- -─ Appearance ─────────────────────────────────────────────────── -->
         <div class="settings-section">
-          <h3>🌗 Appearance</h3>
+          <h3 data-i18n="section_appearance">🌗 Appearance</h3>
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div>
               <div style="font-size:13px;font-weight:600;color:var(--text-primary)">Theme</div>
@@ -3823,8 +3883,14 @@ body.privacy-mode .hide-privacy{display:none!important}
           </div>
         </div>
 
+        <!-- Language / i18n (PART 5) -->
+        <div class="settings-section" id="i18n-settings-section">
+          <h3>🌐 Language / اللغة</h3>
+          <div id="i18n-toggle-wrap"></div>
+        </div>
+
         <div class="settings-section">
-          <h3>School & Teacher Info</h3>
+          <h3><span data-i18n="section_school_info">School & Teacher Info</span></h3>
           <div class="settings-row">
             <div class="form-group">
               <label class="label" for="setting-school">School Name</label>
@@ -3862,14 +3928,14 @@ body.privacy-mode .hide-privacy{display:none!important}
               </div>
             </div>
           </div>
-          <button class="btn btn-primary" onclick="Settings.save()">Save Settings</button>
+          <button class="btn btn-primary" onclick="Settings.save()" data-i18n="save_settings">Save Settings</button>
         </div>
         <div class="settings-section">
-          <h3>Behavior Score Configuration</h3>
+          <h3><span data-i18n="section_behavior_config">Behavior Score Configuration</span></h3>
           <div id="behavior-config-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
         </div>
         <div class="settings-section">
-          <h3>Data Management</h3>
+          <h3><span data-i18n="section_data_mgmt">Data Management</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="ImportNames.open()" data-tip="Bulk import student names from text or CSV file">📥 Import Names</button>
             <button class="btn btn-ghost btn-sm" onclick="DemoLoader.load()" data-tip="Add 12 demo students with realistic behavior data">🎭 Load Demo</button>
@@ -3891,7 +3957,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 
         <!-- -─ CLOUD SYNC SETTINGS — Supabase Offline-First ──────────────── -->
         <div class="settings-section" id="sync-settings-section">
-          <h3>☁️ Cloud Sync (Supabase)</h3>
+          <h3><span data-i18n="section_cloud_sync">☁️ Cloud Sync (Supabase)</span></h3>
 
           <!-- Connection status row -->
           <div class="firebase-status-row disconnected" id="firebase-status-row">
@@ -3910,27 +3976,20 @@ body.privacy-mode .hide-privacy{display:none!important}
             Sync works best when served via HTTP. For full PWA + sync support, open via your web server or place the file in your Capacitor <code style="font-size:10px">www/</code> folder and run <code style="font-size:10px">npx cap run android</code>.
           </div>
 
-          <!-- ==================== AUTO SUPABASE CONFIG - EDITED FOR YOU ==================== -->
+          <!-- ==================== AUTO SUPABASE CONFIG ==================== -->
 <div class="form-group">
   <label class="label" for="sb-url">Supabase Project URL</label>
-  <input class="input" id="sb-url" 
-         value="https://lggtwacnkrjdccempoxu.supabase.co"
+  <input class="input" id="sb-url"
          placeholder="https://xxxx.supabase.co"
-         data-tip="Your Supabase project URL"/>
+         data-tip="Your Supabase project URL — found in Project Settings → API"/>
 </div>
 
 <div class="form-group">
   <label class="label" for="sb-anon-key">Supabase Anon Key</label>
-  <input class="input" id="sb-anon-key" 
-         value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZ3R3YWNua3JqZGNjZW1wb3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MjAwMDAsImV4cCI6MjA2MDI5NjAwMH0.your-full-key-here"
+  <input class="input" id="sb-anon-key"
          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
-         data-tip="Your Supabase anon key"/>
+         data-tip="Your Supabase anon/public key — found in Project Settings → API"/>
 </div>
-          <div class="form-group">
-            <label class="label" for="sb-anon-key">Supabase Anon Key</label>
-            <input class="input" id="sb-anon-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
-                   data-tip="Your Supabase anon/public key — found in Project Settings → API. Starts with eyJ…"/>
-          </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
             <button class="btn btn-primary btn-sm" onclick="SyncEngine.connectSupabase()"
@@ -3941,6 +4000,25 @@ body.privacy-mode .hide-privacy{display:none!important}
                     data-tip="Stop syncing — data stays saved locally">
               Disconnect
             </button>
+            <button class="btn btn-ghost btn-sm" onclick="SyncSetup.showQR()"
+                    data-tip="Share sync credentials to other devices via QR code">
+              📱 Share to Device
+            </button>
+          </div>
+
+          <!-- QR Code Panel — shown after clicking Share to Device -->
+          <div id="sync-qr-panel" style="display:none;margin-top:12px;padding:14px;
+               background:var(--bg-elevated);border:1px solid var(--border);
+               border-radius:var(--radius-md);text-align:center">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px">
+              📱 امسح الكود بكاميرا الجهاز الآخر
+            </div>
+            <div id="sync-qr-canvas" style="display:inline-block;padding:8px;background:#fff;border-radius:8px"></div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5">
+              افتح EduPulse على الجهاز الآخر → الإعدادات → امسح هذا الكود
+            </div>
+            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('sync-qr-panel').style.display='none'"
+                    style="margin-top:8px">إغلاق</button>
           </div>
 
           <div style="margin-top:14px;padding:12px;background:var(--bg-elevated);border-radius:var(--radius-md);border:1px solid var(--border)">
@@ -3975,7 +4053,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <div style="padding:16px;height:100%;overflow-y:auto">
         <!-- Screen header with lesson mode -->
         <div class="screen-header">
-          <div class="screen-title" data-tip="AI Intelligence Engine — Comparisons, Lesson Plans, Interventions">🧠 AI Intelligence <span class="ai-nav-badge" style="margin-left:6px;font-size:10px;padding:2px 7px">ELT</span></div>
+          <div class="screen-title" data-tip="AI"><span data-i18n="nav_ai">🧠 AI Intelligence</span> <span class="ai-nav-badge" style="margin-left:6px;font-size:10px;padding:2px 7px">ELT</span></div>
           <div class="lesson-mode-bar" id="ai-lesson-bar" style="margin-left:auto">
             <button class="lesson-btn" data-lesson="general"  onclick="LessonMode.set('general',this)"  title="General">📖</button>
             <button class="lesson-btn" data-lesson="speaking" onclick="LessonMode.set('speaking',this)" title="Speaking">🎤</button>
@@ -4102,7 +4180,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   <aside class="app-insights">
     <div class="insights-header">
       <span class="ai-badge">AI</span>
-      <h3>Classroom Insights</h3>
+      <h3><span data-i18n="nav_ai">Classroom Insights</span></h3>
     </div>
     <div class="insights-body" id="insights-body" style="padding:8px">
 
@@ -4117,7 +4195,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <!-- Predictions quick list -->
       <div class="ai-panel-section">
         <div class="ai-panel-title">
-          <div class="ai-dot" style="background:var(--orange)"></div> Attention Needed
+          <div class="ai-dot" style="background:var(--orange)"></div> <span data-i18n="attention_needed">Attention Needed</span>
         </div>
         <div id="insights-pred-list" style="display:flex;flex-direction:column;gap:4px"></div>
       </div>
@@ -4125,7 +4203,7 @@ body.privacy-mode .hide-privacy{display:none!important}
       <!-- Classic AI Insights -->
       <div class="ai-panel-section">
         <div class="ai-panel-title">
-          <div class="ai-dot" style="background:var(--green)"></div> Class Insights
+          <div class="ai-dot" style="background:var(--green)"></div> <span data-i18n="class_insights">Class Insights</span>
         </div>
         <div id="insights-classic-list"></div>
       </div>
@@ -4167,31 +4245,31 @@ body.privacy-mode .hide-privacy{display:none!important}
 <nav class="mobile-nav" id="mobile-nav">
   <div class="mobile-nav-item active" data-screen="dashboard" onclick="App.navigate('dashboard')">
     <div class="mn-icon-wrap"><span class="mn-icon">🏠</span></div>
-    <span>Home</span>
+    <span data-i18n="nav_home">Home</span>
   </div>
   <div class="mobile-nav-item" data-screen="students" onclick="App.navigate('students')">
     <div class="mn-icon-wrap"><span class="mn-icon">👥</span></div>
-    <span data-tip="Full student roster — sort, filter by risk, or search by name">Students</span>
+    <span data-i18n="nav_students">Students</span>
   </div>
   <div class="mobile-nav-item" data-screen="ai" onclick="App.navigate('ai')">
     <div class="mn-icon-wrap"><span class="mn-icon">🧠</span></div>
-    <span>AI</span>
+    <span data-i18n="nav_ai_short">AI</span>
   </div>
   <div class="mobile-nav-item" data-screen="seating" onclick="App.navigate('seating')">
     <div class="mn-icon-wrap"><span class="mn-icon">🪑</span></div>
-    <span>Seats</span>
+    <span data-i18n="nav_seats">Seats</span>
   </div>
   <div class="mobile-nav-item" data-screen="analytics" onclick="App.navigate('analytics')">
     <div class="mn-icon-wrap"><span class="mn-icon">📊</span></div>
-    <span>Analytics</span>
+    <span data-i18n="nav_analytics">Analytics</span>
   </div>
   <div class="mobile-nav-item" data-screen="reports" onclick="App.navigate('reports')">
     <div class="mn-icon-wrap"><span class="mn-icon">📋</span></div>
-    <span>Reports</span>
+    <span data-i18n="nav_reports">Reports</span>
   </div>
   <div class="mobile-nav-item" data-screen="settings" onclick="App.navigate('settings')">
     <div class="mn-icon-wrap"><span class="mn-icon">⚙️</span></div>
-    <span>Settings</span>
+    <span data-i18n="nav_settings">Settings</span>
   </div>
 </nav>
 
@@ -5804,6 +5882,12 @@ const BehaviorEngine = {
 
     // Auto-detect classroom atmosphere from behavior patterns
     try{ ClassAtmosphereDetector.onBehaviorLogged(); }catch(e){}
+
+    // PART 1: Mark student's playstyle as dirty for lazy recompute
+    try{ StudentProfileEngine.onBehaviorEvent(studentId); }catch(e){}
+
+    // PART 2/3: Recompute badge progress — undo-safe derived state
+    try{ BadgeEvaluatorV2.syncBadges(studentId); }catch(e){}
 
     return { event:ev, student:updated, trend, riskChanged:newRisk!==prevRisk, prevRisk };
   },
@@ -8947,31 +9031,31 @@ const UI = {
       <div class="stat-card accent">
         <div class="stat-icon">👨‍🎓</div>
         <div class="stat-value">${s.total}</div>
-        <div class="stat-label">Total Students</div>
-        <div class="stat-change">Avg: ${s.avgScore} pts</div>
+        <div class="stat-label">${I18nManager.t('total_students')}</div>
+        <div class="stat-change">${I18nManager.t('class_avg')}: ${s.avgScore}</div>
       </div>
       <div class="stat-card green">
         <div class="stat-icon">✅</div>
         <div class="stat-value">${s.posRatio}%</div>
-        <div class="stat-label">Positive Rate</div>
-        <div class="stat-change ${s.todayPos>0?'up':''}">${s.totalPos} total positive</div>
+        <div class="stat-label">${I18nManager.t('an_pos_ratio')}</div>
+        <div class="stat-change ${s.todayPos>0?'up':''}'">${s.totalPos}</div>
       </div>
       <div class="stat-card ${s.atRisk>0?'red':'green'}">
         <div class="stat-icon">⚠️</div>
         <div class="stat-value">${s.atRisk}</div>
-        <div class="stat-label">At Risk</div>
-        <div class="stat-change ${s.atRisk>0?'down':'up'}">${s.atRisk>0?'Needs attention':'All clear'}</div>
+        <div class="stat-label">${I18nManager.t('at_risk')}</div>
+        <div class="stat-change ${s.atRisk>0?'down':'up'}">${s.atRisk>0?I18nManager.t('risk_medium'):I18nManager.t('risk_none')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📈</div>
         <div class="stat-value">${s.improving}</div>
-        <div class="stat-label">Improving</div>
-        <div class="stat-change down">${s.declining} declining</div>
+        <div class="stat-label">${I18nManager.t('an_improving')}</div>
+        <div class="stat-change down">${s.declining} ${I18nManager.t('an_declining')}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📋</div>
         <div class="stat-value">${s.todayEvents}</div>
-        <div class="stat-label">Today Events</div>
+        <div class="stat-label">${I18nManager.t('today_events')}</div>
         <div class="stat-change up">+${s.todayPos} / -${s.todayNeg}</div>
       </div>
     `;
@@ -9079,6 +9163,18 @@ const UI = {
     if(content){
       content.style.display='flex';
       const tr=this._trendInfo(st.trendScore);
+      // Playstyle mini (shown in panel header for quick reference)
+      const psHtml = (() => {
+        try {
+          const ps = StudentProfileEngine.getPlaystyle(id);
+          const meta = StudentProfileEngine.getMeta(ps.primary);
+          const psName = I18nManager.t('ps_'+ps.primary) || ps.primary;
+          return `<span style="font-size:10px;color:var(--text-muted);margin-left:6px;
+            background:var(--bg-elevated);border:1px solid var(--border);
+            border-radius:99px;padding:1px 7px;white-space:nowrap">
+            ${meta.icon} ${psName}</span>`;
+        } catch(_){ return ''; }
+      })();
       content.innerHTML=`
         <div class="behavior-panel-header">
           <div class="bp-avatar" style="background:${st.color}20;color:${st.color};border-color:${st.color}">${st.avatar}</div>
@@ -9089,24 +9185,25 @@ const UI = {
               <span style="margin-left:8px;color:${st.weeklyScore>=0?'var(--green)':'var(--red)'}">${CONFIG.fmt.weekly(st.weeklyScore)} wk</span>
               <span style="margin-left:8px;color:${tr.color}">${tr.icon} ${tr.label}</span>
               ${st.riskLevel!=='none'?`<span class="pill pill-${st.riskLevel==='high'?'red':st.riskLevel==='medium'?'orange':'accent'}" style="margin-left:6px">${st.riskLevel}</span>`:''}
+              ${psHtml}
             </div>
           </div>
-          <button class="btn btn-ghost btn-xs" onclick="UI.openStudentProfile(${id})">Profile</button>
+          <button class="btn btn-ghost btn-xs" onclick="UI.openStudentProfile(${id})">${I18nManager.t('report')}</button>
         </div>
         <div class="bp-note-wrap">
           <div style="display:flex;flex-direction:column;gap:3px">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">📝 Teacher Note (saved with event)</span>
+            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">📝 ${I18nManager.t('add_note')}</span>
             <span id="bp-note-char" style="font-size:9px;color:var(--text-muted);font-family:var(--mono)">0/120</span>
           </div>
-          <input class="input" id="bp-note-input" placeholder="Observation, context, or feedback…" maxlength="120" data-tip="Optional note — saved with the event, shown in reports. Stays hidden in Privacy Mode."
+          <input class="input" id="bp-note-input" placeholder="${I18nManager.t('add_note')}" maxlength="120"
             oninput="document.getElementById('bp-note-char').textContent=this.value.length+'/120'"
-            data-tip="This note is attached to the behavior event and appears in reports and the activity feed"/>
+            data-tip="This note is attached to the behavior event and appears in reports"/>
         </div>
         </div>
         <div class="bp-scroll-body">
           <div>
-            <div class="behavior-section-label">✅ Positive Behaviors</div>
+            <div class="behavior-section-label">✅ ${I18nManager.t('positive_behaviors')}</div>
             <div class="behavior-btns">
               ${CONFIG.BEHAVIORS.positive.map(b=>`
                 <button class="beh-btn pos" onclick="UI.logBehaviorFromBtn(${id},'${b.id}',this)"
@@ -9118,7 +9215,7 @@ const UI = {
             </div>
           </div>
           <div>
-            <div class="behavior-section-label">❌ Negative Behaviors</div>
+            <div class="behavior-section-label">❌ ${I18nManager.t('negative_behaviors')}</div>
             <div class="behavior-btns">
               ${CONFIG.BEHAVIORS.negative.map(b=>`
                 <button class="beh-btn neg" onclick="UI.logBehaviorFromBtn(${id},'${b.id}',this)"
@@ -9130,7 +9227,7 @@ const UI = {
             </div>
           </div>
           <div>
-            <div class="behavior-section-label">Recent</div>
+            <div class="behavior-section-label">${I18nManager.t('recent_events')}</div>
             <div id="bp-recent-${id}"></div>
           </div>
         </div>
@@ -9246,6 +9343,8 @@ const UI = {
           BehaviorEngine.correct(eventId,'Undone by teacher');
           // Update ActionHistory to mark this event corrected
           try{ ActionHistory.markCorrected(eventId); }catch(e){}
+          // PART 3: Recompute badges after undo — derived state, not permanent
+          try{ BadgeEvaluatorV2.syncBadges(studentId); }catch(e){}
           // Re-render panel with updated score
           this._renderBehaviorPanel(studentId);
           this._refreshHeaderStats();
@@ -10292,6 +10391,11 @@ const UI = {
     }catch(e){}
     // Refresh the sync activity log panel
     if(typeof SyncEngine !== 'undefined') SyncEngine._renderSettingsLog();
+    // PART 5: Render language toggle
+    try {
+      const wrap = document.getElementById('i18n-toggle-wrap');
+      if (wrap) wrap.innerHTML = I18nManager.renderToggle();
+    } catch (_) {}
     // Init country selector
     try{ Settings._initCountrySelect(); }catch(e){}
     // Refresh SyncBrain panel
@@ -12311,6 +12415,60 @@ const ClassManager = {
 const DataService = (() => {
   'use strict';
 
+  // ── STEP 1: Persistent device identity ──────────────────────────────────
+  const DEVICE_ID = (() => {
+    let id = localStorage.getItem('ep_device_id');
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'dev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem('ep_device_id', id);
+    }
+    return id;
+  })();
+
+  // ── STEP 2: Sync state manager ───────────────────────────────────────────
+  const SYNC_STATE = {
+    online:   navigator.onLine,
+    syncing:  false,
+    lastSync: null,
+  };
+
+  window.addEventListener('online',  () => {
+    SYNC_STATE.online = true;
+    _updateSyncIndicator();
+    // Flush queue immediately when connection returns
+    setTimeout(() => DS.flushOfflineQueue().catch(()=>{}), 500);
+  });
+  window.addEventListener('offline', () => {
+    SYNC_STATE.online = false;
+    _updateSyncIndicator();
+  });
+
+  // STEP 8: Visual connection indicator update
+  function _updateSyncIndicator() {
+    try {
+      // Two possible IDs: sync-pill (main header) and sync-status-pill (alt)
+      ['sync-pill', 'sync-status-pill'].forEach(pid => {
+        const pill = document.getElementById(pid);
+        if (!pill) return;
+        if (!SYNC_STATE.online) {
+          pill.className = 'sync-pill offline';
+          const sp = pill.querySelector('span');
+          if (sp) sp.textContent = typeof I18nManager !== 'undefined' && I18nManager.isArabic() ? 'غير متصل' : 'Offline';
+        } else if (SYNC_STATE.syncing) {
+          pill.className = 'sync-pill syncing';
+          const sp = pill.querySelector('span');
+          if (sp) sp.textContent = typeof I18nManager !== 'undefined' && I18nManager.isArabic() ? 'جارٍ المزامنة…' : 'Syncing…';
+        } else {
+          pill.className = 'sync-pill synced';
+          const sp = pill.querySelector('span');
+          if (sp) sp.textContent = typeof I18nManager !== 'undefined' && I18nManager.isArabic() ? 'تمت المزامنة' : 'Synced';
+        }
+      });
+    } catch (_) {}
+  }
+
   const QUEUE_KEY = 'ep_rt_pending_ops';
   const MAX_QUEUE = 200;
 
@@ -12361,6 +12519,8 @@ const DataService = (() => {
       const q = _readQueue();
       if (!q.length) return;
       this._flushInProgress = true;
+      SYNC_STATE.syncing = true;      // STEP 4: update sync state
+      _updateSyncIndicator();
       _writeQueue([]);
       const failed = [];
       for (const op of q) {
@@ -12376,7 +12536,10 @@ const DataService = (() => {
       }
       if (failed.length) { const rest = _readQueue(); _writeQueue(failed.concat(rest)); }
       this._flushInProgress = false;
+      SYNC_STATE.syncing  = false;
+      SYNC_STATE.lastSync = Date.now();
       _updateBadge();
+      _updateSyncIndicator();
     },
 
     // ── Write hook — IMMEDIATE flush, no debounce ────────────────────────────
@@ -12400,43 +12563,71 @@ const DataService = (() => {
     // ── IMMEDIATE flush helpers (fire-and-forget, concurrency-safe) ──────────
     _immediateFlushStudents(cid) {
       const key = 'students_' + cid;
-      if (_pushing[key]) return;  // already in flight
+      if (_pushing[key]) return;
       _pushing[key] = true;
-      this._flushStudentsOut(cid).finally(() => { _pushing[key] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushStudentsOut(cid).finally(() => {
+        _pushing[key] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushEvents(cid) {
       const key = 'behaviors_' + cid;
       if (_pushing[key]) return;
       _pushing[key] = true;
-      this._flushEventsOut(cid).finally(() => { _pushing[key] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushEventsOut(cid).finally(() => {
+        _pushing[key] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushClasses() {
       if (_pushing['classes']) return;
       _pushing['classes'] = true;
-      this._flushClassesOut().finally(() => { _pushing['classes'] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushClassesOut().finally(() => {
+        _pushing['classes'] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushSettings(cid) {
       const key = 'settings_' + cid;
       if (_pushing[key]) return;
       _pushing[key] = true;
-      this._flushSettingsOut(cid).finally(() => { _pushing[key] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushSettingsOut(cid).finally(() => {
+        _pushing[key] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushSeating(cid) {
       const key = 'seating_' + cid;
       if (_pushing[key]) return;
       _pushing[key] = true;
-      this._flushSeatingOut(cid).finally(() => { _pushing[key] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushSeatingOut(cid).finally(() => {
+        _pushing[key] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushDNA(cid) {
       const key = 'dna_' + cid;
       if (_pushing[key]) return;
       _pushing[key] = true;
-      this._flushDNAOut(cid).finally(() => { _pushing[key] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushDNAOut(cid).finally(() => {
+        _pushing[key] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
     _immediateFlushAppState() {
       if (_pushing['app_state']) return;
       _pushing['app_state'] = true;
-      this._flushAppStateOut().finally(() => { _pushing['app_state'] = false; });
+      SYNC_STATE.syncing = true; _updateSyncIndicator();
+      this._flushAppStateOut().finally(() => {
+        _pushing['app_state'] = false;
+        SYNC_STATE.syncing = false; SYNC_STATE.lastSync = Date.now(); _updateSyncIndicator();
+      });
     },
 
     // ── STUDENTS ─────────────────────────────────────────────────────────────
@@ -12452,7 +12643,10 @@ const DataService = (() => {
     },
     async _pushStudentsNow(cid, students) {
       const client = _getClient(); if (!client) throw new Error('No client');
-      const rows = (students||[]).map(s => ({ id:String(s.id), class_id:cid, data:s, updated_at:Date.now() }));
+      const rows = (students||[]).map(s => ({
+        id: String(s.id), class_id: cid, data: s,
+        updated_at: Date.now(), device_id: DEVICE_ID,   // STEP 3
+      }));
       if (!rows.length) return;
       const res = await client.from('students').upsert(rows, { onConflict:'id' });
       if (res.error) throw res.error;
@@ -12468,7 +12662,10 @@ const DataService = (() => {
     },
     async _pushBehaviorsNow(cid, events) {
       const client = _getClient(); if (!client) throw new Error('No client');
-      const rows = (events||[]).map(ev => ({ id:String(ev.id), class_id:cid, data:ev, updated_at:Date.now() }));
+      const rows = (events||[]).map(ev => ({
+        id: String(ev.id), class_id: cid, data: ev,
+        updated_at: Date.now(), device_id: DEVICE_ID,   // STEP 3
+      }));
       if (!rows.length) return;
       const res = await client.from('behaviors').upsert(rows, { onConflict:'id' });
       if (res.error) throw res.error;
@@ -12500,27 +12697,49 @@ const DataService = (() => {
         ]);
         if (stRes.error) throw stRes.error;
         if (beRes.error) throw beRes.error;
-        const remoteStudents = (stRes.data||[]).map(r=>r.data).filter(Boolean);
-        const remoteEvents   = (beRes.data||[]).map(r=>r.data).filter(Boolean);
+
+        // Build remote records with their updated_at for conflict resolution
+        const remoteStudents = (stRes.data||[]).map(r => ({ ...r.data, _remote_ts: r.updated_at })).filter(r => r.id);
+        const remoteEvents   = (beRes.data||[]).map(r => ({ ...r.data, _remote_ts: r.updated_at })).filter(r => r.id);
+
         if (!remoteStudents.length && !remoteEvents.length) {
           try { const local = JSON.parse(localStorage.getItem(_studentsKey(cid))||'[]'); if (Array.isArray(local)&&local.length) return; } catch (_) {}
         }
         const _normName = n => (n||'').trim().toLowerCase().replace(/\s+/g,' ');
+
+        // STEP 7: Merge with timestamp-based conflict resolution (newest wins)
         const mergeById = (remote, localRaw, isStudents) => {
           try {
             const local = JSON.parse(localRaw||'[]');
-            const remoteMap   = new Map(remote.map(r=>[String(r.id),r]));
-            const remoteNames = isStudents ? new Set(remote.filter(r=>!r.deleted).map(r=>_normName(r.name))) : null;
-            const merged = [...remote];
-            for (const localRec of (Array.isArray(local)?local:[])) {
-              const id = String(localRec.id);
-              if (remoteMap.has(id)) continue;
-              if (isStudents && !localRec.deleted && remoteNames && remoteNames.has(_normName(localRec.name))) continue;
-              merged.push(localRec);
-            }
+            const remoteMap   = new Map(remote.map(r=>[String(r.id), r]));
+            const remoteNames = isStudents
+              ? new Set(remote.filter(r=>!r.deleted).map(r=>_normName(r.name))) : null;
+            // Start with local records
+            const localMap = new Map((Array.isArray(local)?local:[]).map(r=>[String(r.id), r]));
+            const merged = [];
             const seen = new Set();
-            return merged.filter(r => { const k=String(r.id); if(seen.has(k)) return false; seen.add(k); return true; });
-          } catch (_) { return remote; }
+            // Merge: newest timestamp wins for same ID
+            const allIds = new Set([...remoteMap.keys(), ...localMap.keys()]);
+            for (const id of allIds) {
+              if (seen.has(id)) continue; seen.add(id);
+              const rem = remoteMap.get(id);
+              const loc = localMap.get(id);
+              if (rem && loc) {
+                // Both exist — newest wins
+                const remTs = rem._remote_ts || 0;
+                const locTs = loc._lastModified || loc.joinedAt ? new Date(loc.joinedAt||0).getTime() : 0;
+                merged.push(remTs >= locTs ? rem : loc);
+              } else if (rem) {
+                merged.push(rem);
+              } else if (loc) {
+                // Local-only — skip if same name already in remote (dedup)
+                if (isStudents && !loc.deleted && remoteNames && remoteNames.has(_normName(loc.name))) continue;
+                merged.push(loc);
+              }
+            }
+            // Strip internal _remote_ts before saving
+            return merged.map(r => { const c = {...r}; delete c._remote_ts; return c; });
+          } catch (_) { return remote.map(r => { const c={...r}; delete c._remote_ts; return c; }); }
         };
         const mergedStudents = mergeById(remoteStudents, localStorage.getItem(_studentsKey(cid)), true);
         const mergedEvents   = mergeById(remoteEvents,   localStorage.getItem(_eventsKey(cid)),   false);
@@ -12703,6 +12922,93 @@ const DataService = (() => {
   return DS;
 })();
 
+// ── STEP 4: 5-second flush interval (runs after DataService is ready) ───────
+// Also runs on visibilitychange (tab focus) for instant sync on resume
+(function _initFlushInterval(){
+  setInterval(() => {
+    if (typeof DataService !== 'undefined' && navigator.onLine)
+      DataService.flushOfflineQueue().catch(()=>{});
+  }, 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && typeof DataService !== 'undefined')
+      DataService.flushOfflineQueue().catch(()=>{});
+  });
+})();
+
+// ── STEP 6: applyRemoteChange — update localStorage + UI instantly ───────────
+function applyRemoteChange(payload) {
+  // DO NOT re-add to syncQueue — this comes from another device
+  const { table, eventType, new: newRow, old: oldRow } = payload;
+  try {
+    const cid = (newRow || oldRow || {}).class_id || null;
+    if (!cid && table !== 'app_state' && table !== 'classes') return;
+
+    if (table === 'students' && cid) {
+      const key = 'ep_students_' + cid;
+      let arr = [];
+      try { arr = JSON.parse(localStorage.getItem(key)||'[]'); } catch(_){}
+      if (eventType === 'DELETE') {
+        const delId = String((oldRow||{}).id||'');
+        arr = arr.filter(s => String(s.id) !== delId);
+      } else {
+        const data = (newRow||{}).data;
+        if (!data) return;
+        const idx = arr.findIndex(s => String(s.id) === String(data.id));
+        if (idx >= 0) arr[idx] = data; else arr.push(data);
+      }
+      localStorage.setItem(key, JSON.stringify(arr));
+      try { StorageManager.invAll(); StudentManager.inv(); EventCache.invalidate(); Analytics.invalidate(); } catch(_){}
+      try { UI._refreshHeaderStats(); UI._renderDashStats(); } catch(_){}
+      try { UI.renderStudents(); } catch(_){}
+      try { UI._renderStudentQuickGrid(); } catch(_){}
+      try { UI.renderInsights(); } catch(_){}
+    }
+
+    if (table === 'behaviors' && cid) {
+      const key = 'ep_events_' + cid;
+      let arr = [];
+      try { arr = JSON.parse(localStorage.getItem(key)||'[]'); } catch(_){}
+      if (eventType === 'DELETE') {
+        const delId = String((oldRow||{}).id||'');
+        arr = arr.filter(e => String(e.id) !== delId);
+      } else {
+        const data = (newRow||{}).data;
+        if (!data) return;
+        const idx = arr.findIndex(e => String(e.id) === String(data.id));
+        if (idx >= 0) arr[idx] = data; else arr.push(data);
+      }
+      localStorage.setItem(key, JSON.stringify(arr));
+      try { EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate(); } catch(_){}
+      try { UI._renderActivityFeed(); UI._refreshHeaderStats(); } catch(_){}
+      try { QuestEngine.render(); } catch(_){}
+    }
+
+    if (table === 'classes') {
+      DataService.pullClasses().then(() => {
+        try { ClassManager.init(); ClassManager._renderSwitcher(); } catch(_){}
+      }).catch(()=>{});
+    }
+
+    if (table === 'settings' && cid) {
+      DataService.pullSettings(cid).catch(()=>{});
+    }
+
+    if (table === 'seating' && cid) {
+      DataService.pullSeating(cid).then(() => {
+        try { SeatingChart.render(); } catch(_){}
+      }).catch(()=>{});
+    }
+
+    if (table === 'dna' && cid) {
+      DataService.pullDNA(cid).catch(()=>{});
+    }
+
+    if (table === 'app_state') {
+      DataService.pullAppState().catch(()=>{});
+    }
+  } catch(e) { console.warn('[applyRemoteChange]', e); }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // REALTIME SERVICE — Supabase Realtime WebSocket channel (v2 — merged)
 // One persistent channel 'edupulse-sync' listens to postgres_changes on both
@@ -12710,6 +13016,11 @@ const DataService = (() => {
 // ═══════════════════════════════════════════════════════════════════════════════
 const RealtimeService = (() => {
   'use strict';
+
+  // Shared device ID for filtering own changes
+  function _myDeviceId() {
+    return localStorage.getItem('ep_device_id') || '';
+  }
 
   const RS = {
     _channel: null,
@@ -12731,61 +13042,40 @@ const RealtimeService = (() => {
 
       const channelName = 'edupulse-sync-' + cid;
 
+      // STEP 5: Helper — ignore changes pushed by this device, apply others instantly
+      const _handle = (table, payload) => {
+        // Filter out own-device changes (we already applied them locally)
+        const senderDevice = (payload.new || payload.old || {}).device_id;
+        if (senderDevice && senderDevice === _myDeviceId()) return;
+        // STEP 6: Apply remote change to localStorage + UI instantly
+        applyRemoteChange({ table, eventType: payload.eventType, new: payload.new, old: payload.old });
+        // Also schedule a full refresh for consistency
+        if (onDatabaseChange) onDatabaseChange({ table, payload });
+      };
+
       const ch = client
         .channel(channelName)
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'students',
-              filter: 'class_id=eq.' + cid },
-            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'students', payload }); })
+            { event: '*', schema: 'public', table: 'students', filter: 'class_id=eq.' + cid },
+            payload => _handle('students', payload))
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'behaviors',
-              filter: 'class_id=eq.' + cid },
-            payload => { if (onDatabaseChange) onDatabaseChange({ table: 'behaviors', payload }); })
-        // Classes table — any class change on any device re-syncs the class list
+            { event: '*', schema: 'public', table: 'behaviors', filter: 'class_id=eq.' + cid },
+            payload => _handle('behaviors', payload))
         .on('postgres_changes',
             { event: '*', schema: 'public', table: 'classes' },
-            payload => {
-              if (typeof DataService !== 'undefined') {
-                DataService.pullClasses().then(() => {
-                  try { ClassManager.init(); } catch (e) {}
-                  try { ClassManager._renderSwitcher(); } catch (e) {}
-                }).catch(() => {});
-              }
-            })
-        // Settings — re-pull when any device saves settings for this class
+            payload => _handle('classes', payload))
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'settings',
-              filter: 'id=eq.' + cid },
-            () => {
-              if (typeof DataService !== 'undefined')
-                DataService.pullSettings(cid).catch(() => {});
-            })
-        // Seating — re-pull when seating layout changes on any device
+            { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.' + cid },
+            payload => _handle('settings', payload))
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'seating',
-              filter: 'id=eq.' + cid },
-            () => {
-              if (typeof DataService !== 'undefined')
-                DataService.pullSeating(cid).then(() => {
-                  try { if (typeof SeatingChart !== 'undefined') SeatingChart.render(); } catch (e) {}
-                }).catch(() => {});
-            })
-        // DNA — re-pull AI profiles when they update on any device
+            { event: '*', schema: 'public', table: 'seating', filter: 'id=eq.' + cid },
+            payload => _handle('seating', payload))
         .on('postgres_changes',
-            { event: '*', schema: 'public', table: 'dna',
-              filter: 'class_id=eq.' + cid },
-            () => {
-              if (typeof DataService !== 'undefined') {
-                DataService.pullDNA(cid).catch(() => {});
-              }
-            })
-        // App state — lesson mode, theme, quest, moods, reflections etc.
+            { event: '*', schema: 'public', table: 'dna', filter: 'class_id=eq.' + cid },
+            payload => _handle('dna', payload))
         .on('postgres_changes',
             { event: '*', schema: 'public', table: 'app_state' },
-            () => {
-              if (typeof DataService !== 'undefined')
-                DataService.pullAppState().catch(() => {});
-            })
+            payload => _handle('app_state', payload))
         .subscribe(status => {
           if (typeof EduPulseSyncBrain !== 'undefined' &&
               typeof EduPulseSyncBrain._onChannelStatus === 'function') {
@@ -12843,9 +13133,10 @@ const EduPulseSyncBrain = (() => {
   function _canUseRealtime() {
     try {
       const proto = location.protocol;
-      if (proto === 'file:')       return false;
-      if (proto === 'capacitor:')  return false;  // Capacitor v3+ uses capacitor://
-      // Capacitor v2 serves from http://localhost — that IS fine for WebSocket
+      if (proto === 'file:') return false;
+      // Capacitor uses capacitor:// BUT Supabase JS handles WebSocket internally
+      // via its own fetch/XHR — Realtime WORKS on Capacitor
+      // Only block on raw file:// (no server at all)
       return true;
     } catch (e) { return false; }
   }
@@ -13152,6 +13443,8 @@ const EduPulseSyncBrain = (() => {
         if (typeof DataService === 'undefined') return;
         const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : null;
         if (!cid) return;
+        // STEP 4: Also flush any pending queue on each heartbeat
+        DataService.flushOfflineQueue().catch(() => {});
         Promise.all([
           DataService.pullClassData(cid),
           DataService.pullClasses().catch(() => {}),
@@ -13164,6 +13457,12 @@ const EduPulseSyncBrain = (() => {
             _invalidateCaches();
             _refreshAllUI();
             try { ClassManager._renderSwitcher(); } catch (e) {}
+            // STEP 8: Update sync indicator after successful heartbeat pull
+            try {
+              if (typeof SYNC_STATE !== 'undefined') {
+                SYNC_STATE.lastSync = Date.now();
+              }
+            } catch (_) {}
           })
           .catch(() => {});
       }, 30_000);
@@ -14070,40 +14369,41 @@ const StudentDNA = {
   _KEY_PREFIX: 'ep_dna_',
 
   // -─ Mapping from behavior ID → axis deltas ───────────────────────────────
-  // [focus, participation, disruption, consistency_boost]
+  // [focus, participation, disruption, consistency, initiative, social_influence]
   _BEHAVIOR_MAP: {
     // ── Original behaviors ────────────────────────────────────────────
-    participation:   [+4, +7,  0,  +2],
-    teamwork:        [+2, +5,  0,  +3],
-    helping:         [+2, +6,  0,  +3],
-    homework:        [+5, +2,  0,  +5],
-    leadership:      [+3, +8, -2,  +4],
-    creativity:      [+4, +5,  0,  +2],
-    respectful:      [+3, +3, -3,  +4],
-    disruption:      [-5, -2, +9,  -5],
-    phone_use:       [-4, -1, +5,  -4],
-    disrespect:      [-4, -3, +8,  -6],
-    no_homework:     [-3, -2, +3,  -7],
-    off_task:        [-6, -4, +4,  -4],
+    participation:   [+4, +7,  0,  +2,  +3,  +2],
+    teamwork:        [+2, +5,  0,  +3,  +2,  +5],
+    helping:         [+2, +6,  0,  +3,  +3,  +6],
+    homework:        [+5, +2,  0,  +5,  +4,   0],
+    leadership:      [+3, +8, -2,  +4,  +7,  +8],
+    creativity:      [+4, +5,  0,  +2,  +6,  +2],
+    respectful:      [+3, +3, -3,  +4,  +1,  +3],
+    disruption:      [-5, -2, +9,  -5,  -2,  -4],
+    phone_use:       [-4, -1, +5,  -4,  -3,   0],
+    disrespect:      [-4, -3, +8,  -6,  -2,  -6],
+    no_homework:     [-3, -2, +3,  -7,  -4,   0],
+    off_task:        [-6, -4, +4,  -4,  -5,   0],
     // ── New ELT behaviors ─────────────────────────────────────────────
-    // [focus, participation, disruption, consistency]
-    great_answer:    [+3, +6,  0,  +2],   // engaged, vocal — focus & participation boost
-    on_task:         [+6, +2, -2,  +4],   // focused, quiet — high focus + consistency
-    extra_effort:    [+5, +3,  0,  +5],   // academic drive — focus & consistency
-    improvement:     [+4, +4, -1,  +6],   // positive momentum — all axes improve
-    kind_act:        [+1, +5, -3,  +3],   // prosocial — participation & lower disruption
-    good_question:   [+5, +7,  0,  +2],   // curiosity — focus & participation
-    volunteer:       [+2, +8, -2,  +3],   // high participation, less disruptive
-    conflict:        [-3, -2, +8,  -5],   // conduct issue — spikes disruption
-    bullying:        [-2, -1,+12,  -8],   // severe conduct — max disruption penalty
-    sleeping:        [-7, -5, +2,  -6],   // disengaged — tanks focus & participation
-    absent:          [-5, -8,  0,  -8],   // missed class — participation & consistency hit
-    incomplete:      [-4, -2, +1,  -7],   // academic failure — consistency tanks
-    late:            [-2, -3, +2,  -3],   // mild disruption on arrival
-    dishonesty:      [-3, -1, +7,  -9],   // integrity breach — disruption + consistency
+    great_answer:    [+3, +6,  0,  +2,  +4,  +3],
+    on_task:         [+6, +2, -2,  +4,  +3,   0],
+    extra_effort:    [+5, +3,  0,  +5,  +6,  +1],
+    improvement:     [+4, +4, -1,  +6,  +5,  +2],
+    kind_act:        [+1, +5, -3,  +3,  +2,  +7],
+    good_question:   [+5, +7,  0,  +2,  +8,  +3],
+    volunteer:       [+2, +8, -2,  +3,  +9,  +5],
+    conflict:        [-3, -2, +8,  -5,  -1,  -5],
+    bullying:        [-2, -1,+12,  -8,   0,  -9],
+    sleeping:        [-7, -5, +2,  -6,  -6,   0],
+    absent:          [-5, -8,  0,  -8,  -5,  -3],
+    incomplete:      [-4, -2, +1,  -7,  -4,   0],
+    late:            [-2, -3, +2,  -3,  -2,   0],
+    stationery_missing:[-1,-1,+1,  -2,  -2,   0],
+    dishonesty:      [-3, -1, +7,  -9,  -2,  -4],
   },
 
-  _DEFAULT: { focus:50, participation:50, disruption:10, consistency:50, lastComputed:0 },
+  // 6 axes total — initiative + social_influence added (Part 4)
+  _DEFAULT: { focus:50, participation:50, disruption:10, consistency:50, initiative:50, social_influence:50, lastComputed:0 },
 
   // ── Load/save ─────────────────────────────────────────────────────────────
   _load(studentId){
@@ -14138,10 +14438,13 @@ const StudentDNA = {
     const deltas  = this._BEHAVIOR_MAP[event.behaviorId] || [0, 0, 0, 0];
     const weights = LessonMode.getWeights();
 
-    // Apply weighted deltas
-    profile.focus         = this._clamp(profile.focus         + deltas[0] * weights.focus);
-    profile.participation = this._clamp(profile.participation + deltas[1] * weights.participation);
-    profile.disruption    = this._clamp(profile.disruption    + deltas[2] * weights.disruption);
+    // Apply weighted deltas — 6 axes
+    profile.focus             = this._clamp(profile.focus             + deltas[0] * weights.focus);
+    profile.participation     = this._clamp(profile.participation     + deltas[1] * weights.participation);
+    profile.disruption        = this._clamp(profile.disruption        + deltas[2] * weights.disruption);
+    // Initiative and social_influence use participation weight as proxy
+    profile.initiative        = this._clamp((profile.initiative        || 50) + (deltas[4] || 0) * weights.participation);
+    profile.social_influence  = this._clamp((profile.social_influence  || 50) + (deltas[5] || 0) * weights.participation);
 
     // Consistency: time-based stability + event impact
     // Each event slightly regresses toward 50; good streaks keep it high
@@ -14719,18 +15022,23 @@ const AIView = {
         </div>
       </div>
 
+      <!-- Playstyle Profile (PART 1) -->
+      ${(()=>{ try{ return StudentProfileEngine.renderBadge(studentId); }catch(_){ return ''; } })()}
+
       <!-- Radar chart -->
       <div class="dna-radar-wrap">
         <canvas id="dna-radar-canvas"></canvas>
       </div>
 
-      <!-- DNA Metric cards -->
+      <!-- DNA Metric cards — 6 axes -->
       <div class="dna-grid">
         ${[
-          { key:'focus',         label:'Focus',         icon:'🎯', color:'var(--accent)', val:Math.round(dna.focus) },
-          { key:'participation', label:'Participation', icon:'✋', color:'var(--green)', val:Math.round(dna.participation) },
-          { key:'disruption',    label:'Disruption',    icon:'⚠️', color:'var(--red)', val:Math.round(dna.disruption) },
-          { key:'consistency',   label:'Consistency',   icon:'📊', color:'var(--purple)', val:Math.round(dna.consistency) },
+          { key:'focus',            label:'Focus',            icon:'🎯', color:'var(--accent)', val:Math.round(dna.focus) },
+          { key:'participation',    label:'Participation',    icon:'✋', color:'var(--green)', val:Math.round(dna.participation) },
+          { key:'disruption',       label:'Disruption',       icon:'⚠️', color:'var(--red)', val:Math.round(dna.disruption) },
+          { key:'consistency',      label:'Consistency',      icon:'📊', color:'var(--purple)', val:Math.round(dna.consistency) },
+          { key:'initiative',       label:'Initiative',       icon:'🚀', color:'var(--orange)', val:Math.round(dna.initiative||50) },
+          { key:'social_influence', label:'Social Influence', icon:'🤝', color:'var(--cyan)', val:Math.round(dna.social_influence||50) },
         ].map(m=>`
           <div class="dna-metric">
             <div class="dm-val" style="color:${m.color}">${m.val}</div>
@@ -14774,13 +15082,22 @@ const AIView = {
     const ctx = document.getElementById('dna-radar-canvas');
     if(!ctx || typeof Chart === 'undefined') return;
     if(this._radarChart) this._radarChart.destroy();
+    // Auto-scale: build axis list from whatever traits exist in dna
+    const axes = [
+      { label:'Focus',            val: dna.focus            || 50 },
+      { label:'Participation',    val: dna.participation    || 50 },
+      { label:'Disruption',       val: dna.disruption       || 10 },
+      { label:'Consistency',      val: dna.consistency      || 50 },
+      { label:'Initiative',       val: dna.initiative       || 50 },
+      { label:'Social Influence', val: dna.social_influence || 50 },
+    ];
     this._radarChart = new Chart(ctx, {
       type: 'radar',
       data:{
-        labels:['Focus','Participation','Disruption','Consistency'],
+        labels: axes.map(a => a.label),
         datasets:[{
           label:'DNA Profile',
-          data:[dna.focus, dna.participation, dna.disruption, dna.consistency],
+          data: axes.map(a => a.val),
           backgroundColor:color+'25',
           borderColor:color,
           borderWidth:2,
@@ -15957,15 +16274,15 @@ const QuestEngine = {
       <div class="quest-bar ${p.complete?'quest-complete':''}">
         <div class="quest-icon">${p.complete?'🎉':p.emoji}</div>
         <div class="quest-info">
-          <div class="quest-title">${p.label}</div>
-          <div class="quest-subtitle">${p.period} · ${p.current} / ${p.goal} pts</div>
+          <div class="quest-title">${typeof I18nManager!=='undefined'?I18nManager.t('Class Behavior Goal')||p.label:p.label}</div>
+          <div class="quest-subtitle">${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?(p.period==='Today'?'اليوم':'هذا الأسبوع'):p.period} · ${p.current} / ${p.goal} pts</div>
         </div>
         <div class="quest-progress-wrap">
           <div class="quest-track"><div class="quest-fill" style="width:${p.pct}%"></div></div>
-          <div class="quest-pct">${p.complete ? '🎉 Goal Reached!' : p.pct + '% complete'}</div>
+          <div class="quest-pct">${p.complete ? (typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'🎉 تم تحقيق الهدف!':'🎉 Goal Reached!') : p.pct + (typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'٪ مكتمل':'% complete')}</div>
         </div>
-        <div class="quest-pts">${p.current}<span>pts ${p.period.toLowerCase()}</span></div>
-        <button class="quest-edit-btn" onclick="QuestEngine.openEdit()">⚙ Goal</button>
+        <div class="quest-pts">${p.current}<span>pts ${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?(p.period==='Today'?'اليوم':'هذا الأسبوع'):p.period.toLowerCase()}</span></div>
+        <button class="quest-edit-btn" onclick="QuestEngine.openEdit()">${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'⚙ الهدف':'⚙ Goal'}</button>
       </div>`;
     wrap.innerHTML = bar;
     if(p.complete && !this._celebrated){
@@ -16217,7 +16534,9 @@ const SeatingChart = {
       }
       UI._showScoreFloat(btn, result.event.scoreChange);
       NotificationEngine.showUndo(`${result.event.icon} ${result.student.name}`, ()=>{
-        try{ BehaviorEngine.correct(result.event.id,'Undone'); EventCache.invalidate(); SeatingChart.render(); }catch(e){}
+        try{ BehaviorEngine.correct(result.event.id,'Undone'); EventCache.invalidate(); SeatingChart.render();
+          try{ BadgeEvaluatorV2.syncBadges(result.student?.id||result.event?.studentId); }catch(_){}
+        }catch(e){}
       });
       clearTimeout(UI._postLogTimer);
       UI._postLogTimer = setTimeout(()=>{ UI._refreshHeaderStats(); UI.renderInsights(); }, CONFIG.TIMINGS.POST_LOG);
@@ -18084,27 +18403,27 @@ const SessionReflection = {
       <div class="card" style="margin-bottom:0">
         <div class="card-header">
           <div class="card-title" style="display:flex;align-items:center;gap:8px">
-            📝 <span>Session Reflection</span>
+            📝 <span>${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'تأملات الحصة':'Session Reflection'}</span>
             <span style="font-size:10px;color:var(--text-muted);font-weight:400">
-              — Post-lesson notes
+              — ${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'ملاحظات ما بعد الدرس':'Post-lesson notes'}
             </span>
           </div>
           ${records.length > 3 ? `
             <button class="btn btn-ghost btn-xs" onclick="SessionReflection.openHistory()"
               data-tip="View all past reflection notes">
-              All (${records.length})
+              ${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'الكل':'All'} (${records.length})
             </button>` : ''}
         </div>
         <div class="card-body" style="padding-top:8px">
           <!-- Write area -->
           <div style="display:flex;gap:8px;margin-bottom:${latest.length?'12px':'0'}">
             <textarea id="sr-input" class="input"
-              placeholder="Write your reflection… What worked? What changed? What do you want to remember?"" 
+              placeholder="${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'اكتب تأملك… ما الذي نجح؟ ما الذي تغيّر؟':'Write your reflection… What worked? What changed?'}"
               style="flex:1;height:60px;resize:none;font-size:12px;line-height:1.5"
               onkeydown="if(event.ctrlKey&&event.key==='Enter') SessionReflection._submit()"></textarea>
             <button class="btn btn-primary btn-sm" style="align-self:flex-end;flex-shrink:0"
               onclick="SessionReflection._submit()" data-tip="Ctrl+Enter to save quickly">
-              💾 Save
+              💾 ${typeof I18nManager!=='undefined'&&I18nManager.isArabic()?'حفظ':'Save'}
             </button>
           </div>
           <!-- Last 3 notes -->
@@ -18323,6 +18642,11 @@ const StudentCard = {
     const sets   = StorageManager.getSettings();
     const evs    = BehaviorEngine.getStudentEvents(studentId);
 
+    // Playstyle (PART 1)
+    const playstyleHtml = (() => {
+      try { return StudentProfileEngine.renderBadge(studentId); } catch (_) { return ''; }
+    })();
+
     // Badges
     const badgeHtml = (st.badges || []).slice(0, 8).map(id => {
       const b = CONFIG.BADGE_DEFS?.find(x => x.id === id);
@@ -18456,6 +18780,15 @@ const StudentCard = {
           ${chartHtml}
         </div>
       </div>
+
+      ${playstyleHtml ? `
+      <!-- Playstyle Profile (PART 1) -->
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);
+           border-radius:var(--radius-md);padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+             color:var(--text-muted);margin-bottom:4px">🧠 Learning Playstyle</div>
+        ${playstyleHtml}
+      </div>` : ''}
 
       ${badgeHtml ? `
       <!-- Badges -->
@@ -21934,6 +22267,1534 @@ self.addEventListener('fetch',e=>{
   },
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PART 1 — STUDENT PLAYSTYLE PROFILE SYSTEM
+// Derives tactical playstyle from accumulated behavior signals.
+// Incremental updates only — never scans all students.
+// ═══════════════════════════════════════════════════════════════════════════════
+const StudentProfileEngine = (() => {
+  'use strict';
+
+  const KEY_PREFIX = 'ep_playstyle_';
+  const DIRTY = {};   // { studentId: true } — needs recompute
+
+  // Playstyle signal weights: each row = [participation, disruption, leadership,
+  //   consistency, social, academic, initiative, response_speed]
+  const PLAYSTYLE_WEIGHTS = {
+    Engine:        [6, -3,  4,  6,  2,  4,  5,  3],
+    Orchestrator:  [5,  0,  8,  5,  7,  3,  4,  2],
+    Destroyer:     [-3, 9, -2, -4, -2, -3, -1, -1],
+    ShadowLearner: [2, -2, -1,  5, -1,  7,  3,  1],
+    Sniper:        [3, -1,  2,  4,  0,  6,  7,  8],
+    Playmaker:     [7,  1,  5,  3,  8,  2,  5,  4],
+    FreeSpirit:    [4,  2,  3, -2,  3,  3,  6,  2],
+    LateStarter:   [-1, 1, -1, -3,  0,  3,  4,  5],
+    CrowdFollower: [5,  1,  1,  2,  6,  1,  1,  2],
+    SilentLeader:  [2, -2,  6,  7,  5,  5,  4,  1],
+  };
+
+  const PLAYSTYLE_META = {
+    Engine:        { icon:'⚡', desc:'High energy driver — pushes class forward' },
+    Orchestrator:  { icon:'🧩', desc:'Coordinates peers, natural team builder' },
+    Destroyer:     { icon:'💥', desc:'High disruption, needs redirection strategy' },
+    ShadowLearner: { icon:'🔍', desc:'Absorbs quietly, strong academic output' },
+    Sniper:        { icon:'🎯', desc:'Precise, fast responder — quality over quantity' },
+    Playmaker:     { icon:'🎭', desc:'Social catalyst — elevates group energy' },
+    FreeSpirit:    { icon:'🌀', desc:'Creative, unpredictable, needs autonomy' },
+    LateStarter:   { icon:'🌅', desc:'Slow warm-up, strong finish — watch early' },
+    CrowdFollower: { icon:'🌊', desc:'Context-dependent — shaped by group mood' },
+    SilentLeader:  { icon:'🧘', desc:'Leads by example, consistent quiet influence' },
+  };
+
+  function _getSignals(studentId) {
+    const evs = typeof BehaviorEngine !== 'undefined'
+      ? BehaviorEngine.getStudentEvents(studentId) : [];
+    const posEvs = evs.filter(e => e.scoreChange > 0 && !e.corrected);
+    const negEvs = evs.filter(e => e.scoreChange < 0 && !e.corrected);
+    const total  = evs.length || 1;
+
+    // [participation, disruption, leadership, consistency, social, academic, initiative, response_speed]
+    const participationScore = posEvs.filter(e =>
+      ['participation','great_answer','volunteer','good_question'].includes(e.behaviorId)).length;
+    const disruptionScore    = negEvs.filter(e =>
+      ['disruption','conflict','bullying','disrespect'].includes(e.behaviorId)).length;
+    const leadershipScore    = posEvs.filter(e =>
+      ['leadership'].includes(e.behaviorId)).length;
+    const st = typeof StudentManager !== 'undefined' ? StudentManager.getById(studentId) : null;
+    const consistencyScore   = st ? (st.streak || 0) : 0;
+    const socialScore        = posEvs.filter(e =>
+      ['teamwork','helping','kind_act','playmaker'].includes(e.behaviorId)).length;
+    const academicScore      = posEvs.filter(e =>
+      ['homework','extra_effort','improvement','on_task'].includes(e.behaviorId)).length;
+    const initiativeScore    = posEvs.filter(e =>
+      ['volunteer','good_question','extra_effort','leadership'].includes(e.behaviorId)).length;
+
+    // Response speed proxy: events logged before 10am (first period = quick starter)
+    const earlyEvs = evs.filter(e => {
+      const h = new Date(e.createdAt).getHours();
+      return h >= 7 && h <= 10;
+    }).length;
+    const speedScore = Math.min(10, earlyEvs * 2);
+
+    return [participationScore, disruptionScore, leadershipScore, consistencyScore,
+            socialScore, academicScore, initiativeScore, speedScore];
+  }
+
+  function _compute(studentId) {
+    const signals = _getSignals(studentId);
+    const scores  = {};
+
+    for (const [name, weights] of Object.entries(PLAYSTYLE_WEIGHTS)) {
+      scores[name] = weights.reduce((sum, w, i) => sum + w * (signals[i] || 0), 0);
+    }
+
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    const top    = sorted[0];
+    const second = sorted[1];
+    const total  = Math.abs(top[1]) + Math.abs(second[1]) + 1;
+    const confidence = Math.min(95, Math.round(Math.abs(top[1]) / total * 100));
+
+    return { primary: top[0], secondary: second[0], confidence };
+  }
+
+  function _cacheKey(studentId) {
+    const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
+    return KEY_PREFIX + cid + '_' + studentId;
+  }
+
+  return {
+    // Called from BehaviorEngine.log — marks student dirty, lazy recomputes
+    onBehaviorEvent(studentId) {
+      DIRTY[studentId] = true;
+    },
+
+    getPlaystyle(studentId) {
+      try {
+        const key = _cacheKey(studentId);
+        if (DIRTY[studentId]) {
+          const result = _compute(studentId);
+          try { localStorage.setItem(key, JSON.stringify(result)); } catch (_) {}
+          DIRTY[studentId] = false;
+          return result;
+        }
+        const cached = localStorage.getItem(key);
+        if (cached) return JSON.parse(cached);
+        // First time — compute and cache
+        const result = _compute(studentId);
+        try { localStorage.setItem(key, JSON.stringify(result)); } catch (_) {}
+        return result;
+      } catch (e) {
+        return { primary:'ShadowLearner', secondary:'Engine', confidence:0 };
+      }
+    },
+
+    getMeta(name) { return PLAYSTYLE_META[name] || { icon:'📋', desc:'' }; },
+
+    // Render a compact playstyle badge HTML
+    renderBadge(studentId) {
+      try {
+        const ps   = this.getPlaystyle(studentId);
+        const meta = this.getMeta(ps.primary);
+        const sec  = this.getMeta(ps.secondary);
+        return `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;
+               background:var(--bg-elevated);border:1px solid var(--border);
+               border-radius:10px;margin-top:8px">
+            <span style="font-size:20px">${meta.icon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${ps.primary}
+                <span style="font-size:10px;font-weight:400;color:var(--accent);margin-left:6px">${ps.confidence}% match</span>
+              </div>
+              <div style="font-size:10px;color:var(--text-muted)">${meta.desc}</div>
+              <div style="font-size:9px;color:var(--text-muted);margin-top:2px">
+                ${sec.icon} Secondary: ${ps.secondary}
+              </div>
+            </div>
+          </div>`;
+      } catch (e) { return ''; }
+    },
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PART 2 + 3 — BADGE EVALUATOR V2 (Progress-based, Undo-safe, Strict filtering)
+// Badges = derived state from badgeProgress — never permanently stored.
+// Undo reverses event → recomputes progress → badge disappears if below threshold.
+// ═══════════════════════════════════════════════════════════════════════════════
+const BadgeEvaluatorV2 = (() => {
+  'use strict';
+
+  // Thresholds for each badge (validated positive events only)
+  const THRESHOLDS = {
+    starter:          { type:'count_pos',     min:1  },
+    consistent:       { type:'streak',        min:5  },
+    responsible:      { type:'beh_pos',       beh:'homework',      min:5  },
+    collaborator:     { type:'cat_pos',       cat:'social',        min:6  },
+    improver:         { type:'score_delta',   min:20 },
+    leader:           { type:'beh_pos',       beh:'leadership',    min:4  },
+    excellent:        { type:'score_abs',     min:150 },
+    master_student:   { type:'tier_count',    min:7  },
+    // Legacy badges
+    team_player:      { type:'beh_pos',       beh:'teamwork',      min:5  },
+    homework_hero:    { type:'beh_pos',       beh:'homework',      min:5  },
+    respect_champ:    { type:'beh_pos',       beh:'respectful',    min:8  },
+    participation_star:{ type:'beh_pos',      beh:'participation', min:10 },
+    class_helper:     { type:'beh_pos',       beh:'helping',       min:6  },
+    born_leader:      { type:'beh_pos',       beh:'leadership',    min:4  },
+    perfect_week:     { type:'perfect_week',  min:1  },
+    century_club:     { type:'score_abs',     min:200 },
+    comeback_kid:     { type:'score_delta',   min:15 },
+    all_rounder:      { type:'all_cats',      min:1  },
+  };
+
+  function _computeProgress(badgeId, student, events) {
+    const thresh = THRESHOLDS[badgeId];
+    if (!thresh) return 0;
+
+    // STRICT: only validated positive events — negatives/neutral/corrected NEVER count
+    const posEvs = events.filter(e => e.scoreChange > 0 && !e.corrected);
+
+    switch (thresh.type) {
+      case 'count_pos':
+        return posEvs.length;
+
+      case 'streak':
+        return student.streak || 0;
+
+      case 'beh_pos':
+        return posEvs.filter(e => e.behaviorId === thresh.beh).length;
+
+      case 'cat_pos':
+        return posEvs.filter(e => {
+          const b = [...(CONFIG.BEHAVIORS.positive||[]), ...(CONFIG.BEHAVIORS.negative||[])]
+            .find(x => x.id === e.behaviorId);
+          return b && b.cat === thresh.cat;
+        }).length;
+
+      case 'score_delta': {
+        // Positive-event-driven score recovery (not raw score)
+        let run = 0, low = 0, maxRec = 0;
+        posEvs.forEach(e => {
+          run += e.scoreChange;
+          if (run < low) low = run;
+          const rec = run - low;
+          if (rec > maxRec) maxRec = rec;
+        });
+        return maxRec;
+      }
+
+      case 'score_abs':
+        // Score threshold: positive history must outnumber negative
+        if (student.score < thresh.min) return 0;
+        return posEvs.length > events.filter(e => e.scoreChange < 0 && !e.corrected).length
+          ? thresh.min : 0;
+
+      case 'perfect_week': {
+        const cut = new Date(Date.now() - 7 * 86400000).toISOString();
+        const wkEvs = events.filter(e => e.createdAt >= cut && !e.corrected);
+        return (wkEvs.length >= 3 && wkEvs.every(e => e.scoreChange > 0)) ? 1 : 0;
+      }
+
+      case 'tier_count': {
+        // Count how many tier 1-7 badges are earned (computed dynamically)
+        const tierBadges = (CONFIG.BADGE_DEFS||[]).filter(b => b.tier >= 1 && b.tier <= 7);
+        return tierBadges.filter(b => {
+          const prog = _computeProgress(b.id, student, events);
+          const th   = THRESHOLDS[b.id];
+          return th && prog >= th.min;
+        }).length;
+      }
+
+      case 'all_cats': {
+        const cats = new Set(posEvs.map(e => {
+          const b = (CONFIG.BEHAVIORS.positive||[]).find(x => x.id === e.behaviorId);
+          return b ? b.cat : null;
+        }).filter(Boolean));
+        return cats.size >= 4 ? 1 : 0;
+      }
+
+      default: return 0;
+    }
+  }
+
+  return {
+    // Evaluate all badges for a student — returns array of earned badge IDs
+    // This is PURE computed state — no side effects
+    evaluate(student, events) {
+      const earned = [];
+      for (const bd of (CONFIG.BADGE_DEFS || [])) {
+        const thresh = THRESHOLDS[bd.id];
+        if (!thresh) continue;
+        const progress = _computeProgress(bd.id, student, events);
+        if (progress >= thresh.min) earned.push(bd.id);
+      }
+      return earned;
+    },
+
+    // Get progress percentage toward a badge (0-100)
+    getProgress(badgeId, student, events) {
+      const thresh = THRESHOLDS[badgeId];
+      if (!thresh) return 0;
+      const raw = _computeProgress(badgeId, student, events);
+      return Math.min(100, Math.round(raw / thresh.min * 100));
+    },
+
+    // Sync earned badges back to student.badges (derived state reconciliation)
+    // Called after every behavior log AND after every undo
+    syncBadges(studentId) {
+      try {
+        const student = typeof StudentManager !== 'undefined'
+          ? StudentManager.getById(studentId) : null;
+        if (!student) return;
+        const events  = typeof BehaviorEngine !== 'undefined'
+          ? BehaviorEngine.getStudentEvents(studentId) : [];
+        const newBadges = this.evaluate(student, events);
+        const old = student.badges || [];
+
+        // Notify new unlocks
+        newBadges.forEach(id => {
+          if (!old.includes(id)) {
+            const bd = (CONFIG.BADGE_DEFS||[]).find(b=>b.id===id);
+            if (bd) NotificationEngine.badge(bd.name, bd.icon);
+          }
+        });
+
+        // Update student.badges to current computed state (undo-safe)
+        if (JSON.stringify(newBadges.sort()) !== JSON.stringify([...old].sort())) {
+          StudentManager.update(studentId, { badges: newBadges });
+          try { InsightEngine.invalidate(); } catch (_) {}
+        }
+      } catch (e) {
+        console.warn('[BadgeEvaluatorV2] syncBadges error', e);
+      }
+    },
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PART 5 — I18n MANAGER (Professional Arabic / English localization)
+// Runtime switching — zero reload — fallback to English on missing keys
+// ═══════════════════════════════════════════════════════════════════════════════
+const I18nManager = (() => {
+  'use strict';
+  const LANG_KEY = 'ep_lang';
+
+  // ── Full translation dictionary ───────────────────────────────────────────
+  const DICT = {
+    en: {
+      nav_dashboard:'Dashboard', nav_students:'Students', nav_analytics:'Analytics',
+      nav_leaderboard:'Leaderboard', nav_reports:'Reports', nav_ai:'AI Engine',
+      nav_coldcall:'Cold Call', nav_settings:'Settings', nav_reset:'Reset Class',
+      nav_seating:'Seating', nav_home:'Home', nav_ai_short:'AI', nav_seats:'Seats',
+      nav_section:'Navigation', tools_section:'Tools', my_classes:'My Classes',
+      add_new_class:'Add New Class',
+      screen_dashboard:'Dashboard', screen_students:'Students',
+      screen_analytics:'Analytics', screen_leaderboard:'Leaderboard',
+      screen_reports:'Reports', screen_ai:'AI Intelligence',
+      screen_settings:'Settings', screen_seating:'Seating Chart',
+      total_students:'Total Students', class_avg:'Class Average',
+      at_risk:'At Risk', today_events:"Today's Events",
+      select_student:'Select a Student',
+      positive_behaviors:'Positive Behaviors', negative_behaviors:'Negative Behaviors',
+      recent_events:'Recent', add_note:'Add a note…',
+      add_student:'Add Student', save:'Save', cancel:'Cancel', delete:'Delete',
+      close:'Close', edit:'Edit', undo:'Undo', restore:'Restore',
+      export:'Export', import:'Import', report:'Report', whatsapp:'WhatsApp',
+      log_behavior:'Log Behavior', interventions:'Interventions',
+      section_appearance:'🌗 Appearance', section_school_info:'School & Teacher Info',
+      section_behavior_config:'Behavior Score Configuration',
+      section_data_mgmt:'Data Management', section_cloud_sync:'☁️ Cloud Sync (Supabase)',
+      theme:'Theme', language:'Language', school_name:'School Name',
+      teacher_name:'Teacher Name', class_name:'Class Name', academic_year:'Academic Year',
+      save_settings:'Save Settings',
+      focus:'Focus', participation:'Participation', disruption:'Disruption',
+      consistency:'Consistency', initiative:'Initiative', social_influence:'Social Influence',
+      dna_state:'State', dna_risk:'Risk', dna_score:'Score', dna_streak:'Streak',
+      dna_suggestions:'Suggested Actions', dna_stable:'Stable', dna_warning:'Warning',
+      dna_escalating:'Escalating',
+      ps_Engine:'Engine', ps_Orchestrator:'Orchestrator', ps_Destroyer:'Destroyer',
+      ps_ShadowLearner:'Shadow Learner', ps_Sniper:'Sniper', ps_Playmaker:'Playmaker',
+      ps_FreeSpirit:'Free Spirit', ps_LateStarter:'Late Starter',
+      ps_CrowdFollower:'Crowd Follower', ps_SilentLeader:'Silent Leader',
+      ps_label:'Learning Playstyle', ps_match:'% match', ps_secondary:'Secondary:',
+      badge_starter:'Starter', badge_consistent:'Consistency',
+      badge_responsible:'Responsibility', badge_collaborator:'Collaboration',
+      badge_improver:'Improvement', badge_leader:'Leadership',
+      badge_excellent:'Excellence', badge_master:'Master Student',
+      badges_title:'Badges & Achievements',
+      lb_alltime:'All Time', lb_weekly:'This Week', lb_rank:'Rank',
+      lb_score:'Score', lb_streak:'Streak', lb_badges:'Badges',
+      an_pos_ratio:'Positive Ratio', an_trend:'Trend',
+      an_improving:'Improving', an_declining:'Declining', an_stable:'Stable',
+      rpt_full_class:'Full Class Report', rpt_individual:'Individual Report',
+      rpt_pdf:'Generate PDF', rpt_csv:'Export CSV',
+      lesson_general:'General', lesson_speaking:'Speaking',
+      lesson_reading:'Reading', lesson_group:'Group Work', lesson_test:'Test / Exam',
+      risk_none:'On Track', risk_low:'Watch', risk_medium:'Needs Attention',
+      risk_high:'Needs Support',
+      class_focused:'Class is Focused', class_calm:'Class is Calm',
+      class_energetic:'Class is Energetic', class_distracted:'Class is Distracted',
+      class_restless:'Class is Restless',
+      synced:'Synced', offline:'Offline',
+      search_placeholder:'Search students…',
+      no_students:'No students yet. Add your first student to get started.',
+      parent_phone:'Parent Phone', seating_auto:'Auto-Assign',
+      seating_cols:'Columns:', seating_clear:'Clear Layout',
+      teacher_label:'Teacher', classroom_label:'Classroom',
+      attention_needed:'Attention Needed', class_insights:'Class Insights',
+    },
+    ar: {
+      nav_dashboard:'لوحة التحكم', nav_students:'الطلاب', nav_analytics:'التحليلات',
+      nav_leaderboard:'قائمة الشرف', nav_reports:'التقارير', nav_ai:'الذكاء الاصطناعي',
+      nav_coldcall:'اختيار عشوائي', nav_settings:'الإعدادات', nav_reset:'إعادة تعيين',
+      nav_seating:'الجلوس', nav_home:'الرئيسية', nav_ai_short:'الذكاء', nav_seats:'الجلوس',
+      nav_section:'التنقل', tools_section:'الأدوات', my_classes:'فصولي',
+      add_new_class:'إضافة فصل جديد',
+      screen_dashboard:'لوحة التحكم', screen_students:'الطلاب',
+      screen_analytics:'التحليلات', screen_leaderboard:'قائمة الشرف',
+      screen_reports:'التقارير', screen_ai:'الذكاء الاصطناعي',
+      screen_settings:'الإعدادات', screen_seating:'خريطة الجلوس',
+      total_students:'إجمالي الطلاب', class_avg:'متوسط الصف',
+      at_risk:'يحتاج متابعة', today_events:'أحداث اليوم',
+      select_student:'اختر طالباً',
+      positive_behaviors:'السلوكيات الإيجابية', negative_behaviors:'السلوكيات السلبية',
+      recent_events:'الأحداث الأخيرة', add_note:'أضف ملاحظة…',
+      add_student:'إضافة طالب', save:'حفظ', cancel:'إلغاء', delete:'حذف',
+      close:'إغلاق', edit:'تعديل', undo:'تراجع', restore:'استعادة',
+      export:'تصدير', import:'استيراد', report:'تقرير', whatsapp:'واتساب',
+      log_behavior:'تسجيل سلوك', interventions:'التدخلات',
+      section_appearance:'🌗 المظهر', section_school_info:'معلومات المدرسة والمعلم',
+      section_behavior_config:'إعداد نقاط السلوك',
+      section_data_mgmt:'إدارة البيانات', section_cloud_sync:'☁️ المزامنة السحابية',
+      theme:'المظهر', language:'اللغة', school_name:'اسم المدرسة',
+      teacher_name:'اسم المعلم', class_name:'اسم الفصل', academic_year:'العام الدراسي',
+      save_settings:'حفظ الإعدادات',
+      focus:'التركيز', participation:'المشاركة', disruption:'الإزعاج',
+      consistency:'الانتظام', initiative:'المبادرة', social_influence:'التأثير الاجتماعي',
+      dna_state:'الحالة', dna_risk:'مستوى الخطر', dna_score:'النقاط',
+      dna_streak:'السلسلة', dna_suggestions:'الإجراءات المقترحة',
+      dna_stable:'مستقر', dna_warning:'تحذير', dna_escalating:'متصاعد',
+      ps_Engine:'المحرك', ps_Orchestrator:'المنسق', ps_Destroyer:'المشاغب',
+      ps_ShadowLearner:'المتعلم الصامت', ps_Sniper:'الدقيق', ps_Playmaker:'صانع اللعب',
+      ps_FreeSpirit:'الروح الحرة', ps_LateStarter:'المتأخر في الانطلاق',
+      ps_CrowdFollower:'تابع الجماعة', ps_SilentLeader:'القائد الصامت',
+      ps_label:'النمط التعلمي', ps_match:'٪ تطابق', ps_secondary:'النمط الثانوي:',
+      badge_starter:'المبتدئ', badge_consistent:'الانتظام',
+      badge_responsible:'المسؤولية', badge_collaborator:'التعاون',
+      badge_improver:'التحسن', badge_leader:'القيادة',
+      badge_excellent:'التميز', badge_master:'الطالب المتفوق',
+      badges_title:'شارات الإنجاز',
+      lb_alltime:'كل الأوقات', lb_weekly:'هذا الأسبوع', lb_rank:'الترتيب',
+      lb_score:'النقاط', lb_streak:'السلسلة', lb_badges:'الشارات',
+      an_pos_ratio:'نسبة الإيجابية', an_trend:'الاتجاه',
+      an_improving:'تحسن', an_declining:'تراجع', an_stable:'مستقر',
+      rpt_full_class:'تقرير الفصل كاملاً', rpt_individual:'تقرير فردي',
+      rpt_pdf:'إنشاء PDF', rpt_csv:'تصدير CSV',
+      lesson_general:'عام', lesson_speaking:'محادثة',
+      lesson_reading:'قراءة', lesson_group:'عمل جماعي', lesson_test:'اختبار',
+      risk_none:'على المسار', risk_low:'مراقبة',
+      risk_medium:'يحتاج اهتمام', risk_high:'يحتاج دعم',
+      class_focused:'الصف في حالة تركيز', class_calm:'الصف هادئ',
+      class_energetic:'الصف نشيط', class_distracted:'الصف مشتت',
+      class_restless:'الصف مضطرب',
+      synced:'تمت المزامنة', offline:'غير متصل',
+      search_placeholder:'ابحث عن طالب…',
+      no_students:'لا يوجد طلاب بعد. أضف أول طالب للبدء.',
+      parent_phone:'هاتف ولي الأمر', seating_auto:'توزيع تلقائي',
+      seating_cols:'الأعمدة:', seating_clear:'مسح الترتيب',
+      teacher_label:'المعلم', classroom_label:'الفصل الدراسي',
+      attention_needed:'يحتاج انتباهاً', class_insights:'مؤشرات الصف',
+    },
+  };
+
+  // ── Phrase map: replaces entire English phrases in rendered HTML ────────────
+  // Used by _translateDOM() for dynamic content (insights, modals, quest, etc.)
+  const PHRASES_AR = {
+    // Dashboard / insights
+    'Class Insights': 'مؤشرات الصف',
+    'Attention Needed': 'يحتاج انتباهاً',
+    'Add students and log behaviors to generate insights.': 'أضف طلاباً وسجّل السلوك لإنشاء المؤشرات.',
+    'Analysing class…': 'جارٍ تحليل الصف…',
+    'Students needing attention': 'طلاب يحتاجون متابعة',
+    'No students yet': 'لا يوجد طلاب بعد',
+    'No activity yet': 'لا يوجد نشاط بعد',
+    'Select a student to log behavior': 'اختر طالباً لتسجيل السلوك',
+    'All clear!': 'كل شيء على ما يرام!',
+    'No students are currently flagged at risk': 'لا يوجد طلاب محددون كحالات خطر حالياً',
+    'The class is in excellent standing today': 'الصف في حالة ممتازة اليوم',
+    'requires immediate attention': 'يحتاج تدخلاً فورياً',
+    'require immediate attention': 'يحتاجون تدخلاً فورياً',
+    'Review recent behavior logs and contact parents': 'راجع سجلات السلوك الأخيرة وتواصل مع أولياء الأمور',
+    'is at medium risk': 'في خطر متوسط',
+    'are at medium risk': 'في خطر متوسط',
+    'Monitor closely and provide additional support': 'راقب عن كثب وقدم دعماً إضافياً',
+    'shows strong improvement': 'يُظهر تحسناً ملحوظاً',
+    'shows a declining trend': 'يُظهر اتجاهاً تنازلياً',
+    'A brief check-in and parental communication may help': 'زيارة مختصرة والتواصل مع الأهل قد يساعد',
+    'leads the class with': 'يتصدر الفصل بـ',
+    'points and is setting a great example': 'نقطة ويضع مثالاً رائعاً للمجموعة',
+    'Class engagement is at': 'مستوى مشاركة الصف:',
+    'students are highly motivated': 'الطلاب متحمسون للغاية',
+    'performing exceptionally well': 'يؤدون بشكل استثنائي',
+    'URGENT:': 'عاجل:',
+    'Review seating arrangements': 'راجع ترتيب الجلوس',
+    'consider a restorative conversation': 'فكر في محادثة إصلاحية',
+    'between students involved': 'بين الطلاب المعنيين',
+    'improvement events logged today': 'حدث تحسّن مسجّل اليوم',
+    'These students deserve recognition': 'هؤلاء الطلاب يستحقون التقدير',
+    'Consider sharing with parents': 'فكر في مشاركة ذلك مع الأهل',
+    'Disruptive behavior peaks around': 'ذروة السلوك التخريبي حول الساعة',
+    'A structured activity change at this time may help': 'تغيير نشاط منظّم في هذا الوقت قد يساعد',
+    'badges have been awarded across the class': 'شارة موزّعة في الفصل',
+    'leads with': 'يتصدر بـ',
+    'badge': 'شارة',
+    'badges': 'شارات',
+    'Most frequent behavior today': 'السلوك الأكثر تكراراً اليوم',
+    'Keep reinforcing this positive pattern': 'استمر في تعزيز هذا النمط الإيجابي',
+    'Address this pattern consistently': 'تعامل مع هذا النمط باتساق',
+    'improve classroom dynamics': 'لتحسين ديناميكيات الصف',
+    'conflict event': 'حدث نزاع',
+    'conflict events': 'أحداث نزاع',
+    // Quest / goal
+    'Class Behavior Goal': 'هدف سلوك الصف',
+    'Daily Goal': 'الهدف اليومي',
+    'Weekly Goal': 'الهدف الأسبوعي',
+    'Goal Reached!': 'تم تحقيق الهدف! 🎉',
+    '% complete': '٪ مكتمل',
+    'Today': 'اليوم',
+    'This Week': 'هذا الأسبوع',
+    '⚙ Goal': '⚙ الهدف',
+    'pts today': 'نقطة اليوم',
+    'pts this week': 'نقطة هذا الأسبوع',
+    // Session reflection
+    'Session Reflection': 'تأملات الحصة',
+    'Post-lesson notes': 'ملاحظات ما بعد الدرس',
+    'Write your reflection… What worked? What changed? What do you want to remember?': 'اكتب تأملك… ما الذي نجح؟ ما الذي تغيّر؟ ما الذي تريد تذكّره؟',
+    '💾 Save': '💾 حفظ',
+    // Modal buttons & titles
+    'Save Settings': 'حفظ الإعدادات',
+    'Add New Class': 'إضافة فصل جديد',
+    'Create Class': 'إنشاء فصل',
+    'Delete Class': 'حذف الفصل',
+    'Edit Student': 'تعديل بيانات الطالب',
+    'Add Student': 'إضافة طالب',
+    'Student Profile': 'ملف الطالب',
+    'Log Behavior': 'تسجيل سلوك',
+    'Interventions': 'التدخلات',
+    'Close': 'إغلاق',
+    'Cancel': 'إلغاء',
+    'Delete': 'حذف',
+    'Save': 'حفظ',
+    'Edit': 'تعديل',
+    'Confirm': 'تأكيد',
+    'Profile': 'الملف',
+    'Undo': 'تراجع',
+    'Restore': 'استعادة',
+    // DNA modal
+    'Student DNA': 'DNA الطالب',
+    'Stable State': 'الحالة: مستقر',
+    'Warning State': 'الحالة: تحذير',
+    'Escalating State': 'الحالة: متصاعد',
+    'Stable': 'مستقر',
+    'Warning': 'تحذير',
+    'Escalating': 'متصاعد',
+    'Risk:': 'الخطر:',
+    'Score:': 'النقاط:',
+    'Streak:': 'السلسلة:',
+    'Suggested Actions': 'الإجراءات المقترحة',
+    'Needs immediate support': 'يحتاج دعماً فورياً',
+    'High risk of disengagement': 'خطر عالٍ من الانفصال',
+    'Likely to escalate further': 'من المحتمل أن يتصاعد',
+    'Intervene now': 'تدخّل الآن',
+    'Score declining': 'النقاط في انخفاض',
+    'monitor closely': 'راقب عن كثب',
+    'offer encouragement': 'قدّم التشجيع',
+    'Struggling to focus': 'يعاني في التركيز',
+    'consider a task change': 'فكر في تغيير المهمة',
+    'Mild warning signals': 'إشارات تحذير خفيفة',
+    'watch for further decline': 'راقب أي تراجع إضافي',
+    'All systems nominal': 'كل شيء على ما يرام',
+    'Performing well': 'يؤدي بشكل جيد',
+    // Leaderboard
+    'All Time': 'كل الأوقات',
+    'Leaderboard': 'قائمة الشرف',
+    'Rank': 'الترتيب',
+    'Total Score': 'إجمالي النقاط',
+    'Weekly Score': 'نقاط الأسبوع',
+    'No students in this class yet': 'لا يوجد طلاب في هذا الفصل بعد',
+    // Seating
+    'Seating Chart': 'خريطة الجلوس',
+    'Auto-Assign': 'توزيع تلقائي',
+    'Clear Layout': 'مسح الترتيب',
+    'Columns:': 'الأعمدة:',
+    // Risk levels in UI
+    'On Track': 'على المسار',
+    'Watch': 'مراقبة',
+    'Needs Attention': 'يحتاج اهتمام',
+    'Needs Support': 'يحتاج دعم',
+    'At Risk': 'يحتاج متابعة',
+    // General UI
+    'Improving': 'تحسن',
+    'Declining': 'تراجع',
+    'Positive Rate': 'نسبة الإيجابية',
+    'Today Events': 'أحداث اليوم',
+    'Total Students': 'إجمالي الطلاب',
+    'Class Average': 'متوسط الصف',
+    'Positive Behaviors': 'السلوكيات الإيجابية',
+    'Negative Behaviors': 'السلوكيات السلبية',
+    'Recent': 'الأحداث الأخيرة',
+    'Learning Playstyle': 'النمط التعلمي',
+    'Secondary:': 'النمط الثانوي:',
+    '% match': '٪ تطابق',
+    'Badges & Achievements': 'شارات الإنجاز',
+    'Recent Behaviors': 'السلوكيات الأخيرة',
+    'No Stationery': 'لا قرطاسية',
+    'Unexcused Abs': 'غياب بدون عذر',
+    'Incomplete Work': 'عمل غير مكتمل',
+    'Late/Tardy': 'تأخر',
+    'Homework ✓': 'الواجب ✓',
+    'Group Work': 'عمل جماعي',
+    'Test / Exam': 'اختبار',
+    // teacher assistant
+    'Teacher Assistant': 'مساعد المعلم',
+    'Intervention Suggestions': 'اقتراحات التدخل',
+    'Ask me anything about your class': 'اسألني أي شيء عن فصلك',
+    'Analysing…': 'جارٍ التحليل…',
+    'Generating…': 'جارٍ الإنشاء…',
+    // Sync
+    'Connected': 'متصل',
+    'Synced': 'تمت المزامنة',
+    'Offline': 'غير متصل',
+    'Syncing…': 'جارٍ المزامنة…',
+    'Saved': 'محفوظ',
+    'Saving…': 'جارٍ الحفظ…',
+  };
+
+  let _current = localStorage.getItem(LANG_KEY) || 'en';
+  let _observer = null;
+
+  function _applyDir(lang) {
+    document.documentElement.dir  = lang === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang === 'ar' ? 'ar' : 'en';
+  }
+
+  // Translate all text nodes inside el (or document.body)
+  function _translateNode(el) {
+    if (_current !== 'ar') return;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    const nodes = [];
+    let node;
+    while ((node = walker.nextNode())) nodes.push(node);
+    for (const n of nodes) {
+      if (!n.parentElement) continue;
+      const tag = n.parentElement.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE') continue;
+      const orig = n.nodeValue;
+      if (!orig || !orig.trim()) continue;
+      let txt = orig;
+      for (const [en, ar] of Object.entries(PHRASES_AR)) {
+        if (txt.includes(en)) txt = txt.split(en).join(ar);
+      }
+      if (txt !== orig) n.nodeValue = txt;
+    }
+    // Also translate placeholder attributes
+    el.querySelectorAll('[placeholder]').forEach(inp => {
+      for (const [en, ar] of Object.entries(PHRASES_AR)) {
+        if (inp.placeholder.includes(en)) inp.placeholder = inp.placeholder.split(en).join(ar);
+      }
+    });
+  }
+
+  // MutationObserver: translates dynamic inserts automatically
+  function _startObserver() {
+    if (_observer) return;
+    _observer = new MutationObserver(muts => {
+      if (_current !== 'ar') return;
+      for (const m of muts) {
+        for (const n of m.addedNodes) {
+          if (n.nodeType === 1) _translateNode(n);
+          else if (n.nodeType === 3) {
+            const orig = n.nodeValue;
+            if (orig && orig.trim()) {
+              let txt = orig;
+              for (const [en, ar] of Object.entries(PHRASES_AR)) {
+                if (txt.includes(en)) txt = txt.split(en).join(ar);
+              }
+              if (txt !== orig) n.nodeValue = txt;
+            }
+          }
+        }
+      }
+    });
+    _observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function _stopObserver() {
+    if (_observer) { _observer.disconnect(); _observer = null; }
+  }
+
+  return {
+    t(key) {
+      return (DICT[_current]?.[key]) || (DICT.en?.[key]) || key;
+    },
+    current()  { return _current; },
+    isRTL()    { return _current === 'ar'; },
+    isArabic() { return _current === 'ar'; },
+
+    switch(lang) {
+      if (!DICT[lang]) return;
+      _current = lang;
+      try { localStorage.setItem(LANG_KEY, lang); } catch (_) {}
+      _applyDir(lang);
+
+      if (lang === 'ar') {
+        // Arabic: start observer then translate existing DOM
+        _startObserver();
+        _translateNode(document.body);
+        this._patchAllDOM();
+      } else {
+        // English: MUST stop observer AND force full re-render of everything
+        // The observer modified text nodes in-place — only a re-render restores English
+        _stopObserver();
+        this._patchAllDOM();   // restore data-i18n elements first
+        this._fullRerender();  // then re-render all dynamic components
+      }
+
+      try {
+        const wrap = document.getElementById('i18n-toggle-wrap');
+        if (wrap) wrap.innerHTML = I18nManager.renderToggle();
+      } catch(_) {}
+      try { document.dispatchEvent(new CustomEvent('edupulse:langswitch', { detail: lang })); } catch(_) {}
+    },
+
+    // Force re-render of every dynamic component so English text is restored
+    _fullRerender() {
+      setTimeout(() => {
+        try {
+          // 1. Re-render current screen
+          const screen = document.querySelector('.screen.active')?.id?.replace('screen-','');
+          if (screen) { try { App.navigate(screen); } catch(_) {} }
+          // 2. Re-render sidebar persistent components
+          try { QuestEngine.render(); } catch(_) {}
+          try { SessionReflection.render(); } catch(_) {}
+          try { UI.renderInsights(); } catch(_) {}
+          try { UI.renderMiniLeaderboard(); } catch(_) {}
+          try { UI._refreshHeaderStats(); } catch(_) {}
+          try { UI._renderDashStats(); } catch(_) {}
+          // 3. If behavior panel is open, re-render it
+          try {
+            const selId = UI._selectedStudentId;
+            if (selId) UI._renderBehaviorPanel(selId);
+          } catch(_) {}
+          // 4. Re-render header autosave label
+          try { AutoSave.signal(); } catch(_) {}
+        } catch(_) {}
+      }, 30);
+    },
+
+    init() {
+      _applyDir(_current);
+      const ready = () => {
+        this._patchAllDOM();
+        if (_current === 'ar') {
+          _startObserver();
+          _translateNode(document.body);
+        }
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ready);
+      } else {
+        setTimeout(ready, 200);
+      }
+    },
+
+    _patchAllDOM() {
+      try {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const t = this.t(el.dataset.i18n);
+          if (t && t !== el.dataset.i18n) el.textContent = t;
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+          const t = this.t(el.dataset.i18nPlaceholder);
+          if (t && t !== el.dataset.i18nPlaceholder) el.placeholder = t;
+        });
+        const si = document.getElementById('students-search');
+        if (si) si.placeholder = this.t('search_placeholder');
+      } catch(_) {}
+    },
+
+    renderToggle() {
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary)">
+              ${_current === 'ar' ? 'اللغة' : 'Language'}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+              ${_current === 'ar' ? 'التبديل فوري بدون إعادة تحميل' : 'Switch instantly — no reload required'}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-xs ${_current==='en'?'btn-primary':'btn-ghost'}"
+              onclick="I18nManager.switch('en')" style="min-width:70px">English</button>
+            <button class="btn btn-xs ${_current==='ar'?'btn-primary':'btn-ghost'}"
+              onclick="I18nManager.switch('ar')" style="min-width:70px">العربية</button>
+          </div>
+        </div>`;
+    },
+  };
+})();
+
+try { I18nManager.init(); } catch (_) {}
+// Initialise I18n on boot (safe — no DOM dependency)
+try { I18nManager.init(); } catch (_) {}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC SETUP — QR credential sharing + polling fallback for file:// + auto-connect
+// ═══════════════════════════════════════════════════════════════════════════════
+const SyncSetup = (() => {
+  'use strict';
+
+  // ── QR Share: encode credentials → QR code ─────────────────────────────────
+  function showQR() {
+    const url = (document.getElementById('sb-url')?.value    || '').trim();
+    const key = (document.getElementById('sb-anon-key')?.value || '').trim();
+    if (!url || !key) {
+      NotificationEngine.warning('بيانات ناقصة', 'أدخل Supabase URL و Anon Key أولاً');
+      return;
+    }
+    const panel = document.getElementById('sync-qr-panel');
+    const canvas = document.getElementById('sync-qr-canvas');
+    if (!panel || !canvas) return;
+
+    // Encode as compact JSON in base64 — scannable as URL
+    const payload  = btoa(JSON.stringify({ u: url, k: key }));
+    const deepLink = `edupulse://sync?c=${payload}`;
+
+    canvas.innerHTML = '';
+    try {
+      if (typeof QRCode === 'undefined') {
+        canvas.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:16px">QR library not loaded</div>';
+      } else {
+        new QRCode(canvas, {
+          text: deepLink, width: 180, height: 180,
+          colorDark: '#0f1117', colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+      }
+      panel.style.display = 'block';
+    } catch(e) {
+      canvas.innerHTML = `<div style="font-size:11px;color:var(--red);padding:8px">خطأ: ${e.message}</div>`;
+    }
+  }
+
+  // ── Auto-apply: check if URL has ?c= sync payload (from QR scan) ────────────
+  function _checkURLPayload() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const c = params.get('c');
+      if (!c) return;
+      const { u, k } = JSON.parse(atob(c));
+      if (!u || !k) return;
+      // Store and connect
+      localStorage.setItem('ep_sb_creds', JSON.stringify({ url: u, key: k }));
+      const uEl = document.getElementById('sb-url');
+      const kEl = document.getElementById('sb-anon-key');
+      if (uEl) uEl.value = u;
+      if (kEl) kEl.value = k;
+      setTimeout(() => {
+        try { SyncEngine.connectSupabase(u, k); } catch(_) {}
+        NotificationEngine.success('✅ تم الربط', 'تم تطبيق بيانات الاتصال من الجهاز الآخر');
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 1500);
+    } catch(_) {}
+  }
+
+  // ── Polling fallback: when Realtime WebSocket unavailable (file://) ──────────
+  // Pulls all 7 tables every 4 seconds — ensures sync even without WebSocket
+  let _pollTimer = null;
+  function _startPolling() {
+    if (_pollTimer) return;
+    console.log('[SyncSetup] Starting polling fallback (4s)');
+    _pollTimer = setInterval(async () => {
+      if (typeof DataService === 'undefined') return;
+      const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : null;
+      if (!cid) return;
+      try {
+        await Promise.all([
+          DataService.pullClassData(cid).catch(()=>{}),
+          DataService.pullClasses().catch(()=>{}),
+          DataService.pullSettings(cid).catch(()=>{}),
+          DataService.pullAppState().catch(()=>{}),
+        ]);
+        // Also flush any pending changes
+        await DataService.flushOfflineQueue().catch(()=>{});
+        // Invalidate caches + refresh UI
+        try { StorageManager.invAll(); StudentManager.inv(); EventCache.invalidate(); } catch(_) {}
+        try { UI._refreshHeaderStats(); UI._renderStudentQuickGrid(); } catch(_) {}
+        try { UI._renderActivityFeed(); } catch(_) {}
+        try { QuestEngine.render(); } catch(_) {}
+      } catch(_) {}
+    }, 4000);
+  }
+
+  function _stopPolling() {
+    if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  }
+
+  // ── Auto-restore saved credentials on boot ───────────────────────────────────
+  function _restoreCredentials() {
+    try {
+      const saved = localStorage.getItem('ep_sb_creds');
+      if (!saved) return;
+      const { url, key } = JSON.parse(saved);
+      const uEl = document.getElementById('sb-url');
+      const kEl = document.getElementById('sb-anon-key');
+      if (uEl && !uEl.value && url) uEl.value = url;
+      if (kEl && !kEl.value && key) kEl.value = key;
+    } catch(_) {}
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+  function init() {
+    // 1. Apply QR payload from URL if present
+    _checkURLPayload();
+    // 2. Restore credentials into inputs
+    setTimeout(_restoreCredentials, 800);
+    // 3. Start polling fallback if on file:// (no WebSocket)
+    if (location.protocol === 'file:') {
+      // Wait for SyncEngine to connect first
+      setTimeout(() => {
+        if (typeof SyncEngine !== 'undefined' && SyncEngine._supabase) {
+          _startPolling();
+        }
+        // Also listen for connection event
+        document.addEventListener('edupulse:synced', _startPolling, { once: true });
+      }, 3000);
+    }
+    // 4. On Capacitor — polling not needed (WebSocket works), but start as safety net
+    if (location.protocol === 'capacitor:') {
+      setTimeout(() => {
+        if (typeof SyncEngine !== 'undefined' && !SyncEngine._realtimeActive) {
+          _startPolling();
+        }
+      }, 5000);
+    }
+  }
+
+  // Boot
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    setTimeout(init, 0);
+  }
+
+  return { showQR, startPolling: _startPolling, stopPolling: _stopPolling };
+})();
+
+window.SyncSetup = SyncSetup;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC MIDDLEWARE — /core/sync/SYNC_MIDDLEWARE
+// Centralized sync dispatcher that intercepts ALL state mutations.
+// Rule: Supabase = source of truth for sync. LocalState = source of truth for UI.
+// ═══════════════════════════════════════════════════════════════════════════════
+const SyncMiddleware = (() => {
+  'use strict';
+
+  // ── Queue with structured format ──────────────────────────────────────────
+  const MW_QUEUE_KEY = 'ep_mw_queue';
+  const MW_MAX       = 500;
+
+  function _devId() {
+    return localStorage.getItem('ep_device_id') || 'unknown';
+  }
+
+  function _readMwQueue() {
+    try { const q = JSON.parse(localStorage.getItem(MW_QUEUE_KEY)||'[]'); return Array.isArray(q)?q:[]; }
+    catch(_){ return []; }
+  }
+  function _writeMwQueue(arr) {
+    if (arr.length > MW_MAX) arr = arr.slice(arr.length - MW_MAX);
+    try { localStorage.setItem(MW_QUEUE_KEY, JSON.stringify(arr)); } catch(_){}
+  }
+
+  function _mkId() {
+    return 'mw_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+  }
+
+  // Debounce map for UI refresh calls
+  const _uiDebounce = {};
+  function _debounceUI(key, fn, ms = 80) {
+    clearTimeout(_uiDebounce[key]);
+    _uiDebounce[key] = setTimeout(fn, ms);
+  }
+
+  // ── Table resolver: action type → Supabase table ─────────────────────────
+  const TABLE_MAP = {
+    'student:create':   'students',
+    'student:update':   'students',
+    'student:delete':   'students',
+    'behavior:log':     'behaviors',
+    'behavior:correct': 'behaviors',
+    'badge:award':      'students',  // badges stored in student.data
+    'dna:update':       'dna',
+    'class:create':     'classes',
+    'class:update':     'classes',
+    'class:delete':     'classes',
+    'settings:save':    'settings',
+    'seating:save':     'seating',
+    'appstate:update':  'app_state',
+  };
+
+  // ── Field-level merge: newest per-field wins ──────────────────────────────
+  // Resolves conflicts without full-record overwrite.
+  // Each field's winner is the one with the higher updated_at.
+  function _fieldMerge(local, remote, remoteTs) {
+    if (!local || typeof local !== 'object') return remote;
+    if (!remote || typeof remote !== 'object') return local;
+    const merged = { ...remote };  // start with remote as base
+    const localTs = local._updatedAt || local.updatedAt || 0;
+    // For each field: if local is newer, keep local value
+    if (localTs > remoteTs) {
+      // Local record is newer overall — keep local for mutable fields
+      const IMMUTABLE = ['id', 'joinedAt', 'class_id'];
+      for (const [k, v] of Object.entries(local)) {
+        if (!IMMUTABLE.includes(k)) merged[k] = v;
+      }
+    }
+    // Always keep the most recent timestamp
+    merged._updatedAt = Math.max(localTs, remoteTs || 0);
+    return merged;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CORE: syncDispatch(action)
+  // The single entry point for ALL state mutations.
+  // Step 1: Apply locally (instant UI)
+  // Step 2: Enqueue to MW queue
+  // Step 3: Trigger async Supabase push
+  // ─────────────────────────────────────────────────────────────────────────
+  function syncDispatch(action) {
+    if (!action || !action.type) {
+      console.warn('[SyncMiddleware] Invalid action:', action);
+      return;
+    }
+
+    const table = TABLE_MAP[action.type];
+
+    // Step 1: Apply locally — already done by caller before syncDispatch
+    // (UI responsiveness is guaranteed by the existing StorageManager pipeline)
+
+    // Step 2: Enqueue with structured format
+    if (table && action.payload) {
+      const op = {
+        id:        _mkId(),
+        type:      action.type,
+        table,
+        payload:   action.payload,
+        timestamp: Date.now(),
+        device_id: _devId(),
+        classId:   action.classId || (typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default'),
+      };
+      const q = _readMwQueue();
+      q.push(op);
+      _writeMwQueue(q);
+    }
+
+    // Step 3: Trigger async Supabase push (non-blocking)
+    _triggerFlush();
+  }
+
+  // ── Async flush trigger (non-blocking) ───────────────────────────────────
+  let _flushScheduled = false;
+  function _triggerFlush() {
+    if (_flushScheduled) return;
+    _flushScheduled = true;
+    // Let the call stack clear first, then flush
+    setTimeout(() => {
+      _flushScheduled = false;
+      _flushMwQueue().catch(() => {});
+    }, 0);
+  }
+
+  // ── Flush MW queue to DataService ─────────────────────────────────────────
+  let _flushing = false;
+  async function _flushMwQueue() {
+    if (_flushing || !navigator.onLine) return;
+    const q = _readMwQueue();
+    if (!q.length) return;
+
+    // Check DataService is available
+    if (typeof DataService === 'undefined') return;
+    const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
+
+    _flushing = true;
+    _writeMwQueue([]);  // optimistic clear
+    const failed = [];
+
+    for (const op of q) {
+      try {
+        // Route each op to the correct DataService flush method
+        switch (op.table) {
+          case 'students':
+            await DataService.pushLocalSnapshot(op.classId || cid);
+            break;
+          case 'behaviors':
+            await DataService._flushEventsOut(op.classId || cid);
+            break;
+          case 'dna':
+            await DataService._flushDNAOut(op.classId || cid);
+            break;
+          case 'classes':
+            await DataService._flushClassesOut();
+            break;
+          case 'settings':
+            await DataService._flushSettingsOut(op.classId || cid);
+            break;
+          case 'seating':
+            await DataService._flushSeatingOut(op.classId || cid);
+            break;
+          case 'app_state':
+            await DataService._flushAppStateOut();
+            break;
+        }
+      } catch(e) {
+        failed.push(op);
+      }
+    }
+
+    if (failed.length) {
+      const rest = _readMwQueue();
+      _writeMwQueue(failed.concat(rest));
+    }
+    _flushing = false;
+  }
+
+  // ── Apply remote change with field-level merge ────────────────────────────
+  // Called by applyRemoteChange (global) for every Realtime event from another device.
+  // RULE: DO NOT re-add to syncQueue.
+  function applyRemote(table, eventType, newRow, oldRow) {
+    try {
+      const cid = (newRow || oldRow || {}).class_id || null;
+
+      if (table === 'students' && cid) {
+        const key = 'ep_students_' + cid;
+        let arr = [];
+        try { arr = JSON.parse(localStorage.getItem(key)||'[]'); } catch(_){}
+
+        if (eventType === 'DELETE') {
+          arr = arr.filter(s => String(s.id) !== String((oldRow||{}).id||''));
+        } else {
+          const remoteData = (newRow||{}).data;
+          const remoteTs   = (newRow||{}).updated_at || 0;
+          if (!remoteData) return;
+          const idx = arr.findIndex(s => String(s.id) === String(remoteData.id));
+          if (idx >= 0) {
+            // Field-level merge: newest wins per field
+            arr[idx] = _fieldMerge(arr[idx], remoteData, remoteTs);
+          } else {
+            arr.push(remoteData);
+          }
+        }
+
+        localStorage.setItem(key, JSON.stringify(arr));
+        // Patch-level UI update (no full reload)
+        _debounceUI('students', () => {
+          try { StorageManager.invAll(); StudentManager.inv(); EventCache.invalidate(); Analytics.invalidate(); } catch(_){}
+          try { UI._refreshHeaderStats(); UI._renderDashStats(); } catch(_){}
+          try { UI._renderStudentQuickGrid(); } catch(_){}
+          try { UI.renderInsights(); } catch(_){}
+        }, 60);
+      }
+
+      if (table === 'behaviors' && cid) {
+        const key = 'ep_events_' + cid;
+        let arr = [];
+        try { arr = JSON.parse(localStorage.getItem(key)||'[]'); } catch(_){}
+        if (eventType === 'DELETE') {
+          arr = arr.filter(e => String(e.id) !== String((oldRow||{}).id||''));
+        } else {
+          const data = (newRow||{}).data;
+          if (!data) return;
+          const idx = arr.findIndex(e => String(e.id) === String(data.id));
+          if (idx >= 0) arr[idx] = data; else arr.push(data);
+        }
+        localStorage.setItem(key, JSON.stringify(arr));
+        _debounceUI('behaviors', () => {
+          try { EventCache.invalidate(); Analytics.invalidate(); InsightEngine.invalidate(); } catch(_){}
+          try { UI._renderActivityFeed(); UI._refreshHeaderStats(); } catch(_){}
+          try { QuestEngine.render(); } catch(_){}
+        }, 60);
+      }
+
+      if (table === 'classes') {
+        DataService.pullClasses().then(() => {
+          try { ClassManager.init(); ClassManager._renderSwitcher(); } catch(_){}
+        }).catch(()=>{});
+      }
+
+      if (table === 'settings' && cid) {
+        DataService.pullSettings(cid).catch(()=>{});
+      }
+
+      if (table === 'seating' && cid) {
+        DataService.pullSeating(cid).then(() => {
+          _debounceUI('seating', () => { try { SeatingChart.render(); } catch(_){} }, 100);
+        }).catch(()=>{});
+      }
+
+      if (table === 'dna' && cid) {
+        DataService.pullDNA(cid).catch(()=>{});
+      }
+
+      if (table === 'app_state') {
+        DataService.pullAppState().catch(()=>{});
+      }
+    } catch(e) { console.warn('[SyncMiddleware.applyRemote]', e); }
+  }
+
+  // ── Background flush: every 3 seconds + on reconnect + on start ──────────
+  setInterval(() => {
+    if (navigator.onLine && !_flushing) _flushMwQueue().catch(()=>{});
+  }, 3000);
+
+  // online/visibilitychange flush handled by _initFlushInterval (5s) and heartbeat
+
+  // ── Intercept existing mutations via StorageManager hook ──────────────────
+  // Wraps the existing StorageManager.set to also dispatch through MW
+  (function _patchStorageManager() {
+    if (typeof StorageManager === 'undefined') return;
+    const _origSet = StorageManager.set.bind(StorageManager);
+    StorageManager.set = function(key, val) {
+      const result = _origSet(key, val);
+      // Route key → action type → syncDispatch
+      try {
+        const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
+        const studKey = 'ep_students_' + cid;
+        const evKey   = 'ep_events_'   + cid;
+        if (key === studKey) {
+          syncDispatch({ type: 'student:update', table: 'students', payload: val, classId: cid });
+        } else if (key === evKey) {
+          syncDispatch({ type: 'behavior:log', table: 'behaviors', payload: val, classId: cid });
+        } else if (key === 'ep_classes') {
+          syncDispatch({ type: 'class:update', table: 'classes', payload: val });
+        } else if (key === `ep_settings_${cid}`) {
+          syncDispatch({ type: 'settings:save', table: 'settings', payload: val, classId: cid });
+        }
+      } catch(_) {}
+      return result;
+    };
+  })();
+
+  // ── Public API ────────────────────────────────────────────────────────────
+  return {
+    // The primary entry point — call for any explicit mutation
+    dispatch: syncDispatch,
+
+    // Apply a remote change from Realtime (no re-queue, field-level merge)
+    applyRemote,
+
+    // Expose for debugging
+    getQueue:  _readMwQueue,
+    flushNow:  () => _flushMwQueue().catch(()=>{}),
+    fieldMerge: _fieldMerge,
+  };
+})();
+
+// applyRemoteChange override consolidated in SyncIntelligence.init()
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC INTELLIGENCE LAYER — single-file injection
+// Wraps existing SyncMiddleware + DataService + Realtime with a clean class API.
+// STRICT: additive only — zero UI changes, zero schema changes, no rewrites.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class SyncIntelligence {
+  // ── TASK 4: Device ID (idempotent, uses existing ep_device_id) ─────────────
+  static get deviceId() {
+    let id = localStorage.getItem('ep_device_id');
+    if (!id) {
+      id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'dev_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem('ep_device_id', id);
+    }
+    return id;
+  }
+
+  // ── Attach device_id to any outgoing payload ────────────────────────────────
+  static stamp(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    return { ...payload, _device_id: SyncIntelligence.deviceId, _ts: Date.now() };
+  }
+
+  // ── TASK 3: resolveConflict — merge local + remote, newest field wins ──────
+  // Uses existing SyncMiddleware._fieldMerge when available, falls back to safe merge.
+  static resolveConflict(local, remote, remoteTs) {
+    if (!local && !remote) return null;
+    if (!local) return remote;
+    if (!remote) return local;
+
+    // Delegate to existing field-level merge engine
+    if (typeof SyncMiddleware !== 'undefined' && typeof SyncMiddleware.fieldMerge === 'function') {
+      return SyncMiddleware.fieldMerge(local, remote, remoteTs || Date.now());
+    }
+
+    // Fallback: compare _ts / _updatedAt / updated_at
+    const localTs  = local._ts  || local._updatedAt  || local.updatedAt  || 0;
+    const remoteTs2 = remoteTs || remote._ts || remote._updatedAt || remote.updatedAt || Date.now();
+    if (localTs > remoteTs2) {
+      // Local is newer — keep local mutable fields, accept remote immutables
+      const IMMUTABLE = ['id', 'joinedAt', 'class_id', 'created_at'];
+      const merged = { ...remote };
+      for (const [k, v] of Object.entries(local)) {
+        if (!IMMUTABLE.includes(k)) merged[k] = v;
+      }
+      return merged;
+    }
+    return remote;  // Remote is newer — accept remote as-is
+  }
+
+  // ── TASK 2: queueChange — canonical alias for syncDispatch ────────────────
+  // Intercepts mutations: student CRUD, behaviors, badges, DNA, settings, seating.
+  static queueChange(type, payload, classId) {
+    const stamped = SyncIntelligence.stamp(payload);
+    // Route through existing SyncMiddleware.dispatch
+    if (typeof SyncMiddleware !== 'undefined') {
+      SyncMiddleware.dispatch({ type, payload: stamped, classId });
+    }
+    // Also ensure DataService immediate flush is triggered
+    try {
+      const cid = classId || (typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default');
+      if (typeof DataService !== 'undefined') {
+        switch (type) {
+          case 'student:create':
+          case 'student:update':
+          case 'student:delete': DataService._immediateFlushStudents(cid); break;
+          case 'behavior:log':
+          case 'behavior:correct': DataService._immediateFlushEvents(cid); break;
+          case 'badge:award':   DataService._immediateFlushStudents(cid); break;
+          case 'dna:update':    DataService.onDNAWrite(cid); break;
+          case 'seating:save':  DataService.onSeatingWrite(cid); break;
+          case 'settings:save': DataService._immediateFlushSettings(cid); break;
+          case 'class:create':
+          case 'class:update':
+          case 'class:delete':  DataService._immediateFlushClasses(); break;
+          case 'appstate:update': DataService._immediateFlushAppState(); break;
+        }
+      }
+    } catch(_) {}
+  }
+
+  // ── Initialize: patch integration points in existing functions ─────────────
+  // TASK 2: Inject queueChange into StudentManager.create, update, remove,
+  //         awardBadge, BehaviorEngine.log, StudentDNA.update — ADDITIVE ONLY.
+  static init() {
+    // Guard: only run once
+    if (SyncIntelligence._initialized) return;
+    SyncIntelligence._initialized = true;
+
+    // ── Patch StudentManager.create ────────────────────────────────────────
+    if (typeof StudentManager !== 'undefined' && StudentManager.create) {
+      const _origCreate = StudentManager.create.bind(StudentManager);
+      StudentManager.create = function(name, extra = {}) {
+        const result = _origCreate(name, extra);
+        try {
+          SyncIntelligence.queueChange('student:create', result);
+        } catch(_) {}
+        return result;
+      };
+    }
+
+    // ── Patch StudentManager.update ────────────────────────────────────────
+    if (typeof StudentManager !== 'undefined' && StudentManager.update) {
+      const _origUpdate = StudentManager.update.bind(StudentManager);
+      StudentManager.update = function(id, changes) {
+        const result = _origUpdate(id, changes);
+        try {
+          if (result) SyncIntelligence.queueChange('student:update', result);
+        } catch(_) {}
+        return result;
+      };
+    }
+
+    // ── Patch StudentManager.remove ────────────────────────────────────────
+    if (typeof StudentManager !== 'undefined' && StudentManager.remove) {
+      const _origRemove = StudentManager.remove.bind(StudentManager);
+      StudentManager.remove = function(id) {
+        const result = _origRemove(id);
+        try {
+          SyncIntelligence.queueChange('student:delete', { id });
+        } catch(_) {}
+        return result;
+      };
+    }
+
+    // ── Patch StudentManager.awardBadge ────────────────────────────────────
+    if (typeof StudentManager !== 'undefined' && StudentManager.awardBadge) {
+      const _origAward = StudentManager.awardBadge.bind(StudentManager);
+      StudentManager.awardBadge = function(id, bid) {
+        const result = _origAward(id, bid);
+        try {
+          if (result) SyncIntelligence.queueChange('badge:award', { studentId: id, badgeId: bid });
+        } catch(_) {}
+        return result;
+      };
+    }
+
+    // ── BehaviorEngine.log: sync already handled by StorageManager pipeline ──
+    // BehaviorEngine.log → StorageManager.appendEvent → StorageManager.set
+    //   → SyncEngine._onLocalWrite → DataService.onLocalStorageWrite
+    //   → _immediateFlushEvents (immediate push)
+    // The AI patch at line ~15191 also wraps BehaviorEngine.log.
+    // NO additional patch needed — would cause double-flush.
+    // queueChange('behavior:log') is called by SyncMiddleware's SM.set hook instead.
+
+    // ── StudentDNA.update: sync already handled by StudentDNA._save ──────────
+    // StudentDNA._save calls DataService.onDNAWrite(cid) directly (line ~14415).
+    // Additional patch would cause double DNA flush — skip.
+
+    // ── TASK 3: Patch Realtime applyRemoteChange to use resolveConflict ───
+    const _origApply = window.applyRemoteChange;
+    window.applyRemoteChange = function(payload) {
+      const { table, eventType, new: newRow, old: oldRow } = payload;
+      // Prevent sync loop (same device)
+      const sender = (newRow || oldRow || {}).device_id ||
+                     (newRow || oldRow || {})._device_id;
+      if (sender && sender === SyncIntelligence.deviceId) return;
+
+      // For student/behavior updates: resolve conflict before applying
+      if ((table === 'students' || table === 'behaviors') &&
+           eventType !== 'DELETE' && newRow) {
+        try {
+          const cid = (newRow || {}).class_id;
+          if (cid) {
+            const key = `ep_${table === 'students' ? 'students' : 'events'}_${cid}`;
+            let arr = [];
+            try { arr = JSON.parse(localStorage.getItem(key)||'[]'); } catch(_){}
+            const remoteData = newRow.data || newRow;
+            const remoteTs   = newRow.updated_at || Date.now();
+            const idx = arr.findIndex(r => String(r.id) === String(remoteData.id));
+            if (idx >= 0) {
+              // Conflict resolution: merge field-level
+              arr[idx] = SyncIntelligence.resolveConflict(arr[idx], remoteData, remoteTs);
+            } else {
+              arr.push(remoteData);
+            }
+            localStorage.setItem(key, JSON.stringify(arr));
+            // Minimal patch UI update
+            try { StorageManager.invAll(); StudentManager.inv(); EventCache.invalidate(); } catch(_){}
+            try { UI._refreshHeaderStats(); UI._renderStudentQuickGrid(); } catch(_){}
+            return;  // Handled by SyncIntelligence — skip default applyRemote
+          }
+        } catch(e) { /* fall through to original handler */ }
+      }
+
+      // Delegate everything else to existing handler
+      if (typeof _origApply === 'function') _origApply(payload);
+      else if (typeof SyncMiddleware !== 'undefined') {
+        SyncMiddleware.applyRemote(table, eventType, newRow, oldRow);
+      }
+    };
+
+    console.log('[SyncIntelligence] Initialized — device:', SyncIntelligence.deviceId);
+  }
+}
+
+// Auto-initialize after DOM is ready (safe if called multiple times)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => SyncIntelligence.init());
+} else {
+  // DOM already ready — init on next tick to ensure all modules are loaded
+  setTimeout(() => SyncIntelligence.init(), 0);
+}
+
+// Expose globally for debugging: SyncIntelligence.queueChange(...)
+window.SyncIntelligence = SyncIntelligence;
+
+// Convenience alias: queueChange() matches the prompt's expected API
+window.queueChange = (type, payload, classId) => SyncIntelligence.queueChange(type, payload, classId);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYNC CORE — Single clean entry point tying all layers together
+// Architecture:
+//   SyncCore.syncDispatch(action)         ← single mutation entry point
+//     → SyncMiddleware.dispatch()         ← MW queue + 3s flush
+//       → DataService._immediateFlush*()  ← Supabase immediate push
+//   SyncCore.flushQueue()                 ← manual flush trigger
+//   SyncCore.applyRemote()                ← receive change from other device
+//   SyncCore.resolveConflict(l,r,ts)      ← field-level merge
+// All flush intervals: 3s (MW) + 5s (DS) + on reconnect + on visibilitychange
+// ═══════════════════════════════════════════════════════════════════════════════
+const SyncCore = (() => {
+  'use strict';
+
+  const DEVICE_ID = SyncIntelligence.deviceId;
+
+  // Queue op factory — structured format
+  function _makeOp(table, type, payload) {
+    return {
+      id:        'sc_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6),
+      table,
+      type,       // 'insert' | 'update' | 'delete'
+      payload:   { ...payload, device_id: DEVICE_ID },
+      timestamp: Date.now(),
+      device_id: DEVICE_ID,
+    };
+  }
+
+  // Conflict resolution — delegates to SyncIntelligence
+  function resolveConflict(local, remote, remoteTs) {
+    return SyncIntelligence.resolveConflict(local, remote, remoteTs);
+  }
+
+  // syncDispatch — THE single entry point for ALL mutations
+  function syncDispatch(action) {
+    if (!action || !action.type) return;
+    if (action.payload && typeof action.payload === 'object') {
+      action.payload = { ...action.payload, device_id: DEVICE_ID };
+    }
+    if (typeof SyncMiddleware !== 'undefined') SyncMiddleware.dispatch(action);
+  }
+
+  // flushQueue — triggers both MW and DS queues
+  function flushQueue() {
+    try { if (typeof SyncMiddleware !== 'undefined') SyncMiddleware.flushNow(); } catch(_){}
+    try { if (typeof DataService    !== 'undefined') DataService.flushOfflineQueue().catch(()=>{}); } catch(_){}
+  }
+
+  // applyRemote — receive change from another device (no re-queue)
+  function applyRemote(table, eventType, newRow, oldRow) {
+    const sender = (newRow||oldRow||{}).device_id || (newRow||oldRow||{})._device_id;
+    if (sender && sender === DEVICE_ID) return;  // prevent sync loop
+    if (typeof SyncMiddleware !== 'undefined') SyncMiddleware.applyRemote(table, eventType, newRow, oldRow);
+  }
+
+  // Status report
+  function status() {
+    return {
+      deviceId: DEVICE_ID, online: navigator.onLine,
+      mwQueue:  typeof SyncMiddleware!=='undefined' ? SyncMiddleware.getQueue().length : 'N/A',
+      dsQueue:  typeof DataService   !=='undefined' ? DataService.getQueueLength()    : 'N/A',
+      lastSync: typeof SYNC_STATE    !=='undefined' ? SYNC_STATE.lastSync             : 'N/A',
+      layers:   ['DataService','SyncMiddleware','SyncIntelligence','SyncCore'],
+    };
+  }
+
+  // Flush on app start (1s delay to let boot sequence finish first)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(flushQueue, 1000));
+  } else {
+    setTimeout(flushQueue, 1000);
+  }
+  return { syncDispatch, flushQueue, applyRemote, resolveConflict, makeOp: _makeOp, status, deviceId: DEVICE_ID };
+})();
+
+// Expose all sync APIs globally
+window.SyncCore     = SyncCore;
+window.syncDispatch = SyncCore.syncDispatch;  // global alias
+
 </script>
 
 <!-- -═════════════════════════ PWA INSTALL BANNER ═══════════════════════════ -->
@@ -21955,5 +23816,3 @@ self.addEventListener('fetch',e=>{
 </div>
 </body>
 </html>
-
-
