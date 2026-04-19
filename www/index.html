@@ -3390,6 +3390,17 @@ body.privacy-mode .hide-privacy{display:none!important}
       <div class="header-stat" title="Students at risk" data-title="At Risk" data-description="Number of students currently flagged at risk based on behavior frequency and score trends in the last 24–48 hours.">
         <span style="font-size:10px">⚠️</span><span class="val" id="hdr-risk" style="color:var(--orange);cursor:pointer" onclick="App.navigate('students');setTimeout(()=>UI.filterByRisk('high'),80)">0</span>
       </div>
+      <!-- Direct Connect Button — WhatsApp Web-style device linking -->
+      <button class="header-btn" id="direct-connect-btn"
+        onclick="DirectConnect.open()"
+        title="Direct Connect — link devices instantly"
+        data-tip="Link devices for real-time sync — like WhatsApp Web"
+        style="position:relative">
+        📲
+        <span id="dc-online-badge" style="display:none;position:absolute;top:-3px;right:-3px;
+          background:var(--green);color:#fff;font-size:8px;font-weight:800;
+          padding:1px 4px;border-radius:99px;min-width:14px;text-align:center">0</span>
+      </button>
       <button class="header-btn" onclick="ColdCallPicker.open()" title="Cold Call — randomly selects a student" data-tip="Cold Call — randomly selects a student weighted toward low-engagement students">
         🎲
       </button>
@@ -13581,6 +13592,8 @@ const SyncEngine = {
         try{
           if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain.init(client);
         }catch(e){ console.warn('[SyncEngine] EduPulseSyncBrain.init', e); }
+        // ── WhatsApp-style Broadcast channel ──────────────────────────────────
+        try{ if(typeof WASync !== 'undefined') WASync.connect(client); }catch(e){}
         this._setupRealtimeReconnect(client, creds);
         const cid = ClassManager.activeId();
         if(typeof DataService !== 'undefined'){
@@ -13827,6 +13840,7 @@ const SyncEngine = {
       this._updatePill('offline','Offline');
       try{ if(typeof EduPulseSyncBrain !== 'undefined') EduPulseSyncBrain._setConnStatus('offline','🔴 Offline'); }catch(e){}
       document.getElementById('offline-banner')?.classList.add('visible');
+      try { if(typeof DirectConnect !== 'undefined') DirectConnect.setState('OFFLINE'); } catch(_){}
       this._computeRealState();
     });
   },
@@ -13845,6 +13859,15 @@ const SyncEngine = {
     if(!row||!lbl) return;
     row.className = 'firebase-status-row ' + state;
     lbl.textContent = label;
+    // Sync state → DirectConnect connection indicator
+    try {
+      if (typeof DirectConnect !== 'undefined') {
+        if (state === 'connected')     DirectConnect.setState('CONNECTED');
+        else if (state === 'connecting') DirectConnect.setState('CONNECTING');
+        else if (state === 'offline')    DirectConnect.setState('OFFLINE');
+        else                             DirectConnect.setState('LOCAL_ONLY');
+      }
+    } catch(_) {}
   },
   _updateOfflineBanner(){
     const el = document.getElementById('offline-queue-count');
@@ -15204,6 +15227,12 @@ const AIView = {
   const _origLog = BehaviorEngine.log.bind(BehaviorEngine);
   BehaviorEngine.log = function(studentId, behaviorId, note=''){
     const result = _origLog(studentId, behaviorId, note);
+    // ── WhatsApp-style instant broadcast ────────────────────────────────────
+    try {
+      if (result && result.event && typeof WASync !== 'undefined') {
+        WASync.broadcast('behavior:log', { event: result.event });
+      }
+    } catch(_) {}
     // -─ AI pipeline (non-blocking, isolated from core) ──
     setTimeout(()=>{
       try{ StudentDNA.update(studentId, result.event); }catch(e){}
@@ -16363,6 +16392,8 @@ const SeatingChart = {
       if (typeof DataService !== 'undefined' && typeof SyncEngine !== 'undefined' && SyncEngine._supabase)
         DataService.onSeatingWrite(typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default');
     } catch (e) {}
+    // WhatsApp-style instant broadcast
+    try { if (typeof WASync !== 'undefined') WASync.broadcast('seating:save', { data: layout }); } catch(_){}
   },
 
   // layout: { [seatIndex]: studentId | null }
@@ -23050,6 +23081,794 @@ try { I18nManager.init(); } catch (_) {}
 try { I18nManager.init(); } catch (_) {}
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DIRECT CONNECT — WhatsApp Web-style device linking
+// ───────────────────────────────────────────────────────────────────────────────
+// Flow:
+//   Host device   → generates signed session token → shows QR
+//   Guest device  → scans QR → validates token → joins channel → syncs instantly
+//   Token expires in 5 minutes, single-use, HMAC-signed (no server needed)
+// ═══════════════════════════════════════════════════════════════════════════════
+const DirectConnect = (() => {
+  'use strict';
+
+  const TOKEN_TTL   = 5 * 60 * 1000;   // 5 minutes
+  const SIGN_SECRET = 'ep-dc-2025';     // client-side HMAC (integrity, not security)
+  const SESSION_KEY = 'ep_dc_session';
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function _devId() { return localStorage.getItem('ep_device_id') || 'unknown'; }
+
+  // Simple HMAC-like signature using Web Crypto if available, fallback XOR hash
+  async function _sign(payload) {
+    const str = JSON.stringify(payload);
+    if (window.crypto?.subtle) {
+      try {
+        const key = await crypto.subtle.importKey(
+          'raw', new TextEncoder().encode(SIGN_SECRET), { name:'HMAC', hash:'SHA-256' }, false, ['sign']
+        );
+        const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,16);
+      } catch(_) {}
+    }
+    // Fallback: djb2 hash
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h<<5)+h) ^ str.charCodeAt(i);
+    return (h >>> 0).toString(16);
+  }
+
+  async function _verify(token) {
+    try {
+      const { payload, sig } = JSON.parse(atob(token));
+      if (Date.now() > payload.exp) return null;     // expired
+      const expectedSig = await _sign(payload);
+      if (expectedSig !== sig) return null;           // tampered
+      return payload;
+    } catch(_) { return null; }
+  }
+
+  // ── Generate session token ─────────────────────────────────────────────────
+  async function _generateToken() {
+    const creds = JSON.parse(localStorage.getItem('ep_sb_creds') || 'null');
+    if (!creds?.url || !creds?.key) return null;
+    const payload = {
+      url:     creds.url,
+      key:     creds.key,
+      host:    _devId(),
+      channel: 'edupulse-wa',
+      exp:     Date.now() + TOKEN_TTL,
+      nonce:   Math.random().toString(36).slice(2),
+    };
+    const sig   = await _sign(payload);
+    const token = btoa(JSON.stringify({ payload, sig }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, created: Date.now() }));
+    return token;
+  }
+
+  // ── QR Code renderer ──────────────────────────────────────────────────────
+  function _renderQR(container, text) {
+    container.innerHTML = '';
+    if (typeof QRCode === 'undefined') {
+      container.innerHTML = '<div style="padding:20px;font-size:11px;color:var(--text-muted)">QR library loading…</div>';
+      return;
+    }
+    new QRCode(container, {
+      text, width: 220, height: 220,
+      colorDark: '#0f1117', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  }
+
+  // ── QR Scanner (camera) ───────────────────────────────────────────────────
+  let _scanStream = null;
+
+  function _stopScan() {
+    if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  }
+
+  function _startScanner(videoEl, onResult) {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      onResult(null, 'Camera not available on this device');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        _scanStream = stream;
+        videoEl.srcObject = stream;
+        videoEl.play();
+
+        // Dynamically load jsQR for decoding
+        if (typeof jsQR === 'undefined') {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js';
+          s.onload = () => _scanLoop(videoEl, onResult);
+          s.onerror = () => onResult(null, 'QR decoder failed to load');
+          document.head.appendChild(s);
+        } else {
+          _scanLoop(videoEl, onResult);
+        }
+      })
+      .catch(err => onResult(null, `Camera error: ${err.message}`));
+  }
+
+  function _scanLoop(videoEl, onResult) {
+    if (!_scanStream) return;
+    const canvas  = document.createElement('canvas');
+    const ctx     = canvas.getContext('2d');
+    let   found   = false;
+
+    function tick() {
+      if (!_scanStream || found) return;
+      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+        canvas.width  = videoEl.videoWidth;
+        canvas.height = videoEl.videoHeight;
+        ctx.drawImage(videoEl, 0, 0);
+        try {
+          const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+          if (code) {
+            found = true;
+            _stopScan();
+            onResult(code.data, null);
+            return;
+          }
+        } catch(_) {}
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ── Apply token from QR scan — connect as guest ───────────────────────────
+  async function _applyToken(rawToken) {
+    const payload = await _verify(rawToken);
+    if (!payload) {
+      NotificationEngine.danger('❌ Invalid QR', 'This code is expired or invalid. Ask the host to regenerate it.');
+      return false;
+    }
+    if (payload.host === _devId()) {
+      NotificationEngine.warning('Same Device', 'This QR code was generated on this device.');
+      return false;
+    }
+    // Store credentials and connect
+    const creds = { url: payload.url, key: payload.key };
+    localStorage.setItem('ep_sb_creds', JSON.stringify(creds));
+    const uEl = document.getElementById('sb-url');
+    const kEl = document.getElementById('sb-anon-key');
+    if (uEl) uEl.value = creds.url;
+    if (kEl) kEl.value = creds.key;
+
+    NotificationEngine.success('🔗 Linking…', 'Connecting to sync channel…');
+    setTimeout(() => {
+      try { SyncEngine.connectSupabase(creds.url, creds.key); } catch(_) {}
+    }, 300);
+    return true;
+  }
+
+  // ── Connection state tracker ───────────────────────────────────────────────
+  const STATES = {
+    OFFLINE:      { label: '🔴 Offline',        cls: 'offline',    desc: 'No internet connection' },
+    LOCAL_ONLY:   { label: '⚪ Local Only',      cls: 'local',      desc: 'Working locally — not synced' },
+    CONNECTING:   { label: '🟡 Connecting…',    cls: 'syncing',    desc: 'Establishing connection' },
+    RECONNECTING: { label: '🟡 Reconnecting…',  cls: 'syncing',    desc: 'Connection lost — retrying' },
+    SYNCING:      { label: '🟡 Syncing…',        cls: 'syncing',    desc: 'Sending changes' },
+    CONNECTED:    { label: '🟢 Connected',       cls: 'synced',     desc: 'Real-time sync active' },
+    LINKED:       { label: '🟢 Linked',          cls: 'synced',     desc: 'Multiple devices connected' },
+  };
+
+  let _currentState = 'LOCAL_ONLY';
+
+  function setState(stateKey) {
+    if (_currentState === stateKey) return;
+    _currentState = stateKey;
+    const s = STATES[stateKey];
+    if (!s) return;
+    try {
+      const pill = document.getElementById('sync-pill');
+      if (pill) {
+        pill.className = `sync-pill ${s.cls}`;
+        const sp = pill.querySelector('#sync-label');
+        if (sp) sp.textContent = s.label;
+        pill.title = s.desc;
+      }
+      // Update realtime conn status too
+      const rt = document.getElementById('realtime-conn-status');
+      if (rt) {
+        rt.textContent = s.label;
+        rt.className = `realtime-conn-status ${stateKey === 'CONNECTED' || stateKey === 'LINKED' ? 'online' : stateKey === 'OFFLINE' ? 'offline' : 'connecting'}`;
+      }
+    } catch(_) {}
+  }
+
+  function updateOnlineCount(count) {
+    const badge = document.getElementById('dc-online-badge');
+    const btn   = document.getElementById('direct-connect-btn');
+    if (!badge || !btn) return;
+    if (count > 1) {
+      badge.textContent = count;
+      badge.style.display = 'block';
+      setState('LINKED');
+    } else if (count === 1) {
+      badge.style.display = 'none';
+      setState('CONNECTED');
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // ── Main UI: open Direct Connect panel ────────────────────────────────────
+  async function open() {
+    const isDesktop   = PlatformService.isDesktop();
+    const hasCredentials = !!localStorage.getItem('ep_sb_creds');
+    const supaReady   = typeof SyncEngine !== 'undefined' && !!SyncEngine._supabase;
+    const onlineCount = typeof WASync !== 'undefined' ? WASync.onlineCount() : 0;
+
+    // Decide role: host (has credentials) or guest (no credentials / on mobile)
+    const role = (hasCredentials && supaReady) ? 'host' : 'guest';
+
+    UI._openModal({
+      title: '📲 Direct Connect',
+      size:  'sm',
+      body:  `
+        <div id="dc-panel">
+
+          <!-- Connection status bar -->
+          <div id="dc-status-bar" style="display:flex;align-items:center;gap:8px;padding:10px 12px;
+               background:var(--bg-elevated);border:1px solid var(--border);
+               border-radius:8px;margin-bottom:14px">
+            <div id="dc-status-dot" style="width:9px;height:9px;border-radius:50%;
+                 background:${supaReady ? 'var(--green)' : 'var(--text-muted)'};flex-shrink:0"></div>
+            <div style="flex:1">
+              <div id="dc-status-label" style="font-size:12px;font-weight:600;color:var(--text-primary)">
+                ${supaReady ? `Connected — ${onlineCount > 1 ? onlineCount + ' devices online' : 'waiting for other devices'}` : 'Not connected to sync'}
+              </div>
+              <div id="dc-status-sub" style="font-size:10px;color:var(--text-muted);margin-top:1px">
+                ${supaReady ? 'Real-time sync active' : 'Enter Supabase credentials in Settings → Cloud Sync'}
+              </div>
+            </div>
+          </div>
+
+          <!-- Role tabs -->
+          <div style="display:flex;gap:6px;margin-bottom:14px">
+            <button class="btn ${role==='host'?'btn-primary':'btn-ghost'} btn-sm" 
+                    style="flex:1" onclick="DirectConnect._switchRole('host',this)"
+                    id="dc-tab-host">
+              🖥️ This is the Host
+            </button>
+            <button class="btn ${role==='guest'?'btn-primary':'btn-ghost'} btn-sm"
+                    style="flex:1" onclick="DirectConnect._switchRole('guest',this)"
+                    id="dc-tab-guest">
+              📱 Join Another Device
+            </button>
+          </div>
+
+          <!-- Host: show QR -->
+          <div id="dc-host-panel" style="display:${role==='host'?'block':'none'}">
+            ${!hasCredentials ? `
+              <div style="padding:14px;background:rgba(243,156,18,.1);border:1px solid rgba(243,156,18,.3);
+                   border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.6">
+                ⚠️ No Supabase credentials found. Go to <strong>Settings → Cloud Sync</strong> first.
+              </div>` : `
+              <div style="text-align:center">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">
+                  Scan this QR on your <strong>tablet or mobile</strong><br>
+                  to link it instantly. Valid for <strong>5 minutes</strong>.
+                </div>
+                <div id="dc-qr-host" style="display:inline-block;padding:10px;background:#fff;
+                     border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.2);margin-bottom:12px">
+                  <div style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;
+                       color:var(--text-muted);font-size:12px">⏳ Generating…</div>
+                </div>
+                <div id="dc-token-timer" style="font-size:10px;color:var(--orange);margin-bottom:8px"></div>
+                <div>
+                  <button class="btn btn-ghost btn-xs" onclick="DirectConnect._refreshQR()">🔄 Refresh QR</button>
+                </div>
+              </div>`}
+          </div>
+
+          <!-- Guest: scan QR -->
+          <div id="dc-guest-panel" style="display:${role==='guest'?'block':'none'}">
+            <div style="text-align:center;margin-bottom:10px">
+              <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px">
+                Point your camera at the QR code on the <strong>host device</strong>.<br>
+                You'll be linked instantly.
+              </div>
+            </div>
+            <div id="dc-scanner-area" style="position:relative;border-radius:12px;overflow:hidden;
+                 background:#000;max-height:280px;margin-bottom:12px">
+              <video id="dc-video" autoplay playsinline muted
+                     style="width:100%;display:block;max-height:280px;object-fit:cover"></video>
+              <!-- Scan overlay -->
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+                   pointer-events:none">
+                <div style="width:160px;height:160px;border:3px solid var(--accent);border-radius:12px;
+                     box-shadow:0 0 0 2000px rgba(0,0,0,.35)"></div>
+              </div>
+            </div>
+            <div id="dc-scan-status" style="font-size:11px;color:var(--text-muted);text-align:center;
+                 padding:4px;min-height:20px">
+              Starting camera…
+            </div>
+            <div style="margin-top:10px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">
+                — or paste the code manually —
+              </div>
+              <div style="display:flex;gap:6px">
+                <input class="input" id="dc-manual-token" placeholder="Paste token here…"
+                       style="flex:1;font-size:10px"/>
+                <button class="btn btn-primary btn-xs"
+                        onclick="DirectConnect._applyManual()">Connect</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live device list -->
+          <div id="dc-devices" style="margin-top:14px;display:${supaReady?'block':'none'}">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+                 color:var(--text-muted);margin-bottom:6px">Online Devices</div>
+            <div id="dc-device-list" style="display:flex;flex-direction:column;gap:4px">
+              <div style="font-size:11px;color:var(--text-muted);padding:6px">Scanning for devices…</div>
+            </div>
+          </div>
+
+        </div>`,
+      buttons: [{ label: 'Close', class: 'btn-ghost', onclick: 'App.closeModal()' }],
+    });
+
+    // Initialize based on role
+    setTimeout(() => {
+      if (role === 'host') _initHost();
+      else                  _initGuest();
+      _startDeviceRefresh();
+    }, 100);
+  }
+
+  // ── Host init: generate QR ────────────────────────────────────────────────
+  let _tokenTimer = null;
+  let _tokenExpiry = 0;
+
+  async function _initHost() {
+    const qrWrap = document.getElementById('dc-qr-host');
+    if (!qrWrap) return;
+    const token = await _generateToken();
+    if (!token) return;
+    _renderQR(qrWrap, `edupulse://join?t=${token}`);
+    _tokenExpiry = Date.now() + TOKEN_TTL;
+    _startTokenTimer();
+  }
+
+  async function _refreshQR() {
+    const qrWrap = document.getElementById('dc-qr-host');
+    if (!qrWrap) return;
+    clearInterval(_tokenTimer);
+    qrWrap.innerHTML = '<div style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px">⏳ Refreshing…</div>';
+    const token = await _generateToken();
+    if (!token) return;
+    _renderQR(qrWrap, `edupulse://join?t=${token}`);
+    _tokenExpiry = Date.now() + TOKEN_TTL;
+    _startTokenTimer();
+    NotificationEngine.success('🔄 QR Refreshed', 'New code valid for 5 minutes');
+  }
+
+  function _startTokenTimer() {
+    clearInterval(_tokenTimer);
+    _tokenTimer = setInterval(() => {
+      const timerEl = document.getElementById('dc-token-timer');
+      if (!timerEl) { clearInterval(_tokenTimer); return; }
+      const remaining = Math.max(0, Math.ceil((_tokenExpiry - Date.now()) / 1000));
+      const m = Math.floor(remaining / 60), s = remaining % 60;
+      timerEl.textContent = remaining > 0
+        ? `⏱ Expires in ${m}:${String(s).padStart(2,'0')}`
+        : '⚠️ Expired — click Refresh QR';
+      if (remaining === 0) {
+        clearInterval(_tokenTimer);
+        timerEl.style.color = 'var(--red)';
+      }
+    }, 1000);
+  }
+
+  // ── Guest init: start camera ───────────────────────────────────────────────
+  function _initGuest() {
+    const video = document.getElementById('dc-video');
+    const status = document.getElementById('dc-scan-status');
+    if (!video) return;
+    _startScanner(video, async (data, err) => {
+      if (err) {
+        if (status) status.textContent = `⚠️ ${err}`;
+        return;
+      }
+      if (status) status.textContent = '✅ QR detected — linking…';
+      // Extract token from edupulse://join?t=TOKEN or raw token
+      let token = data;
+      try { token = new URL(data).searchParams.get('t') || data; } catch(_) {}
+      const ok = await _applyToken(token);
+      if (ok) {
+        setTimeout(() => App.closeModal(), 1000);
+      } else {
+        if (status) status.textContent = '❌ Invalid or expired code';
+        setTimeout(() => _initGuest(), 2000);  // retry
+      }
+    });
+  }
+
+  async function _applyManual() {
+    const inp = document.getElementById('dc-manual-token');
+    if (!inp?.value.trim()) return;
+    let token = inp.value.trim();
+    try { token = new URL(token).searchParams.get('t') || token; } catch(_) {}
+    const ok = await _applyToken(token);
+    if (ok) setTimeout(() => App.closeModal(), 800);
+  }
+
+  // ── Role switch ────────────────────────────────────────────────────────────
+  function _switchRole(role, btn) {
+    _stopScan();
+    document.getElementById('dc-host-panel').style.display  = role === 'host'  ? 'block' : 'none';
+    document.getElementById('dc-guest-panel').style.display = role === 'guest' ? 'block' : 'none';
+    document.querySelectorAll('#dc-panel .btn').forEach(b => {
+      if (b.id === 'dc-tab-host'  && role === 'host')  b.className = b.className.replace('btn-ghost','btn-primary');
+      if (b.id === 'dc-tab-host'  && role !== 'host')  b.className = b.className.replace('btn-primary','btn-ghost');
+      if (b.id === 'dc-tab-guest' && role === 'guest') b.className = b.className.replace('btn-ghost','btn-primary');
+      if (b.id === 'dc-tab-guest' && role !== 'guest') b.className = b.className.replace('btn-primary','btn-ghost');
+    });
+    setTimeout(() => {
+      if (role === 'host')  _initHost();
+      else                   _initGuest();
+    }, 100);
+  }
+
+  // ── Live device list refresh ───────────────────────────────────────────────
+  let _devRefreshTimer = null;
+  function _startDeviceRefresh() {
+    clearInterval(_devRefreshTimer);
+    _devRefreshTimer = setInterval(() => {
+      const list = document.getElementById('dc-device-list');
+      if (!list) { clearInterval(_devRefreshTimer); return; }
+      const devices = typeof WASync !== 'undefined' ? WASync.onlineDevices() : [];
+      const myId    = _devId();
+      if (!devices.length) {
+        list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:6px">No other devices connected</div>';
+        return;
+      }
+      list.innerHTML = devices.map(id => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;
+             background:var(--bg-elevated);border-radius:6px;border:1px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+          <span style="font-size:11px;color:var(--text-primary);font-family:var(--mono)">
+            ${id === myId ? '🖥️ This device' : '📱 ' + id.slice(0,12) + '…'}
+          </span>
+          ${id === myId ? '<span style="font-size:9px;color:var(--accent);font-weight:600">YOU</span>' : ''}
+        </div>`).join('');
+      // Update status bar
+      const statusLabel = document.getElementById('dc-status-label');
+      if (statusLabel) statusLabel.textContent = `${devices.length} device${devices.length>1?'s':''} connected`;
+    }, 2000);
+  }
+
+  // ── Auto-apply QR token from URL on startup (e.g. after scanning) ──────────
+  function _checkStartupToken() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get('t');
+      if (t) {
+        _applyToken(t).then(ok => {
+          if (ok) {
+            NotificationEngine.success('🔗 Linked!', 'Device connected via QR');
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        });
+      }
+    } catch(_) {}
+  }
+
+  // Boot
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _checkStartupToken);
+  } else {
+    setTimeout(_checkStartupToken, 500);
+  }
+
+  // ── Public ─────────────────────────────────────────────────────────────────
+  return {
+    open,
+    setState,
+    updateOnlineCount,
+    _switchRole,
+    _refreshQR,
+    _applyManual,
+    _applyToken,
+  };
+})();
+
+window.DirectConnect = DirectConnect;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WA SYNC — WhatsApp-style instant broadcast sync
+// ───────────────────────────────────────────────────────────────────────────────
+// مثل واتساب ويب تماماً:
+//   • كل حركة تُبث فوراً لجميع الأجهزة عبر WebSocket مباشر (< 50ms)
+//   • لا تنتظر قاعدة البيانات — الـ Broadcast يسبق الحفظ
+//   • الجهاز الآخر يستقبل ويُحدّث الـ UI في نفس اللحظة
+//   • معرفة الأجهزة المتصلة (Presence)
+//   • إعادة اتصال تلقائية + تزامن ما فات عند العودة
+// ═══════════════════════════════════════════════════════════════════════════════
+const WASync = (() => {
+  'use strict';
+
+  const CHANNEL_NAME = 'edupulse-wa';
+  const DEVICE_ID    = () => localStorage.getItem('ep_device_id') || 'unknown';
+
+  let _ch      = null;   // Supabase Realtime channel
+  let _client  = null;
+  let _online  = [];     // list of online devices
+  let _ready   = false;
+
+  // ── 1. Connect & subscribe to Broadcast + Presence ─────────────────────────
+  function connect(client) {
+    if (!client) return;
+    _client = client;
+    if (_ch) { try { client.removeChannel(_ch); } catch(_) {} }
+
+    _ch = client.channel(CHANNEL_NAME, {
+      config: {
+        broadcast: { self: false, ack: false },   // don't receive own messages
+        presence:  { key: DEVICE_ID() },
+      },
+    });
+
+    // ── Receive all broadcast events ────────────────────────────────────────
+    const events = [
+      'student:create','student:update','student:delete',
+      'behavior:log','behavior:correct',
+      'badge:award',
+      'dna:update',
+      'class:create','class:update','class:delete',
+      'settings:save','seating:save','appstate:update',
+      'quest:update','reflection:add','reflection:delete',
+    ];
+
+    events.forEach(ev => {
+      _ch.on('broadcast', { event: ev }, ({ payload }) => _receive(ev, payload));
+    });
+
+    // ── Presence: track who is online ────────────────────────────────────────
+    _ch.on('presence', { event: 'sync' }, () => {
+      const state = _ch.presenceState();
+      _online = Object.keys(state);
+      _updatePresenceUI();
+      try { if (typeof DirectConnect !== 'undefined') DirectConnect.updateOnlineCount(_online.length); } catch(_){}
+    });
+    _ch.on('presence', { event: 'join' }, ({ key }) => {
+      if (!_online.includes(key)) _online.push(key);
+      _updatePresenceUI();
+      try { if (typeof DirectConnect !== 'undefined') DirectConnect.updateOnlineCount(_online.length); } catch(_){}
+      // New device joined → send it the current class data snapshot
+      if (_online.length > 1) {
+        setTimeout(() => _pushSnapshot(), 500);
+      }
+    });
+    _ch.on('presence', { event: 'leave' }, ({ key }) => {
+      _online = _online.filter(d => d !== key);
+      _updatePresenceUI();
+      try { if (typeof DirectConnect !== 'undefined') DirectConnect.updateOnlineCount(_online.length); } catch(_){}
+    });
+
+    _ch.subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        _ready = true;
+        _ch.track({
+          device_id:  DEVICE_ID(),
+          joined_at:  Date.now(),
+          user_agent: navigator.userAgent.slice(0, 60),
+        });
+        console.log('[WASync] ✅ Broadcast channel ready');
+      }
+    });
+
+    // ── Auto-reconnect on disconnect ─────────────────────────────────────────
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && _client) {
+        if (!_ready || (_ch && _ch.state !== 'joined')) {
+          setTimeout(() => connect(_client), 500);
+        }
+      }
+    });
+    window.addEventListener('online', () => {
+      setTimeout(() => {
+        if (_client && (!_ready || (_ch && _ch.state !== 'joined'))) {
+          connect(_client);
+        }
+      }, 1000);
+    });
+  }
+
+  // ── 2. Broadcast: send to all other devices instantly ──────────────────────
+  function broadcast(event, payload) {
+    if (!_ch || !_ready) return;
+    try {
+      _ch.send({
+        type:  'broadcast',
+        event,
+        payload: {
+          ...payload,
+          _from:  DEVICE_ID(),
+          _ts:    Date.now(),
+          _cid:   typeof ClassManager !== 'undefined' ? ClassManager.activeId() : '',
+        },
+      });
+    } catch(e) { console.warn('[WASync] broadcast error', e); }
+  }
+
+  // ── 3. Receive: apply remote change instantly to UI ─────────────────────────
+  function _receive(event, payload) {
+    if (!payload || payload._from === DEVICE_ID()) return;  // skip own
+    const cid = payload._cid || (typeof ClassManager !== 'undefined' ? ClassManager.activeId() : '');
+
+    switch (event) {
+
+      // ── Students ──────────────────────────────────────────────────────────
+      case 'student:create':
+      case 'student:update': {
+        const st = payload.student || payload;
+        if (!st || !st.id) break;
+        const key = 'ep_students_' + cid;
+        let arr = _load(key);
+        const idx = arr.findIndex(s => String(s.id) === String(st.id));
+        if (idx >= 0) arr[idx] = { ...arr[idx], ...st };
+        else arr.push(st);
+        _save(key, arr);
+        _uiRefresh('students');
+        break;
+      }
+      case 'student:delete': {
+        const key = 'ep_students_' + cid;
+        let arr = _load(key).filter(s => String(s.id) !== String(payload.id));
+        _save(key, arr);
+        _uiRefresh('students');
+        break;
+      }
+
+      // ── Behaviors ─────────────────────────────────────────────────────────
+      case 'behavior:log': {
+        const ev = payload.event || payload;
+        if (!ev || !ev.id) break;
+        const key = 'ep_events_' + cid;
+        let arr = _load(key);
+        const idx = arr.findIndex(e => String(e.id) === String(ev.id));
+        if (idx >= 0) arr[idx] = ev; else arr.push(ev);
+        _save(key, arr);
+        _uiRefresh('behaviors');
+        break;
+      }
+      case 'behavior:correct': {
+        const key = 'ep_events_' + cid;
+        let arr = _load(key);
+        const idx = arr.findIndex(e => String(e.id) === String(payload.eventId));
+        if (idx >= 0) { arr[idx] = { ...arr[idx], corrected: true }; _save(key, arr); }
+        _uiRefresh('behaviors');
+        break;
+      }
+
+      // ── Badges ────────────────────────────────────────────────────────────
+      case 'badge:award': {
+        const key = 'ep_students_' + cid;
+        let arr = _load(key);
+        const idx = arr.findIndex(s => String(s.id) === String(payload.studentId));
+        if (idx >= 0) {
+          const badges = arr[idx].badges || [];
+          if (!badges.includes(payload.badgeId)) {
+            arr[idx] = { ...arr[idx], badges: [...badges, payload.badgeId] };
+            _save(key, arr);
+            _uiRefresh('students');
+          }
+        }
+        break;
+      }
+
+      // ── DNA ───────────────────────────────────────────────────────────────
+      case 'dna:update': {
+        const { studentId, profile } = payload;
+        if (studentId && profile)
+          localStorage.setItem(`ep_dna_${cid}_${studentId}`, JSON.stringify(profile));
+        break;
+      }
+
+      // ── Classes ───────────────────────────────────────────────────────────
+      case 'class:create':
+      case 'class:update':
+      case 'class:delete': {
+        try { DataService.pullClasses().then(() => { try { ClassManager._renderSwitcher(); } catch(_){} }); }
+        catch(_){}
+        break;
+      }
+
+      // ── Settings ──────────────────────────────────────────────────────────
+      case 'settings:save': {
+        try { localStorage.setItem(`ep_settings_${cid}`, JSON.stringify(payload.data || payload)); }
+        catch(_){}
+        break;
+      }
+
+      // ── Seating ───────────────────────────────────────────────────────────
+      case 'seating:save': {
+        try { localStorage.setItem(`ep_seating_${cid}`, JSON.stringify(payload.data || payload));
+              if (typeof SeatingChart !== 'undefined') SeatingChart.render(); }
+        catch(_){}
+        break;
+      }
+
+      // ── App state ─────────────────────────────────────────────────────────
+      case 'appstate:update': {
+        const d = payload.data || {};
+        if (d.lesson_mode) { try { LessonMode.set(d.lesson_mode); } catch(_){} }
+        if (d.theme)       { try { ThemeManager._apply(d.theme, false); } catch(_){} }
+        if (d.quest)       { try { localStorage.setItem('ep_quest', JSON.stringify(d.quest)); QuestEngine.render(); } catch(_){} }
+        if (d.reflections) { try { localStorage.setItem('ep_reflections', JSON.stringify(d.reflections)); SessionReflection.render(); } catch(_){} }
+        break;
+      }
+    }
+  }
+
+  // ── 4. Push snapshot to newly joined device ─────────────────────────────────
+  function _pushSnapshot() {
+    const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : '';
+    if (!cid) return;
+    try {
+      const students = JSON.parse(localStorage.getItem(`ep_students_${cid}`) || '[]');
+      broadcast('student:update', { students, _snapshot: true, _cid: cid });
+    } catch(_) {}
+  }
+
+  // ── 5. Presence UI indicator ─────────────────────────────────────────────────
+  function _updatePresenceUI() {
+    try {
+      const count = _online.length;
+      const pill  = document.getElementById('sync-pill');
+      if (!pill) return;
+      const myId  = DEVICE_ID();
+      const others = _online.filter(d => d !== myId);
+      if (others.length > 0) {
+        pill.className = 'sync-pill synced';
+        const sp = pill.querySelector('span');
+        if (sp) sp.textContent = `🟢 ${others.length + 1} أجهزة متصلة`;
+      }
+    } catch(_) {}
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function _load(key) {
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(_) { return []; }
+  }
+  function _save(key, arr) {
+    try { localStorage.setItem(key, JSON.stringify(arr)); } catch(_) {}
+  }
+  function _uiRefresh(type) {
+    // Instant UI update — no debounce
+    try { StorageManager.invAll(); StudentManager.inv(); EventCache.invalidate(); Analytics.invalidate(); } catch(_){}
+    if (type === 'students') {
+      try { UI._renderStudentQuickGrid(); UI._refreshHeaderStats(); UI._renderDashStats(); UI.renderInsights(); } catch(_){}
+    }
+    if (type === 'behaviors') {
+      try { UI._renderActivityFeed(); UI._refreshHeaderStats(); QuestEngine.render(); } catch(_){}
+      try {
+        const selId = UI._selectedStudentId;
+        if (selId) UI._renderBehaviorPanel(selId);
+      } catch(_){}
+    }
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────────
+  return {
+    connect,
+    broadcast,
+    isReady:      ()  => _ready,
+    onlineCount:  ()  => _online.length,
+    onlineDevices: () => [..._online],
+  };
+})();
+
+window.WASync = WASync;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SYNC SETUP — QR credential sharing + polling fallback for file:// + auto-connect
 // ═══════════════════════════════════════════════════════════════════════════════
 const SyncSetup = (() => {
@@ -23469,7 +24288,6 @@ const SyncMiddleware = (() => {
     const _origSet = StorageManager.set.bind(StorageManager);
     StorageManager.set = function(key, val) {
       const result = _origSet(key, val);
-      // Route key → action type → syncDispatch
       try {
         const cid = typeof ClassManager !== 'undefined' ? ClassManager.activeId() : 'default';
         const studKey = 'ep_students_' + cid;
@@ -23480,8 +24298,18 @@ const SyncMiddleware = (() => {
           syncDispatch({ type: 'behavior:log', table: 'behaviors', payload: val, classId: cid });
         } else if (key === 'ep_classes') {
           syncDispatch({ type: 'class:update', table: 'classes', payload: val });
+          if (typeof WASync !== 'undefined') WASync.broadcast('class:update', { data: val });
         } else if (key === `ep_settings_${cid}`) {
           syncDispatch({ type: 'settings:save', table: 'settings', payload: val, classId: cid });
+          if (typeof WASync !== 'undefined') WASync.broadcast('settings:save', { data: val });
+        } else if (key === 'ep_quest') {
+          if (typeof WASync !== 'undefined') WASync.broadcast('appstate:update', { data: { quest: val } });
+        } else if (key === 'ep_reflections') {
+          if (typeof WASync !== 'undefined') WASync.broadcast('appstate:update', { data: { reflections: val } });
+        } else if (key === 'ep_lesson_mode') {
+          if (typeof WASync !== 'undefined') WASync.broadcast('appstate:update', { data: { lesson_mode: val } });
+        } else if (key === 'ep_theme') {
+          if (typeof WASync !== 'undefined') WASync.broadcast('appstate:update', { data: { theme: val } });
         }
       } catch(_) {}
       return result;
@@ -23602,6 +24430,7 @@ class SyncIntelligence {
         const result = _origCreate(name, extra);
         try {
           SyncIntelligence.queueChange('student:create', result);
+          if (typeof WASync !== 'undefined') WASync.broadcast('student:create', { student: result });
         } catch(_) {}
         return result;
       };
@@ -23613,7 +24442,10 @@ class SyncIntelligence {
       StudentManager.update = function(id, changes) {
         const result = _origUpdate(id, changes);
         try {
-          if (result) SyncIntelligence.queueChange('student:update', result);
+          if (result) {
+            SyncIntelligence.queueChange('student:update', result);
+            if (typeof WASync !== 'undefined') WASync.broadcast('student:update', { student: result });
+          }
         } catch(_) {}
         return result;
       };
@@ -23626,6 +24458,7 @@ class SyncIntelligence {
         const result = _origRemove(id);
         try {
           SyncIntelligence.queueChange('student:delete', { id });
+          if (typeof WASync !== 'undefined') WASync.broadcast('student:delete', { id });
         } catch(_) {}
         return result;
       };
@@ -23637,7 +24470,10 @@ class SyncIntelligence {
       StudentManager.awardBadge = function(id, bid) {
         const result = _origAward(id, bid);
         try {
-          if (result) SyncIntelligence.queueChange('badge:award', { studentId: id, badgeId: bid });
+          if (result) {
+            SyncIntelligence.queueChange('badge:award', { studentId: id, badgeId: bid });
+            if (typeof WASync !== 'undefined') WASync.broadcast('badge:award', { studentId: id, badgeId: bid });
+          }
         } catch(_) {}
         return result;
       };
@@ -23816,3 +24652,5 @@ window.syncDispatch = SyncCore.syncDispatch;  // global alias
 </div>
 </body>
 </html>
+
+
