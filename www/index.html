@@ -23165,29 +23165,194 @@ const DirectConnect = (() => {
     if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
   }
 
+  // ── _ensureJsQR: load decoder then call cb ────────────────────────────────
+  function _ensureJsQR(cb) {
+    if (typeof jsQR !== 'undefined') { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js';
+    s.onload  = cb;
+    s.onerror = () => console.warn('[DirectConnect] jsQR failed to load');
+    document.head.appendChild(s);
+  }
+
+  // ── _decodeImageEl: decode an <img> or ImageData with jsQR ───────────────
+  function _decodeImageEl(imgEl, onResult) {
+    _ensureJsQR(() => {
+      const c = document.createElement('canvas');
+      c.width  = imgEl.naturalWidth  || imgEl.width  || 640;
+      c.height = imgEl.naturalHeight || imgEl.height || 480;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(imgEl, 0, 0, c.width, c.height);
+      try {
+        const id   = ctx.getImageData(0, 0, c.width, c.height);
+        const code = jsQR(id.data, id.width, id.height);
+        if (code) onResult(code.data, null);
+        else      onResult(null, 'لم يُعثر على QR — حاول مجدداً');
+      } catch(e) { onResult(null, e.message); }
+    });
+  }
+
+  // ── Strategy 4 (most reliable on Android): file-input camera capture ──────
+  // Uses native camera app → returns photo → jsQR decodes it
+  // Works in ALL Android environments (WebView, Capacitor, Chrome, Firefox)
+  function _fileInputScan(onResult) {
+    const inp = document.createElement('input');
+    inp.type    = 'file';
+    inp.accept  = 'image/*';
+    inp.setAttribute('capture', 'environment');   // opens rear camera directly
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+
+    inp.onchange = (e) => {
+      const file = e.target?.files?.[0];
+      document.body.removeChild(inp);
+      if (!file) { onResult(null, 'لم يتم اختيار صورة'); return; }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload  = () => _decodeImageEl(img, onResult);
+        img.onerror = () => onResult(null, 'تعذّر تحميل الصورة');
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+    inp.click();
+  }
+
+  // ── Main scanner: 4-strategy fallback chain ───────────────────────────────
+  // Strategy 1: Capacitor Camera plugin (best UX on native Android/iOS)
+  // Strategy 2: Capacitor permissions request → then getUserMedia
+  // Strategy 3: getUserMedia (Chrome/HTTPS — works if permission granted)
+  // Strategy 4: file input capture (works EVERYWHERE — final fallback)
   function _startScanner(videoEl, onResult) {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      onResult(null, 'Camera not available on this device');
+    const isCapacitor = !!(window.Capacitor?.isNativePlatform?.());
+    const isAndroid   = /android/i.test(navigator.userAgent);
+    const statusEl    = document.getElementById('dc-scan-status');
+
+    function _setStatus(msg) {
+      if (statusEl) statusEl.textContent = msg;
+    }
+
+    // ── Strategy 1: Capacitor Camera plugin ──────────────────────────────
+    if (isCapacitor && window.Capacitor?.Plugins?.Camera) {
+      const Cam = window.Capacitor.Plugins.Camera;
+      _setStatus('فتح الكاميرا…');
+      Cam.requestPermissions({ permissions: ['camera'] })
+        .then(() => Cam.getPhoto({
+          quality:       90,
+          allowEditing:  false,
+          resultType:    'dataUrl',   // base64 data URL
+          source:        'CAMERA',
+          correctOrientation: true,
+        }))
+        .then(result => {
+          _setStatus('✅ تم التقاط الصورة — جارٍ المسح…');
+          const img = new Image();
+          img.onload  = () => _decodeImageEl(img, onResult);
+          img.onerror = () => onResult(null, 'تعذّر معالجة الصورة');
+          img.src = result.dataUrl;
+        })
+        .catch(err => {
+          if (/cancel|denied/i.test(err?.message || '')) {
+            _setStatus('⚠️ تم رفض الإذن — جرّب طريقة أخرى');
+            _showAndroidFallbackUI(onResult);
+          } else {
+            // Capacitor plugin error → fall through to getUserMedia
+            _strategy2(videoEl, onResult, isAndroid, _setStatus);
+          }
+        });
       return;
     }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+
+    // ── Strategy 2-4 (browser) ────────────────────────────────────────────
+    _strategy2(videoEl, onResult, isAndroid, _setStatus);
+  }
+
+  function _strategy2(videoEl, onResult, isAndroid, _setStatus) {
+    // Request permission explicitly via Permissions API first (Android Chrome)
+    const tryPermission = (navigator.permissions?.query)
+      ? navigator.permissions.query({ name: 'camera' }).catch(() => null)
+      : Promise.resolve(null);
+
+    tryPermission.then(perm => {
+      if (perm?.state === 'denied') {
+        _setStatus('🚫 إذن الكاميرا مرفوض');
+        _showAndroidFallbackUI(onResult);
+        return;
+      }
+      // ── Strategy 3: getUserMedia ─────────────────────────────────────────
+      if (!navigator.mediaDevices?.getUserMedia) {
+        // No getUserMedia at all → go straight to file input
+        _setStatus('📷 فتح الكاميرا…');
+        _fileInputScan(onResult);
+        return;
+      }
+
+      _setStatus('📷 جارٍ طلب إذن الكاميرا…');
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width:  { ideal: 1280 },
+          height: { ideal: 720 },
+        }
+      })
       .then(stream => {
         _scanStream = stream;
         videoEl.srcObject = stream;
+        videoEl.style.display = 'block';
         videoEl.play();
-
-        // Dynamically load jsQR for decoding
-        if (typeof jsQR === 'undefined') {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js';
-          s.onload = () => _scanLoop(videoEl, onResult);
-          s.onerror = () => onResult(null, 'QR decoder failed to load');
-          document.head.appendChild(s);
-        } else {
-          _scanLoop(videoEl, onResult);
-        }
+        _setStatus('🔍 وجّه الكاميرا نحو الـ QR…');
+        _ensureJsQR(() => _scanLoop(videoEl, onResult));
       })
-      .catch(err => onResult(null, `Camera error: ${err.message}`));
+      .catch(err => {
+        const isPermError = /Permission|NotAllowed|denied/i.test(err.name + err.message);
+        if (isPermError) {
+          _setStatus('🚫 تم رفض إذن الكاميرا');
+          _showAndroidFallbackUI(onResult);
+        } else {
+          // Non-permission error (hardware, etc.) → file input
+          _setStatus('⚠️ الكاميرا غير متاحة — سيتم فتح صورة بدلاً');
+          setTimeout(() => _fileInputScan(onResult), 800);
+        }
+      });
+    });
+  }
+
+  // ── Fallback UI for Android when permission denied ────────────────────────
+  function _showAndroidFallbackUI(onResult) {
+    const area    = document.getElementById('dc-scanner-area');
+    const statusEl = document.getElementById('dc-scan-status');
+    if (area) {
+      area.innerHTML = `
+        <div style="padding:16px;text-align:center">
+          <div style="font-size:28px;margin-bottom:8px">📷</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px">
+            تعذّر فتح الكاميرا
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);line-height:1.6;margin-bottom:14px">
+            اختر إحدى الطريقتين أدناه:
+          </div>
+          <button class="btn btn-primary btn-sm" style="width:100%;margin-bottom:8px"
+                  id="dc-photo-btn">
+            📸 التقط صورة للـ QR
+          </button>
+          <div style="font-size:10px;color:var(--text-muted);margin:8px 0">— أو —</div>
+          <div style="font-size:10px;color:var(--text-muted);line-height:1.5">
+            <strong>لتفعيل الكاميرا:</strong><br>
+            إعدادات الجهاز → التطبيقات → المتصفح → الأذونات → الكاميرا → سماح
+          </div>
+        </div>`;
+
+      document.getElementById('dc-photo-btn')?.addEventListener('click', () => {
+        if (statusEl) statusEl.textContent = '📷 فتح الكاميرا…';
+        _fileInputScan((data, err) => {
+          if (statusEl) statusEl.textContent = err
+            ? `⚠️ ${err}` : '✅ تم اكتشاف الـ QR!';
+          onResult(data, err);
+        });
+      });
+    }
   }
 
   function _scanLoop(videoEl, onResult) {
@@ -23365,38 +23530,64 @@ const DirectConnect = (() => {
               </div>`}
           </div>
 
-          <!-- Guest: scan QR -->
+          <!-- Guest: scan QR — Android-first design -->
           <div id="dc-guest-panel" style="display:${role==='guest'?'block':'none'}">
-            <div style="text-align:center;margin-bottom:10px">
-              <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:12px">
-                Point your camera at the QR code on the <strong>host device</strong>.<br>
-                You'll be linked instantly.
-              </div>
+
+            <!-- Primary: native camera button — works everywhere no permissions needed -->
+            <div style="text-align:center;padding:10px 0 14px">
+              <button id="dc-capture-btn"
+                onclick="DirectConnect._triggerCapture()"
+                style="width:100%;padding:18px 12px;border-radius:14px;border:none;cursor:pointer;
+                       background:linear-gradient(135deg,var(--accent),#6c63ff);color:#fff;
+                       font-size:16px;font-weight:700;display:flex;align-items:center;
+                       justify-content:center;gap:10px;letter-spacing:.3px;
+                       box-shadow:0 4px 20px rgba(79,142,247,.4)">
+                <span style="font-size:28px">📷</span>
+                <div style="text-align:left">
+                  <div>افتح الكاميرا</div>
+                  <div style="font-size:11px;font-weight:400;opacity:.85">وجّهها نحو الـ QR على الكمبيوتر</div>
+                </div>
+              </button>
+              <div id="dc-scan-status" style="font-size:11px;color:var(--text-muted);
+                   margin-top:10px;min-height:18px;text-align:center"></div>
             </div>
-            <div id="dc-scanner-area" style="position:relative;border-radius:12px;overflow:hidden;
-                 background:#000;max-height:280px;margin-bottom:12px">
+
+            <!-- Live scanner (hidden initially, shown if getUserMedia works) -->
+            <div id="dc-scanner-area" style="display:none;position:relative;border-radius:12px;
+                 overflow:hidden;background:#111;max-height:240px;margin-bottom:10px">
               <video id="dc-video" autoplay playsinline muted
-                     style="width:100%;display:block;max-height:280px;object-fit:cover"></video>
-              <!-- Scan overlay -->
-              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-                   pointer-events:none">
-                <div style="width:160px;height:160px;border:3px solid var(--accent);border-radius:12px;
-                     box-shadow:0 0 0 2000px rgba(0,0,0,.35)"></div>
+                     style="width:100%;display:block;max-height:240px;object-fit:cover"></video>
+              <div style="position:absolute;inset:0;display:flex;align-items:center;
+                   justify-content:center;pointer-events:none">
+                <div style="width:140px;height:140px;border:3px solid var(--accent);
+                     border-radius:12px;box-shadow:0 0 0 2000px rgba(0,0,0,.5)"></div>
               </div>
+              <button onclick="DirectConnect._closeLiveScanner()"
+                style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);
+                       color:#fff;border:none;border-radius:99px;width:28px;height:28px;
+                       font-size:14px;cursor:pointer;display:flex;align-items:center;
+                       justify-content:center">✕</button>
             </div>
-            <div id="dc-scan-status" style="font-size:11px;color:var(--text-muted);text-align:center;
-                 padding:4px;min-height:20px">
-              Starting camera…
+
+            <!-- Try live scanner link -->
+            <div style="text-align:center;margin-bottom:12px">
+              <button class="btn btn-ghost btn-xs" onclick="DirectConnect._tryLiveScanner()"
+                      style="font-size:10px">
+                🎥 جرّب المسح المباشر (يحتاج HTTPS)
+              </button>
             </div>
-            <div style="margin-top:10px;text-align:center">
+
+            <!-- Manual paste fallback -->
+            <div style="border-top:1px solid var(--border);padding-top:12px;text-align:center">
               <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">
-                — or paste the code manually —
+                أو الصق رمز الجلسة يدوياً
               </div>
               <div style="display:flex;gap:6px">
-                <input class="input" id="dc-manual-token" placeholder="Paste token here…"
-                       style="flex:1;font-size:10px"/>
+                <input class="input" id="dc-manual-token"
+                       placeholder="الصق الرمز هنا…"
+                       style="flex:1;font-size:10px;direction:ltr"/>
                 <button class="btn btn-primary btn-xs"
-                        onclick="DirectConnect._applyManual()">Connect</button>
+                        onclick="DirectConnect._applyManual()">ربط</button>
               </div>
             </div>
           </div>
@@ -23466,28 +23657,104 @@ const DirectConnect = (() => {
     }, 1000);
   }
 
-  // ── Guest init: start camera ───────────────────────────────────────────────
+  // ── Guest init: show capture button immediately (no camera needed upfront) ──
   function _initGuest() {
-    const video = document.getElementById('dc-video');
-    const status = document.getElementById('dc-scan-status');
-    if (!video) return;
-    _startScanner(video, async (data, err) => {
-      if (err) {
-        if (status) status.textContent = `⚠️ ${err}`;
+    // Nothing to init — button is already visible and triggers _triggerCapture
+    // The video element is hidden until _tryLiveScanner is clicked
+  }
+
+  // ── _triggerCapture: opens native camera app — works everywhere on Android ─
+  async function _triggerCapture() {
+    const status  = document.getElementById('dc-scan-status');
+    const capBtn  = document.getElementById('dc-capture-btn');
+
+    if (status) status.textContent = '📷 فتح الكاميرا…';
+
+    // Strategy 1: Capacitor Camera plugin (best on APK)
+    if (window.Capacitor?.Plugins?.Camera) {
+      try {
+        await window.Capacitor.Plugins.Camera.requestPermissions({ permissions: ['camera'] });
+        const result = await window.Capacitor.Plugins.Camera.getPhoto({
+          quality: 90, allowEditing: false, resultType: 'dataUrl', source: 'CAMERA',
+          correctOrientation: true,
+        });
+        if (status) status.textContent = '🔍 جارٍ تحليل الـ QR…';
+        const img = new Image();
+        img.onload  = () => _decodeImageEl(img, (data, err) => _handleScanResult(data, err, status));
+        img.onerror = () => { if(status) status.textContent = '⚠️ تعذّر تحميل الصورة'; };
+        img.src = result.dataUrl;
         return;
+      } catch(e) {
+        if (!/cancel/i.test(e?.message || '')) {
+          // Non-cancel error: fall through to file input
+        } else {
+          if (status) status.textContent = '↩️ تم الإلغاء';
+          return;
+        }
       }
-      if (status) status.textContent = '✅ QR detected — linking…';
-      // Extract token from edupulse://join?t=TOKEN or raw token
-      let token = data;
-      try { token = new URL(data).searchParams.get('t') || data; } catch(_) {}
-      const ok = await _applyToken(token);
-      if (ok) {
-        setTimeout(() => App.closeModal(), 1000);
-      } else {
-        if (status) status.textContent = '❌ Invalid or expired code';
-        setTimeout(() => _initGuest(), 2000);  // retry
-      }
-    });
+    }
+
+    // Strategy 2: File input + capture='environment' (opens native camera on Android)
+    // Works on http://, file://, capacitor:// — NO HTTPS NEEDED
+    _fileInputScan((data, err) => _handleScanResult(data, err, status));
+  }
+
+  // ── _tryLiveScanner: optional live preview — requires HTTPS ───────────────
+  function _tryLiveScanner() {
+    const area   = document.getElementById('dc-scanner-area');
+    const video  = document.getElementById('dc-video');
+    const status = document.getElementById('dc-scan-status');
+    if (!area || !video) return;
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      NotificationEngine.warning('غير متاح', 'المسح المباشر يحتاج HTTPS. استخدم زر الكاميرا.');
+      return;
+    }
+
+    area.style.display = 'block';
+    if (status) status.textContent = '📷 جارٍ طلب الإذن…';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment', width:{ideal:1280} } })
+      .then(stream => {
+        _scanStream = stream;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        video.play();
+        if (status) status.textContent = '🔍 وجّه الكاميرا نحو الـ QR…';
+        _ensureJsQR(() => _scanLoop(video, (data, err) => {
+          area.style.display = 'none';
+          _handleScanResult(data, err, status);
+        }));
+      })
+      .catch(err => {
+        area.style.display = 'none';
+        if (status) status.textContent = '🚫 ' + (/Permission|NotAllowed/i.test(err.name)
+          ? 'الإذن مرفوض — استخدم زر 📷 أعلاه' : err.message);
+      });
+  }
+
+  function _closeLiveScanner() {
+    _stopScan();
+    const area = document.getElementById('dc-scanner-area');
+    if (area) area.style.display = 'none';
+  }
+
+  // ── Shared result handler ─────────────────────────────────────────────────
+  async function _handleScanResult(data, err, statusEl) {
+    if (err) {
+      if (statusEl) statusEl.textContent = `⚠️ ${err}`;
+      return;
+    }
+    if (statusEl) statusEl.textContent = '✅ تم اكتشاف الـ QR — جارٍ الربط…';
+    let token = data;
+    try { token = new URL(data).searchParams.get('t') || data; } catch(_) {}
+    const ok = await _applyToken(token);
+    if (ok) {
+      NotificationEngine.success('🔗 تم الربط!', 'الجهاز متصل ومتزامن الآن');
+      setTimeout(() => App.closeModal(), 800);
+    } else {
+      if (statusEl) statusEl.textContent = '❌ رمز منتهي — اطلب من الكمبيوتر تجديد الـ QR';
+    }
   }
 
   async function _applyManual() {
@@ -23576,6 +23843,9 @@ const DirectConnect = (() => {
     _refreshQR,
     _applyManual,
     _applyToken,
+    _triggerCapture,
+    _tryLiveScanner,
+    _closeLiveScanner,
   };
 })();
 
@@ -24652,5 +24922,3 @@ window.syncDispatch = SyncCore.syncDispatch;  // global alias
 </div>
 </body>
 </html>
-
-
