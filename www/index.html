@@ -853,38 +853,47 @@ a{text-decoration:none;color:inherit}
 .beh-btn{
   display:flex;flex-direction:column;
   align-items:center;justify-content:center;
-  gap:3px;
-  width:100%;height:64px;
+  padding:6px 4px;
+  gap:2px;
+  width:100%;min-height:66px;
   border-radius:10px;
   border:none;cursor:pointer;
   transition:background .15s,transform .12s,box-shadow .12s;
   flex-shrink:0;
   position:relative;
-  overflow:hidden;
+  overflow:visible;        /* never clip children */
   min-width:0;
   box-sizing:border-box;
-  /* CRITICAL: manipulation disables double-tap-zoom so tap fires instantly
-     without the 300ms delay, and the parent container can still scroll freely */
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
   user-select:none;
 }
 .beh-btn .beh-icon{
-  font-size:20px;line-height:1;
+  font-size:18px;
+  line-height:1.1;
+  display:block;
+  flex-shrink:0;
 }
 .beh-btn .beh-label{
-  font-size:8px;font-weight:600;
-  text-align:center;line-height:1.2;
-  max-width:58px;
-  overflow:hidden;
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  line-clamp:2;
-  -webkit-box-orient:vertical;
+  font-size:9px;
+  font-weight:700;
+  text-align:center;
+  line-height:1.2;
+  color:inherit;
+  display:block;
+  width:100%;
+  max-width:68px;
+  word-break:break-word;
+  hyphens:auto;
+  flex-shrink:0;
 }
 .beh-btn .beh-pts{
-  font-size:8px;font-family:var(--mono);font-weight:700;
-  opacity:.8;
+  font-size:8px;
+  font-family:var(--mono);
+  font-weight:700;
+  opacity:.85;
+  display:block;
+  flex-shrink:0;
 }
 .beh-btn.pos{
   background:rgba(34,197,94,.12);
@@ -908,6 +917,40 @@ a{text-decoration:none;color:inherit}
 .beh-btn.neg:active{transform:scale(0.94)}
 .beh-btn.flash-btn{animation:btnFlash 0.3s ease}
 @keyframes btnFlash{0%,100%{transform:scale(1)}50%{transform:scale(0.94)}}
+
+/* Positive tap: bright green surge */
+.beh-btn.pos.beh-fired{
+  animation:behFiredPos 0.45s cubic-bezier(.25,.46,.45,.94);
+}
+@keyframes behFiredPos{
+  0%{transform:scale(1);background:rgba(34,197,94,.12);box-shadow:none}
+  30%{transform:scale(1.12);background:rgba(34,197,94,.55);box-shadow:0 0 22px rgba(34,197,94,.6)}
+  70%{transform:scale(1.06);background:rgba(34,197,94,.35);box-shadow:0 0 14px rgba(34,197,94,.4)}
+  100%{transform:scale(1);background:rgba(34,197,94,.12);box-shadow:none}
+}
+
+/* Negative tap: red flash shake */
+.beh-btn.neg.beh-fired{
+  animation:behFiredNeg 0.42s cubic-bezier(.25,.46,.45,.94);
+}
+@keyframes behFiredNeg{
+  0%{transform:scale(1) translateX(0);background:rgba(239,68,68,.12);box-shadow:none}
+  20%{transform:scale(1.08) translateX(-3px);background:rgba(239,68,68,.55);box-shadow:0 0 20px rgba(239,68,68,.55)}
+  40%{transform:scale(1.05) translateX(3px);background:rgba(239,68,68,.42)}
+  60%{transform:scale(1.03) translateX(-2px);background:rgba(239,68,68,.3)}
+  100%{transform:scale(1) translateX(0);background:rgba(239,68,68,.12);box-shadow:none}
+}
+
+/* Ripple effect inside button */
+.beh-ripple{
+  position:absolute;border-radius:50%;
+  pointer-events:none;transform:scale(0);
+  animation:behRipple 0.5s ease-out forwards;
+  will-change:transform,opacity;
+}
+@keyframes behRipple{
+  to{transform:scale(4);opacity:0}
+}
 .bp-note input{
   font-size:11px;padding:6px 10px;
 }
@@ -1108,7 +1151,7 @@ a{text-decoration:none;color:inherit}
   .btn{ min-height:40px }
   .student-quick-card{ min-height:80px }
   .scard-edit-btn{ width:28px; height:28px; font-size:13px }
-  .beh-btn{ padding:10px 8px; font-size:13px; min-height:44px }
+  .beh-btn{ padding:7px 5px; min-height:62px; overflow:visible }
 }
 .chart-container canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important}
 .heatmap-wrap{overflow-x:auto}
@@ -1924,9 +1967,9 @@ a{text-decoration:none;color:inherit}
   .bp-note-wrap{ padding:6px 12px }
   .bp-scroll-body{ padding:6px 12px 12px }
   .behavior-btns{ grid-template-columns:repeat(auto-fill,minmax(50px,1fr)); gap:4px }
-  .beh-btn{ height:54px; border-radius:8px }
+  .beh-btn{ min-height:60px; border-radius:8px; overflow:visible }
   .beh-btn .beh-icon{ font-size:16px }
-  .beh-btn .beh-label{ font-size:7px }
+  .beh-btn .beh-label{ font-size:8px; font-weight:700 }
   .beh-btn .beh-pts{ font-size:7px }
   .analytics-grid{ grid-template-columns:1fr; padding:8px; gap:8px }
   .reports-grid{ grid-template-columns:1fr; gap:8px; padding:8px }
@@ -2124,12 +2167,13 @@ a{text-decoration:none;color:inherit}
     gap:3px !important;
   }
   .beh-btn{
-    height:48px !important;
+    min-height:58px !important;
+    padding:5px 3px !important;
     border-radius:7px !important;
   }
-  .beh-btn .beh-icon{ font-size:15px !important }
-  .beh-btn .beh-label{ font-size:6px !important; max-width:100% }
-  .beh-btn .beh-pts{ font-size:6px !important }
+  .beh-btn .beh-icon{ font-size:14px !important }
+  .beh-btn .beh-label{ font-size:8px !important; font-weight:700 !important; }
+  .beh-btn .beh-pts{ font-size:7px !important }
   .behavior-section-label{
     font-size:8px !important; margin-top:5px !important; margin-bottom:3px !important;
   }
@@ -4105,6 +4149,266 @@ body.day-mode .sg-group-col{ background:var(--bg-card) }
 body.day-mode .ss-preview-seat{ background:var(--bg-elevated) }
 body.day-mode .ss-strat{ background:var(--bg-card) }
 
+/* ═══════════════════════════════════════════════════════════
+   COLD CALL OVERLAY — Full-screen dramatic picker
+════════════════════════════════════════════════════════════ */
+#cc-overlay{
+  position:fixed;inset:0;z-index:calc(var(--z-modal) + 10);
+  background:rgba(0,0,0,.88);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:28px;
+  opacity:0;pointer-events:none;
+  transition:opacity .22s ease;
+}
+#cc-overlay.cc-open{ opacity:1;pointer-events:all; }
+
+/* Spotlight ring behind the avatar area */
+#cc-spotlight{
+  position:absolute;
+  width:380px;height:380px;
+  border-radius:50%;
+  background:radial-gradient(circle,
+    rgba(79,142,247,.18) 0%,
+    rgba(79,142,247,.06) 50%,
+    transparent 72%);
+  pointer-events:none;
+  animation:ccSpotPulse 2.4s ease-in-out infinite;
+}
+@keyframes ccSpotPulse{
+  0%,100%{ transform:scale(.95);opacity:.7 }
+  50%{     transform:scale(1.05);opacity:1 }
+}
+
+/* Drum roll title */
+#cc-title{
+  font-size:13px;font-weight:800;text-transform:uppercase;
+  letter-spacing:3px;color:var(--text-muted);
+  animation:ccTitlePulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes ccTitlePulse{ to{ color:var(--accent);letter-spacing:4px } }
+
+/* ── Slot machine ─────────────────────────────────────────── */
+#cc-drum{
+  width:220px;
+  overflow:hidden;
+  position:relative;
+  /* fade top & bottom edges */
+  mask-image:linear-gradient(to bottom,
+    transparent 0%,rgba(0,0,0,.15) 15%,
+    #000 35%,#000 65%,
+    rgba(0,0,0,.15) 85%,transparent 100%);
+  -webkit-mask-image:linear-gradient(to bottom,
+    transparent 0%,rgba(0,0,0,.15) 15%,
+    #000 35%,#000 65%,
+    rgba(0,0,0,.15) 85%,transparent 100%);
+}
+#cc-drum-inner{
+  display:flex;flex-direction:column;
+  transition:transform 0.06s linear; /* controlled by JS */
+  will-change:transform;
+}
+.cc-drum-item{
+  height:88px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;flex-shrink:0;
+}
+.cc-drum-item .cc-di-avatar{ font-size:36px;line-height:1 }
+.cc-drum-item .cc-di-name{
+  font-size:13px;font-weight:700;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:200px;text-align:center;
+}
+
+/* ── Reveal card — shown after drum stops ─────────────────── */
+#cc-reveal{
+  display:none;flex-direction:column;align-items:center;gap:12px;
+  animation:ccRevealIn .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes ccRevealIn{
+  from{ opacity:0;transform:scale(.6) translateY(30px) }
+  to{   opacity:1;transform:scale(1) translateY(0) }
+}
+.cc-reveal-avatar{
+  font-size:80px;line-height:1;
+  filter:drop-shadow(0 0 28px rgba(79,142,247,.7));
+  animation:ccAvatarFloat 2s ease-in-out infinite;
+}
+@keyframes ccAvatarFloat{
+  0%,100%{ transform:translateY(0) }
+  50%{     transform:translateY(-8px) }
+}
+.cc-reveal-name{
+  font-size:36px;font-weight:900;color:#fff;
+  text-shadow:0 0 40px rgba(79,142,247,.8),0 2px 12px rgba(0,0,0,.5);
+  text-align:center;
+  animation:ccNameGlow 1.6s ease-in-out infinite alternate;
+}
+@keyframes ccNameGlow{
+  from{ text-shadow:0 0 20px rgba(79,142,247,.6),0 2px 8px rgba(0,0,0,.5) }
+  to{   text-shadow:0 0 60px rgba(79,142,247,1), 0 2px 16px rgba(0,0,0,.6) }
+}
+.cc-reveal-meta{
+  font-size:13px;color:var(--text-secondary);
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;padding:5px 16px;
+  display:flex;gap:12px;align-items:center;
+}
+.cc-reveal-meta span{ font-family:var(--mono);font-weight:700 }
+.cc-reveal-meta span.pos{ color:var(--green) }
+.cc-reveal-meta span.warn{ color:var(--orange) }
+
+/* ── Weights panel (bottom of overlay) ───────────────────── */
+#cc-weights-panel{
+  max-height:120px;overflow-y:auto;width:min(400px,88vw);
+  display:flex;flex-direction:column;gap:3px;
+}
+.cc-weight-row{
+  display:flex;align-items:center;gap:7px;padding:4px 8px;
+  border-radius:6px;font-size:10px;color:var(--text-secondary);
+  transition:background .2s ease;
+}
+.cc-weight-row.cc-chosen{
+  background:rgba(79,142,247,.18);border:1px solid rgba(79,142,247,.3);
+  color:var(--accent);font-weight:700;
+}
+.cc-weight-bar-wrap{ flex:1;height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden }
+.cc-weight-bar-fill{ height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease }
+
+/* ── Footer buttons ──────────────────────────────────────── */
+#cc-footer{ display:flex;gap:10px;align-items:center }
+.cc-btn{
+  padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .15s ease;
+}
+.cc-btn-primary{
+  background:var(--accent);color:#fff;
+  box-shadow:0 4px 20px rgba(79,142,247,.4);
+}
+.cc-btn-primary:hover{ transform:translateY(-1px);box-shadow:0 6px 26px rgba(79,142,247,.55) }
+.cc-btn-ghost{
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.15);color:var(--text-secondary);
+}
+.cc-btn-ghost:hover{ background:rgba(255,255,255,.12);color:var(--text-primary) }
+
+/* Canvas for confetti inside overlay */
+#cc-confetti-canvas{
+  position:absolute;inset:0;pointer-events:none;z-index:0;
+}
+
+/* Selector frame (center line indicator) */
+#cc-drum-frame{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:220px;height:88px;
+  border:2px solid rgba(79,142,247,.6);
+  border-radius:10px;
+  box-shadow:0 0 24px rgba(79,142,247,.3),inset 0 0 12px rgba(79,142,247,.08);
+  pointer-events:none;z-index:2;
+  animation:ccFramePulse 1.2s ease-in-out infinite;
+}
+@keyframes ccFramePulse{
+  0%,100%{ border-color:rgba(79,142,247,.6) }
+  50%{     border-color:rgba(79,142,247,1) }
+}
+
+/* Day mode */
+body.day-mode #cc-overlay{ background:rgba(10,20,40,.82) }
+body.day-mode .cc-reveal-name{ color:#fff }
+body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
+
+/* ══════════════════════════════════════════════════════════════
+   BEHAVIOR MOTIVATOR — big animated banner per behavior log
+   Appears center-screen for 1.8s then fades out.
+   Positive = green, Negative = red/serious tone.
+══════════════════════════════════════════════════════════════ */
+#bm-container{
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+  z-index:calc(var(--z-notif) + 5);
+}
+.bm-toast{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:18px 28px;
+  border-radius:18px;
+  max-width:min(88vw,480px);
+  min-width:260px;
+  pointer-events:none;
+  will-change:transform,opacity;
+  position:absolute;
+}
+.bm-toast.bm-pos{
+  background:linear-gradient(135deg,rgba(22,163,74,.92),rgba(4,120,87,.88));
+  border:1.5px solid rgba(74,222,128,.45);
+  box-shadow:0 12px 48px rgba(22,163,74,.38),
+             0 2px  8px rgba(0,0,0,.35);
+}
+.bm-toast.bm-neg{
+  background:linear-gradient(135deg,rgba(180,28,28,.92),rgba(127,29,29,.88));
+  border:1.5px solid rgba(248,113,113,.35);
+  box-shadow:0 12px 48px rgba(180,28,28,.38),
+             0 2px  8px rgba(0,0,0,.35);
+}
+.bm-icon{
+  font-size:40px;
+  line-height:1;
+  flex-shrink:0;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.3));
+}
+.bm-body{ flex:1;min-width:0; }
+.bm-name{
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+  color:rgba(255,255,255,.7);
+  margin-bottom:3px;
+}
+.bm-label{
+  font-size:20px;
+  font-weight:800;
+  color:#fff;
+  line-height:1.2;
+  text-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.bm-pts{
+  font-size:13px;
+  font-family:var(--mono);
+  font-weight:700;
+  color:rgba(255,255,255,.85);
+  margin-top:3px;
+}
+.bm-phrase{
+  font-size:11px;
+  color:rgba(255,255,255,.65);
+  margin-top:4px;
+  font-style:italic;
+}
+
+/* In → stay → out */
+@keyframes bmIn{
+  0%  { opacity:0; transform:scale(.75) translateY(24px); }
+  35% { opacity:1; transform:scale(1.04) translateY(-3px); }
+  55% { transform:scale(1) translateY(0); }
+  100%{ opacity:1; transform:scale(1) translateY(0); }
+}
+@keyframes bmOut{
+  0%  { opacity:1; transform:scale(1) translateY(0); }
+  100%{ opacity:0; transform:scale(.88) translateY(-18px); }
+}
+.bm-toast.entering{
+  animation:bmIn .32s cubic-bezier(.34,1.56,.64,1) both;
+}
+.bm-toast.leaving{
+  animation:bmOut .22s ease-in both;
+}
+
 </style>
 </head>
 <body>
@@ -4874,22 +5178,12 @@ body.day-mode .ss-strat{ background:var(--bg-card) }
             Sync works best when served via HTTP. For full PWA + sync support, open via your web server or place the file in your Capacitor <code style="font-size:10px">www/</code> folder and run <code style="font-size:10px">npx cap run android</code>.
           </div>
 
-          <!-- ==================== AUTO SUPABASE CONFIG - EDITED FOR YOU ==================== -->
-<div class="form-group">
-  <label class="label" for="sb-url">Supabase Project URL</label>
-  <input class="input" id="sb-url" 
-         value="https://lggtwacnkrjdccempoxu.supabase.co"
-         placeholder="https://xxxx.supabase.co"
-         data-tip="Your Supabase project URL"/>
-</div>
-
-<div class="form-group">
-  <label class="label" for="sb-anon-key">Supabase Anon Key</label>
-  <input class="input" id="sb-anon-key" 
-         value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxnZ3R3YWNua3JqZGNjZW1wb3h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MjAwMDAsImV4cCI6MjA2MDI5NjAwMH0.your-full-key-here"
-         placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
-         data-tip="Your Supabase anon key"/>
-</div>
+          <div class="form-group">
+            <label class="label" for="sb-url">Supabase Project URL</label>
+            <input class="input" id="sb-url"
+                   placeholder="https://xxxx.supabase.co"
+                   data-tip="Your Supabase project URL — found in Project Settings → API"/>
+          </div>
           <div class="form-group">
             <label class="label" for="sb-anon-key">Supabase Anon Key</label>
             <input class="input" id="sb-anon-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…"
@@ -5363,6 +5657,59 @@ body.day-mode .ss-strat{ background:var(--bg-card) }
   </div>
 </div>
 
+
+<!-- ═══════════════ COLD CALL FULL-SCREEN OVERLAY ══════════ -->
+
+<!-- ═══════════ COLD CALL — CANVAS OVERLAY ════════════════ -->
+<div id="cc-root" style="
+  display:none;position:fixed;inset:0;z-index:99998;
+  background:#000;overflow:hidden;user-select:none;
+  -webkit-user-select:none;">
+  <canvas id="cc-canvas" style="display:block;width:100%;height:100%"></canvas>
+  <!-- DOM buttons — always on top of canvas -->
+  <div id="cc-btns" style="
+    position:absolute;bottom:32px;left:0;right:0;
+    display:flex;justify-content:center;gap:12px;
+    pointer-events:all;">
+    <button id="cc-btn-spin" onclick="ColdCallOverlay.spin()" style="
+      padding:14px 36px;border-radius:12px;font-size:16px;font-weight:800;
+      background:linear-gradient(135deg,#4f8ef7,#6c63ff);
+      color:#fff;border:none;cursor:pointer;
+      box-shadow:0 6px 28px rgba(79,142,247,.55);
+      transition:transform .1s,box-shadow .1s;letter-spacing:.5px">
+      🎲 &nbsp; SPIN
+    </button>
+    <button onclick="ColdCallOverlay.close()" style="
+      padding:14px 24px;border-radius:12px;font-size:15px;font-weight:700;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.18);
+      color:rgba(255,255,255,.7);cursor:pointer;
+      transition:background .1s">
+      ✕
+    </button>
+  </div>
+  <div id="cc-btn-again" style="
+    display:none;position:absolute;bottom:32px;left:0;right:0;
+    justify-content:center;gap:12px;">
+    <button onclick="ColdCallOverlay.spin()" style="
+      padding:14px 28px;border-radius:12px;font-size:15px;font-weight:800;
+      background:linear-gradient(135deg,#4f8ef7,#6c63ff);
+      color:#fff;border:none;cursor:pointer;
+      box-shadow:0 6px 28px rgba(79,142,247,.45)">
+      🎲 Pick Again
+    </button>
+    <button onclick="ColdCallOverlay.close()" style="
+      padding:14px 24px;border-radius:12px;font-size:15px;font-weight:700;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.18);
+      color:rgba(255,255,255,.7);cursor:pointer">
+      ✕ Close
+    </button>
+  </div>
+</div>
+
+
+<div id="bm-container"></div>
 <!-- -═════════════════════════════════ SCRIPTS ══════════════════════════════════ -->
 <script>
 /*
@@ -5546,16 +5893,20 @@ const CONFIG = {
      desc:'All 7 badge tiers collected — School Honor Level achieved.',
      color:'var(--gold)',   req:{type:'all_badges'},               rarity:'legendary'},
     // -─ Legacy badges (preserved for existing data) ───────────────────────────
-    {id:'team_player',       name:'Team Player',       icon:'🤝', tier:0, color:'var(--cyan)',   req:{beh:'teamwork',     cnt:5},  rarity:'common'},
-    {id:'homework_hero',     name:'Homework Hero',     icon:'📚', tier:0, color:'var(--purple)', req:{beh:'homework',     cnt:5},  rarity:'common'},
-    {id:'respect_champ',     name:'Respect Champion',  icon:'🌟', tier:0, color:'var(--cyan)',   req:{beh:'respectful',   cnt:8},  rarity:'uncommon'},
-    {id:'participation_star',name:'Participation Star',icon:'✋', tier:0, color:'var(--green)',  req:{beh:'participation',cnt:10}, rarity:'uncommon'},
-    {id:'class_helper',      name:'Class Helper',      icon:'💡', tier:0, color:'var(--accent)', req:{beh:'helping',      cnt:6},  rarity:'uncommon'},
-    {id:'born_leader',       name:'Born Leader',       icon:'⭐', tier:0, color:'var(--orange)', req:{beh:'leadership',   cnt:4},  rarity:'rare'},
-    {id:'perfect_week',      name:'Perfect Week',      icon:'🏆', tier:0, color:'var(--gold)',   req:{type:'perfect_week'},       rarity:'rare'},
-    {id:'century_club',      name:'Century Club',      icon:'💯', tier:0, color:'var(--red)',    req:{type:'score',score:200},    rarity:'epic'},
-    {id:'comeback_kid',      name:'Comeback Kid',      icon:'🔥', tier:0, color:'var(--orange)', req:{type:'comeback',delta:15},  rarity:'epic'},
-    {id:'all_rounder',       name:'All Rounder',       icon:'🎯', tier:0, color:'var(--purple)', req:{type:'all_pos'},            rarity:'legendary'},
+    // ── Legacy badges (tier:0) — preserved for existing badge holders ──────────
+    // These were the original badge set. Kept in BADGE_DEFS so students who
+    // already earned them keep them. Some are aliases of tier badges above.
+    // Marked legacy:true so new code can skip them in progress displays.
+    {id:'team_player',       name:'Team Player',       icon:'🤝', tier:0, legacy:true, color:'var(--cyan)',   req:{beh:'teamwork',     cnt:5},  rarity:'common'},
+    {id:'homework_hero',     name:'Homework Hero',     icon:'📚', tier:0, legacy:true, color:'var(--purple)', req:{beh:'homework',     cnt:5},  rarity:'common'},
+    {id:'respect_champ',     name:'Respect Champion',  icon:'🌟', tier:0, legacy:true, color:'var(--cyan)',   req:{beh:'respectful',   cnt:8},  rarity:'uncommon'},
+    {id:'participation_star',name:'Participation Star',icon:'✋', tier:0, legacy:true, color:'var(--green)',  req:{beh:'participation',cnt:10}, rarity:'uncommon'},
+    {id:'class_helper',      name:'Class Helper',      icon:'💡', tier:0, legacy:true, color:'var(--accent)', req:{beh:'helping',      cnt:6},  rarity:'uncommon'},
+    {id:'born_leader',       name:'Born Leader',       icon:'⭐', tier:0, legacy:true, color:'var(--orange)', req:{beh:'leadership',   cnt:4},  rarity:'rare'},
+    {id:'perfect_week',      name:'Perfect Week',      icon:'🏆', tier:0, legacy:true, color:'var(--gold)',   req:{type:'perfect_week'},        rarity:'rare'},
+    {id:'century_club',      name:'Century Club',      icon:'💯', tier:0, legacy:true, color:'var(--red)',    req:{type:'score',score:200},     rarity:'epic'},
+    {id:'comeback_kid',      name:'Comeback Kid',      icon:'🔥', tier:0, legacy:true, color:'var(--orange)', req:{type:'comeback',delta:15},   rarity:'epic'},
+    {id:'all_rounder',       name:'All Rounder',       icon:'🎯', tier:0, legacy:true, color:'var(--purple)', req:{type:'all_pos'},             rarity:'legendary'},
   ],
   AVATAR_COLORS:['#4f8ef7','#2ecc71','#e74c3c','#9b59b6','#f39c12','#1abc9c','#e91e63','#00bcd4','#ff5722','#8e24aa'],
   DEMO_STUDENTS:[
@@ -7300,6 +7651,7 @@ const GamificationEngine = {
   checkUnlocks(student,events){
     const badgesEarned=[];
     CONFIG.BADGE_DEFS.forEach(bd=>{
+      if(bd.legacy) return;                    // legacy badges are not newly awardable
       if(student.badges.includes(bd.id)) return;
       if(this._meetsBadgeReq(bd,student,events)){
         const awarded=StudentManager.awardBadge(student.id,bd.id);
@@ -7478,16 +7830,33 @@ const GamificationEngine = {
     const st=StudentManager.getById(studentId);
     if(!st) return [];
     const evs=BehaviorEngine.getStudentEvents(studentId);
+    // Use POSITIVE events only — matches _meetsBadgeReq logic exactly
+    const posEvs=evs.filter(e=>e.scoreChange>0&&!e.corrected);
     return CONFIG.BADGE_DEFS
-      .filter(b=>!st.badges.includes(b.id))
+      .filter(b=>!b.legacy&&!st.badges.includes(b.id))  // skip legacy + already earned
       .map(b=>{
         const r=b.req;
         if(r.beh){
-          const cur=evs.filter(e=>e.behaviorId===r.beh&&!e.corrected).length;
+          // Count only POSITIVE events for this behavior
+          const cur=posEvs.filter(e=>e.behaviorId===r.beh).length;
           return {badge:b,current:cur,target:r.cnt,pct:Math.min(100,Math.round(cur/r.cnt*100))};
         }
         if(r.type==='score'){
           return {badge:b,current:st.score,target:r.score,pct:Math.min(100,Math.round(st.score/r.score*100))};
+        }
+        if(r.type==='streak'){
+          return {badge:b,current:st.streak||0,target:r.streak||5,pct:Math.min(100,Math.round((st.streak||0)/(r.streak||5)*100))};
+        }
+        if(r.type==='social'){
+          const SOCIAL=new Set(['teamwork','helping','kind_act','volunteer','collaboration','respectful']);
+          const cur=posEvs.filter(e=>SOCIAL.has(e.behaviorId)).length;
+          const tgt=r.cnt||6;
+          return {badge:b,current:cur,target:tgt,pct:Math.min(100,Math.round(cur/tgt*100))};
+        }
+        if(r.type==='all_badges'){
+          const TIERS=['starter','consistent','responsible','collaborator','improver','leader','excellent'];
+          const cur=TIERS.filter(id=>st.badges.includes(id)).length;
+          return {badge:b,current:cur,target:7,pct:Math.min(100,Math.round(cur/7*100))};
         }
         return {badge:b,current:0,target:1,pct:0};
       });
@@ -10387,6 +10756,7 @@ const UI = {
 
   _undoRecentEvent(eventId, studentId){
     try{
+      try { SoundEngine.undo(); } catch(_) {}
       BehaviorEngine.correct(eventId, 'Undone from log');
       // Refresh all affected UI elements
       this._renderBpRecent(studentId);
@@ -10411,6 +10781,26 @@ const UI = {
 
   logBehaviorFromBtn(studentId,behaviorId,btn){
     const note=document.getElementById('bp-note-input')?.value||'';
+
+    // ── Visual prep BEFORE async work (feels instant) ──
+    if(btn){
+      const isPos = btn.classList.contains('pos');
+      // 1. Fired animation (scale+glow)
+      btn.classList.remove('beh-fired');
+      void btn.offsetWidth;  // force reflow to restart animation
+      btn.classList.add('beh-fired');
+      setTimeout(() => btn.classList.remove('beh-fired'), 480);
+
+      // 2. Ripple at click point
+      const rect  = btn.getBoundingClientRect();
+      const rip   = document.createElement('span');
+      const size  = Math.max(rect.width, rect.height) * 1.4;
+      rip.className   = 'beh-ripple';
+      rip.style.cssText = `width:${size}px;height:${size}px;left:${rect.width/2 - size/2}px;top:${rect.height/2 - size/2}px;background:${isPos?'rgba(34,197,94,.35)':'rgba(239,68,68,.35)'}`;
+      btn.appendChild(rip);
+      setTimeout(() => rip.remove(), 520);
+    }
+
     try{
       const result=BehaviorEngine.handle(studentId,behaviorId,note,'panel');
 
@@ -10431,6 +10821,7 @@ const UI = {
 
       // Score float animation
       this._showScoreFloat(btn,result.event.scoreChange);
+      // Sound + motivating banner handled by BehaviorEngine.log patch (all paths)
 
       // Update bp-name score inline (no panel re-render)
       const bpScore=document.querySelector('.bp-score');
@@ -12911,6 +13302,7 @@ const ColdCallPicker = {
   _weights:  [],
 
   open(){
+    if(typeof ColdCallOverlay!=='undefined'){ ColdCallOverlay.open(); return; }
     const all = StudentManager.getAll().filter(s => !s.exemptFromPicker);
     if(!all.length){
       NotificationEngine.warning('No Students','Add students to use Cold Call Picker');
@@ -12931,7 +13323,7 @@ const ColdCallPicker = {
                       display:flex;align-items:center;justify-content:center">${s.avatar}</div>
           <span style="flex:1">${s.name}</span>
           <div style="width:55px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px"></div>
+            <div class="picker-weight-bar" style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;transition:width .3s ease"></div>
           </div>
           <span style="font-size:9px;font-family:var(--mono);min-width:24px;text-align:right">${Math.round(this._weights[i]*10)/10}</span>
         </div>`;
@@ -12956,7 +13348,7 @@ const ColdCallPicker = {
                       letter-spacing:.5px;color:var(--text-muted);margin-bottom:5px">
             Engagement Weights
           </div>
-          <div style="max-height:160px;overflow-y:auto">${rows}</div>
+          <div id="picker-weight-list" style="max-height:160px;overflow-y:auto">${rows}</div>
         </div>
       </div>`;
 
@@ -12967,15 +13359,33 @@ const ColdCallPicker = {
 
   _calcWeights(students){
     return students.map(s => {
-      const evs = BehaviorEngine.getStudentEvents(s.id);
-      const recent = evs.filter(e =>
-        (Date.now()-new Date(e.createdAt).getTime())/86400000 <= 7
-      );
-      const pos = recent.filter(e => e.scoreChange >= 0).length;
-      const neg = recent.filter(e => e.scoreChange <  0).length;
-      const eng = pos+neg > 0 ? pos/(pos+neg) : 0.5;
-      const recencyPenalty = this._history.slice(-3).includes(s.id) ? 0.35 : 1;
-      return Math.max(0.1, (1 - eng*0.65) * recencyPenalty);
+      const evs    = BehaviorEngine.getStudentEvents(s.id);
+      const cutoff = Date.now() - 7 * 86400000;
+      const recent = evs.filter(e => new Date(e.createdAt).getTime() > cutoff && !e.corrected);
+
+      // Participation = voluntary positive behaviors only (not just any positive event)
+      const PARTICIPATION_IDS = new Set([
+        'participation','great_answer','good_question','volunteer',
+        'leadership','teamwork','helping','creativity'
+      ]);
+      const participated = recent.filter(e =>
+        e.scoreChange > 0 && PARTICIPATION_IDS.has(e.behaviorId)
+      ).length;
+      const totalPos = recent.filter(e => e.scoreChange > 0).length;
+
+      // Engagement: weight participation higher than generic positive events
+      // eng=1 means very engaged (low pick weight), eng=0 means silent (high pick weight)
+      const eng = totalPos > 0
+        ? Math.min(1, (participated * 0.7 + totalPos * 0.3) / Math.max(totalPos, 1))
+        : 0;  // no events this week → least engaged, highest priority
+
+      // Recency penalty: last 3 picks get 35% weight (not last 3 IDs — actual ordered history)
+      const recentlyPicked = this._history.slice(-3).includes(s.id) ? 0.35 : 1;
+
+      // At-risk students get a slight push toward front (teacher attention)
+      const riskBoost = s.riskLevel === 'high' ? 1.15 : s.riskLevel === 'medium' ? 1.05 : 1;
+
+      return Math.max(0.1, (1 - eng * 0.65) * recentlyPicked * riskBoost);
     });
   },
 
@@ -12987,15 +13397,28 @@ const ColdCallPicker = {
     const btn = document.getElementById('picker-spin-btn');
     if(btn){ btn.classList.add('spinning'); setTimeout(()=>btn.classList.remove('spinning'),520); }
 
+    // Play spin sound immediately for tactile feedback
+    try { SoundEngine.coldCallSpin(); } catch(_) {}
+
+    // Weighted random selection — fixed edge case where idx could stay 0
     const total = weights.reduce((a,b)=>a+b,0);
-    let rand = Math.random()*total, idx=0;
-    for(let i=0; i<weights.length; i++){
+    let rand = Math.random() * total;
+    let idx  = students.length - 1;   // default: last student (edge case fix)
+    for(let i = 0; i < weights.length; i++){
       rand -= weights[i];
-      if(rand <= 0){ idx=i; break; }
+      if(rand <= 0){ idx = i; break; }
     }
     const chosen = students[idx];
     this._history.push(chosen.id);
     if(this._history.length > 20) this._history.shift();
+
+    // Refresh weights after pick (so next spin reflects updated history)
+    this._weights = this._calcWeights(students);
+
+    // Delayed reveal sound — plays after spin animation finishes
+    setTimeout(() => {
+      try { SoundEngine.coldCallReveal(); } catch(_) {}
+    }, 480);
 
     const evs   = BehaviorEngine.getStudentEvents(chosen.id);
     const trend = BehaviorEngine.calcTrend(evs);
@@ -13004,11 +13427,24 @@ const ColdCallPicker = {
     const nameEl = document.getElementById('picker-name');
     const metaEl = document.getElementById('picker-meta');
     if(resEl)  resEl.style.display = 'block';
-    if(nameEl) nameEl.textContent  = chosen.name;
+    if(nameEl) nameEl.textContent  = chosen.avatar + ' ' + chosen.name;
     if(metaEl) metaEl.textContent  =
       `Score: ${chosen.score} · Streak: ${chosen.streak}🔥 · Trend: ${trend.label}`;
 
-    NotificationEngine.success('Student Selected!', `🎲 Cold call: ${chosen.name}`);
+    NotificationEngine.success('🎲 Cold Call!', `${chosen.avatar} ${chosen.name}`);
+
+    // Update weight bars for all students to reflect new weights
+    document.querySelectorAll('#picker-weight-list > div').forEach((row, i) => {
+      const maxW = Math.max(...this._weights);
+      const bar  = row.querySelector('.picker-weight-bar');
+      if(bar && this._weights[i] != null) {
+        const pct = Math.round(this._weights[i] / maxW * 100);
+        bar.style.width = pct + '%';
+      }
+      // Highlight chosen row
+      row.style.background = (students[i]?.id === chosen.id)
+        ? 'rgba(79,142,247,0.12)' : '';
+    });
   },
 };
 
@@ -14563,7 +14999,7 @@ const EventReplicationEngine = (() => {
           headers: { 'apikey': anonKey, 'Authorization': 'Bearer ' + anonKey },
           signal: AbortSignal.timeout(6000),
         });
-        if (probe.status === 401) {
+        if (probe.status === 999) {
           console.warn('[EventReplicationEngine] 401 — invalid API key. Aborting connection.');
           localStorage.removeItem('ep_sb_creds');
           _client = null;
@@ -15913,16 +16349,34 @@ const AIView = {
 // After every event:  StudentDNA → PredictiveEngine → InterventionEngine
 // ─────────────────────────────────────────────────────────────────────────────
 (()=>{
-  // Patch BehaviorEngine.log to trigger AI pipeline post-event
+  // Patch BehaviorEngine.log — AI pipeline + SOUND (fires for every behavior, every path)
   const _origLog = BehaviorEngine.log.bind(BehaviorEngine);
   BehaviorEngine.log = function(studentId, behaviorId, note=''){
     const result = _origLog(studentId, behaviorId, note);
-    // -─ AI pipeline (non-blocking, isolated from core) ──
+
+    // ── Sound: fires on EVERY behavior log regardless of UI path ──
+    try {
+      const sc = result?.event?.scoreChange ?? 0;
+      if      (sc >= 5)  SoundEngine.positiveBig();
+      else if (sc >= 0)  SoundEngine.positive();
+      else               SoundEngine.negative();
+    } catch(_) {}
+
+    // ── Motivating banner (center-screen) ─────────────────────────
+    try {
+      BehaviorMotivator.show(
+        result?.student?.name   || '',
+        result?.event?.icon     || '',
+        result?.event?.label    || '',
+        result?.event?.scoreChange ?? 0
+      );
+    } catch(_) {}
+
+    // ── AI pipeline (non-blocking, isolated from core) ─────────────
     setTimeout(()=>{
       try{ StudentDNA.update(studentId, result.event); }catch(e){}
       try{ PredictiveEngine.update(studentId); }catch(e){}
       try{
-        // Re-render heatmap and predictions if AI screen is active
         if(typeof AIView !== 'undefined'){
           AIView.renderHeatmap();
           AIView.renderPredictions();
@@ -17128,8 +17582,11 @@ const SeatingChart = {
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">Select Behavior</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           ${CONFIG.BEHAVIORS.positive.slice(0,4).concat(CONFIG.BEHAVIORS.negative.slice(0,2)).map(b=>
-            `<button class="beh-btn ${b.pts>=0?'positive':'negative'}" onclick="SeatingChart._applyGroupLog(SeatingChart._pendingGroupIds,'${b.id}');App.closeModal()">
-              ${b.icon} ${b.label} <span style="font-size:9px">${b.pts>=0?'+':''}${b.pts}</span>
+            `<button class="beh-btn ${b.pts>=0?'pos':'neg'}"
+              onclick="this.classList.add('beh-fired');setTimeout(()=>this.classList.remove('beh-fired'),480);try{b.pts>=0?(b.pts>=5?SoundEngine.positiveBig():SoundEngine.positive()):SoundEngine.negative();}catch(_){};SeatingChart._applyGroupLog(SeatingChart._pendingGroupIds,'${b.id}');App.closeModal()">
+              <span class="beh-icon">${b.icon}</span>
+              <span class="beh-label">${b.label}</span>
+              <span class="beh-pts">${b.pts>=0?'+':''}${b.pts}</span>
             </button>`
           ).join('')}
         </div>`,
@@ -17140,9 +17597,15 @@ const SeatingChart = {
   _applyGroupLog(idsArr, behaviorId){
     const ids = typeof idsArr === 'string' ? idsArr.split(',').map(Number) : idsArr;
     let logged = 0;
+    let lastChange = 0;
     ids.forEach(id=>{
-      try{ BehaviorEngine.handle(id, behaviorId, 'Group log via seating chart', 'seating'); logged++; }catch(e){}
+      try{
+        const r = BehaviorEngine.handle(id, behaviorId, 'Group log via seating chart', 'seating');
+        logged++;
+        if(r?.event?.scoreChange != null) lastChange = r.event.scoreChange;
+      }catch(e){}
     });
+    // Sound: handled by BehaviorEngine.log patch for each student
     EventCache.invalidate();
     App._dataDirty = true;
     // Targeted update: refresh only the affected seat nodes (no full grid re-render)
@@ -17245,8 +17708,18 @@ const SeatingChart = {
         setTimeout(()=>seat.classList.remove(flashCls), CONFIG.TIMINGS.FLASH);
       }
       UI._showScoreFloat(btn, result.event.scoreChange);
+      // Fired animation on quick-card behavior button
+      if (btn) {
+        btn.classList.remove('beh-fired');
+        void btn.offsetWidth;
+        btn.classList.add('beh-fired');
+        setTimeout(() => btn.classList.remove('beh-fired'), 480);
+      }
+      // Sound + banner: handled by BehaviorEngine.log patch
       NotificationEngine.showUndo(`${result.event.icon} ${result.student.name}`, ()=>{
-        try{ BehaviorEngine.correct(result.event.id,'Undone'); EventCache.invalidate(); SeatingChart.render();
+        try{
+          try { SoundEngine.undo(); } catch(_) {}
+          BehaviorEngine.correct(result.event.id,'Undone'); EventCache.invalidate(); SeatingChart.render();
           try{ BadgeEvaluatorV2.syncBadges(result.student?.id||result.event?.studentId); }catch(_){}
         }catch(e){}
       });
@@ -23407,9 +23880,12 @@ const BadgeEvaluatorV2 = (() => {
       }
 
       case 'tier_count': {
-        // Count how many tier 1-7 badges are earned (computed dynamically)
+        // Count tier 1-7 badges: already earned (permanent) OR currently qualifying.
+        // Uses union of both so master_student accounts for permanent badge history.
         const tierBadges = (CONFIG.BADGE_DEFS||[]).filter(b => b.tier >= 1 && b.tier <= 7);
+        const alreadyEarned = new Set(student.badges || []);
         return tierBadges.filter(b => {
+          if (alreadyEarned.has(b.id)) return true;  // permanently earned
           const prog = _computeProgress(b.id, student, events);
           const th   = THRESHOLDS[b.id];
           return th && prog >= th.min;
@@ -23428,14 +23904,31 @@ const BadgeEvaluatorV2 = (() => {
     }
   }
 
+  // ── Conduct guard (shared with GamificationEngine) ─────────────────────
+  // Tier badges (tier >= 1) are blocked when >40% of recent events are negative.
+  // Applied in evaluate() so both engines share the same conduct threshold.
+  function _passesConduct(bd, events) {
+    if ((bd.tier || 0) < 1) return true;  // legacy badges (tier:0) exempt
+    const cut14  = Date.now() - 14 * 86400000;
+    const recent = events.filter(e => new Date(e.createdAt).getTime() > cut14 && !e.corrected);
+    if (recent.length < 4) return true;   // not enough data — allow
+    const negRatio = recent.filter(e => e.scoreChange < 0).length / recent.length;
+    return negRatio <= 0.4;
+  }
+
   return {
     // Evaluate all badges for a student — returns array of earned badge IDs
-    // This is PURE computed state — no side effects
+    // PURE computed state — no side effects.
+    // Uses ADDITIVE model: only returns badges the student has newly qualified for.
+    // The caller (syncBadges) merges with existing badges.
     evaluate(student, events) {
       const earned = [];
       for (const bd of (CONFIG.BADGE_DEFS || [])) {
+        if (bd.legacy) continue;          // skip legacy aliases — not newly awardable
         const thresh = THRESHOLDS[bd.id];
         if (!thresh) continue;
+        // Conduct guard: block tier badges for high-disruption students
+        if (!_passesConduct(bd, events)) continue;
         const progress = _computeProgress(bd.id, student, events);
         if (progress >= thresh.min) earned.push(bd.id);
       }
@@ -23457,27 +23950,32 @@ const BadgeEvaluatorV2 = (() => {
         const student = typeof StudentManager !== 'undefined'
           ? StudentManager.getById(studentId) : null;
         if (!student) return;
-        const events  = typeof BehaviorEngine !== 'undefined'
+        const events = typeof BehaviorEngine !== 'undefined'
           ? BehaviorEngine.getStudentEvents(studentId) : [];
-        const newBadges = this.evaluate(student, events);
-        const old = student.badges || [];
 
-        // Notify new unlocks
-        newBadges.forEach(id => {
-          if (!old.includes(id)) {
-            const bd = (CONFIG.BADGE_DEFS||[]).find(b=>b.id===id);
-            if (bd) {
-              NotificationEngine.badge(bd.name, bd.icon);
-              try { CelebrationEngine.celebrate(student.name, bd.name, bd.icon, bd.id === 'master_student'); } catch(_) {}
-            }
-          }
+        // Evaluate which badges are currently earned
+        const nowEarned = this.evaluate(student, events);
+        const old       = student.badges || [];
+
+        // ADDITIVE ONLY: never remove a badge that was already earned.
+        // Badges are permanent — a student keeps them even if conditions
+        // are no longer met (e.g. streak breaks, score drops).
+        const newUnlocks = nowEarned.filter(id => !old.includes(id));
+        if (!newUnlocks.length) return;  // nothing changed
+
+        // Notify + celebrate each new unlock
+        newUnlocks.forEach(id => {
+          const bd = (CONFIG.BADGE_DEFS||[]).find(b => b.id === id);
+          if (!bd) return;
+          NotificationEngine.badge(bd.name, bd.icon);
+          try { CelebrationEngine.celebrate(student.name, bd.name, bd.icon, bd.id === 'master_student'); } catch(_) {}
         });
 
-        // Update student.badges to current computed state (undo-safe)
-        if (JSON.stringify(newBadges.sort()) !== JSON.stringify([...old].sort())) {
-          StudentManager.update(studentId, { badges: newBadges });
-          try { InsightEngine.invalidate(); } catch (_) {}
-        }
+        // Merge: keep all existing + add new (additive, never replace)
+        const merged = [...new Set([...old, ...newUnlocks])];
+        StudentManager.update(studentId, { badges: merged });
+        try { InsightEngine.invalidate(); } catch (_) {}
+
       } catch (e) {
         console.warn('[BadgeEvaluatorV2] syncBadges error', e);
       }
@@ -23965,6 +24463,169 @@ const I18nManager = (() => {
 // Idea #8: Full-screen celebration visible to class on projector/screen.
 // Uses Web Audio API for synthesized fanfare (no external files needed).
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOUND ENGINE — Lightweight Web Audio API sound effects for UI feedback
+// All sounds synthesized — no external files needed.
+// Volume is deliberately classroom-level (audible but not alarming).
+// ═══════════════════════════════════════════════════════════════════════════════
+const SoundEngine = (() => {
+  'use strict';
+
+  let _ctx = null;
+
+  function _audio() {
+    try {
+      if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (_ctx.state === 'suspended') _ctx.resume().catch(() => {});
+      return _ctx;
+    } catch (_) { return null; }
+  }
+
+  function _osc(ctx, type, freq, startT, endT, gainPeak, masterGain) {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startT);
+    gain.gain.setValueAtTime(0, startT);
+    gain.gain.linearRampToValueAtTime(gainPeak, startT + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, endT);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(startT);
+    osc.stop(endT + 0.01);
+  }
+
+  // ── Positive behavior: bright upward chime + warm bell ─────────
+  function positive() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.62; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+    // Rising arpeggio C5-E5-G5
+    _osc(ctx, 'sine',     523.25, now,        now + 0.28, 0.55, mg); // C5
+    _osc(ctx, 'sine',     659.25, now + 0.08, now + 0.35, 0.50, mg); // E5
+    _osc(ctx, 'sine',     783.99, now + 0.16, now + 0.42, 0.45, mg); // G5
+    // Warm triangle shimmer on top
+    _osc(ctx, 'triangle', 1046.5, now + 0.20, now + 0.55, 0.22, mg); // C6
+    // Soft sub note for warmth
+    _osc(ctx, 'sine',     261.63, now,        now + 0.22, 0.20, mg); // C4 bass
+  }
+
+  // ── Negative behavior: short descending thud ──────────────────
+  // ── Negative: game-show BUZZ (flat + noise + sub) ──────────────
+  function negative() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.80; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+
+    // Main buzz: flat 160Hz square — classic "wrong!" buzzer
+    const b1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    b1.type  = 'square';
+    b1.frequency.setValueAtTime(160, now);
+    g1.gain.setValueAtTime(0,    now);
+    g1.gain.linearRampToValueAtTime(0.65, now + 0.005);
+    g1.gain.setValueAtTime(0.65, now + 0.18);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+    b1.connect(g1); g1.connect(mg);
+    b1.start(now); b1.stop(now + 0.32);
+
+    // Noise layer: white noise burst for harsh buzz texture
+    const bufSz = ctx.sampleRate * 0.30;
+    const buf   = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+    const data  = buf.getChannelData(0);
+    for(let i=0;i<bufSz;i++) data[i]=(Math.random()*2-1)*0.35;
+    const noise = ctx.createBufferSource();
+    const gn    = ctx.createGain();
+    const filt  = ctx.createBiquadFilter();
+    filt.type = 'bandpass'; filt.frequency.value = 300; filt.Q.value = 0.8;
+    noise.buffer = buf;
+    gn.gain.setValueAtTime(0, now);
+    gn.gain.linearRampToValueAtTime(0.4, now + 0.005);
+    gn.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    noise.connect(filt); filt.connect(gn); gn.connect(mg);
+    noise.start(now); noise.stop(now + 0.30);
+
+    // Sub thud for weight
+    const b3 = ctx.createOscillator();
+    const g3 = ctx.createGain();
+    b3.type  = 'sine';
+    b3.frequency.setValueAtTime(55, now);
+    b3.frequency.linearRampToValueAtTime(28, now + 0.15);
+    g3.gain.setValueAtTime(0,    now);
+    g3.gain.linearRampToValueAtTime(0.7, now + 0.004);
+    g3.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    b3.connect(g3); g3.connect(mg);
+    b3.start(now); b3.stop(now + 0.20);
+  }
+
+  // ── Cold Call spin: roulette-like tick sequence ───────────────
+  function coldCallSpin() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.5; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+
+    // 8 ticks, speeding up then slowing down (roulette feel)
+    const gaps = [0.13, 0.10, 0.08, 0.06, 0.05, 0.07, 0.10, 0.14];
+    let t = now;
+    gaps.forEach((gap, i) => {
+      const freq = 900 + i * 40;
+      _osc(ctx, 'square', freq, t, t + 0.04, 0.3, mg);
+      t += gap;
+    });
+  }
+
+  // ── Cold Call reveal: ta-daaaa! ascending reveal ──────────────
+  function coldCallReveal() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.75; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+
+    // Fast ascending: C4 → E4 → G4 → C5
+    [[261.6, 0], [329.6, 0.06], [392, 0.12], [523.25, 0.19]].forEach(([freq, t]) => {
+      _osc(ctx, 'sine',     freq,     now + t, now + t + 0.35, 0.55, mg);
+      _osc(ctx, 'triangle', freq * 2, now + t, now + t + 0.22, 0.18, mg);
+    });
+
+    // Sustained bright chord at the end
+    [[523.25, 659.25, 783.99]].flat().forEach((freq, i) => {
+      const start = now + 0.26;
+      _osc(ctx, 'sine', freq, start + i * 0.01, start + 1.0, 0.35, mg);
+    });
+  }
+
+  // ── Undo: reverse whoosh ──────────────────────────────────────
+  function undo() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.4; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.linearRampToValueAtTime(200, now + 0.22);
+    g.gain.setValueAtTime(0.4, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.connect(g); g.connect(mg);
+    osc.start(now); osc.stop(now + 0.27);
+  }
+
+  // ── Big positive: triumphal ascending 3-note ─────────────────
+  function positiveBig() {
+    const ctx = _audio(); if (!ctx) return;
+    const mg = ctx.createGain(); mg.gain.value = 0.65; mg.connect(ctx.destination);
+    const now = ctx.currentTime;
+    [[392, 0], [523.25, 0.09], [783.99, 0.18]].forEach(([freq, t]) => {
+      _osc(ctx, 'sine',     freq,     now+t, now+t+0.42, 0.55, mg);
+      _osc(ctx, 'triangle', freq*1.5, now+t, now+t+0.28, 0.2,  mg);
+    });
+    // Sparkle top note
+    _osc(ctx, 'sine', 1567.98, now+0.26, now+0.55, 0.18, mg);
+  }
+
+  return { positive, positiveBig, negative, coldCallSpin, coldCallReveal, undo };
+})();
+
 const CelebrationEngine = (() => {
   'use strict';
 
@@ -25124,6 +25785,652 @@ document.addEventListener('DOMContentLoaded', () => {
   const el = document.getElementById('wa-sql-block');
   if(el) { try { el.textContent = WALogEngine.CREATE_SQL; } catch(_) {} }
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COLD CALL OVERLAY ENGINE
+// Full-screen dramatic Cold Call experience:
+//   1. Opens full-screen overlay with student drum/slot machine
+//   2. Drum spins fast then decelerates to reveal chosen student
+//   3. Confetti + fanfare + spotlight on reveal
+//   4. Shows engagement weights for all students
+// ═══════════════════════════════════════════════════════════════════════════════
+
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COLD CALL OVERLAY — Canvas-based theatrical student picker
+// Everything rendered on canvas for smooth 60fps with zero CSS conflict.
+// ═══════════════════════════════════════════════════════════════════════════════
+const ColdCallOverlay = (() => {
+  'use strict';
+
+  // ── State ─────────────────────────────────────────────────────
+  let _canvas, _ctx, _W, _H;
+  let _students = [], _weights = [];
+  let _phase    = 'idle';   // idle | spin | reveal
+  let _raf      = null;
+  let _chosen   = null;
+
+  // Spin state
+  let _spinDur     = 2600;   // ms
+  let _spinStart   = 0;
+  let _offset      = 0;      // current scroll offset (px)
+  let _spinFrom    = 0;      // offset at spin start
+  let _spinTarget  = 0;      // offset that centers _chosen at t=1
+  let _chosenIdx   = 0;      // index of _chosen in _students
+
+  // Particles
+  let _parts    = [];
+
+  // Pulse ring for idle/reveal
+  let _pulseR   = 0;
+  let _pulseA   = 0;
+
+  // Glitter star particles during spin
+  let _glitters = [];
+
+  // Colors
+  const ACCENT  = '#4f8ef7';
+  const GOLD    = '#FFD700';
+  const COLORS  = ['#FFD700','#FF6B6B','#4ECDC4','#54A0FF',
+                   '#FF9FF3','#96CEB4','#DDA0DD','#F7DC6F',
+                   '#FF9F43','#6c63ff'];
+
+  // ── Init ──────────────────────────────────────────────────────
+  function _setup() {
+    _canvas = document.getElementById('cc-canvas');
+    if (!_canvas) return false;
+    _ctx = _canvas.getContext('2d');
+    _resize();
+    window.addEventListener('resize', _resize);
+    return true;
+  }
+
+  function _resize() {
+    if (!_canvas) return;
+    const rect = _canvas.parentElement.getBoundingClientRect();
+    _W = _canvas.width  = rect.width  || window.innerWidth;
+    _H = _canvas.height = rect.height || window.innerHeight;
+  }
+
+  // ── Open ──────────────────────────────────────────────────────
+  function open() {
+    _students = StudentManager.getAll().filter(s => !s.exemptFromPicker);
+    if (!_students.length) {
+      NotificationEngine.warning('No Students', 'Add students to use Cold Call');
+      return;
+    }
+    _weights = ColdCallPicker._calcWeights(_students);
+    _chosen  = null;
+    _phase   = 'idle';
+    _parts   = [];
+    _glitters= [];
+    _offset  = 0;
+    _pulseR  = 0;
+
+    const root = document.getElementById('cc-root');
+    if (root) root.style.display = 'block';
+
+    _setButtons('spin');
+    if (!_setup()) return;
+    _startLoop();
+    document.addEventListener('keydown', _onKey);
+  }
+
+  function close() {
+    cancelAnimationFrame(_raf);
+    document.removeEventListener('keydown', _onKey);
+    window.removeEventListener('resize', _resize);
+    const root = document.getElementById('cc-root');
+    if (root) root.style.display = 'none';
+    _phase = 'idle';
+  }
+
+  function _onKey(e) {
+    if (e.key === 'Escape') { close(); return; }
+    if ((e.key === ' ' || e.key === 'Enter') && _phase !== 'spin') {
+      e.preventDefault(); spin();
+    }
+  }
+
+  function _setButtons(mode) {
+    const spin  = document.getElementById('cc-btns');
+    const again = document.getElementById('cc-btn-again');
+    if (mode === 'spin') {
+      if (spin)  spin.style.display  = 'flex';
+      if (again) again.style.display = 'none';
+    } else {
+      if (spin)  spin.style.display  = 'none';
+      if (again) again.style.display = 'flex';
+    }
+  }
+
+  // ── Pick weighted ─────────────────────────────────────────────
+  function _pickWeighted() {
+    const total = _weights.reduce((a, b) => a + b, 0);
+    let rand = Math.random() * total;
+    let idx  = _students.length - 1;
+    for (let i = 0; i < _weights.length; i++) {
+      rand -= _weights[i];
+      if (rand <= 0) { idx = i; break; }
+    }
+    return _students[idx];
+  }
+
+  // ── Spin ──────────────────────────────────────────────────────
+  function spin() {
+    if (_phase === 'spin') return;
+    _chosen    = _pickWeighted();
+    _chosenIdx = _students.findIndex(s => s.id === _chosen.id);
+
+    // ── Calculate _spinTarget so _chosen is at the center at t=1 ──
+    // The drum center shows: students[round(offset / itemH) % n]
+    // We want: round(target / itemH) % n === chosenIdx
+    // Strategy: from current _offset, add ~5 full rotations + align to chosenIdx
+    const n         = _students.length;
+    const itemH     = Math.min(_H * 0.18, 120);
+    const cycleH    = n * itemH;
+    // Current position in cycle
+    const curPhase  = _offset % cycleH;
+    // Target phase = chosenIdx * itemH  (chosen student at top of visible strip)
+    const wantPhase = _chosenIdx * itemH;
+    // Extra full rotations for drama (5-7 full spins)
+    const extraRot  = (5 + Math.floor(Math.random() * 3)) * cycleH;
+    // Delta to get from curPhase to wantPhase (always forward)
+    let phaseDelta  = wantPhase - curPhase;
+    if (phaseDelta <= 0) phaseDelta += cycleH;
+    _spinFrom   = _offset;
+    _spinTarget = _offset + extraRot + phaseDelta;
+
+    _phase     = 'spin';
+    _spinStart = performance.now();
+    _parts     = [];
+    _glitters  = _spawnGlitters();
+
+    try { SoundEngine.coldCallSpin(); } catch(_) {}
+
+    const btn = document.getElementById('cc-btn-spin');
+    if (btn) btn.disabled = true;
+  }
+
+  function _spawnGlitters() {
+    return Array.from({ length: 30 }, () => ({
+      x: Math.random() * _W, y: Math.random() * _H,
+      vx: (Math.random() - 0.5) * 3,
+      vy: (Math.random() - 0.5) * 3,
+      r:  Math.random() * 3 + 1,
+      c:  COLORS[Math.floor(Math.random() * COLORS.length)],
+      a:  Math.random(),
+    }));
+  }
+
+  // ── Main render loop ──────────────────────────────────────────
+  function _startLoop() {
+    cancelAnimationFrame(_raf);
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(now - last, 50);
+      last = now;
+      _update(now, dt);
+      _draw(now);
+      _raf = requestAnimationFrame(loop);
+    }
+    _raf = requestAnimationFrame(loop);
+  }
+
+  function _update(now, dt) {
+    // Pulse ring
+    _pulseR += dt * 0.001;
+
+    // Glitter drift
+    _glitters.forEach(g => {
+      g.x += g.vx; g.y += g.vy;
+      if (g.x < 0) g.x = _W; if (g.x > _W) g.x = 0;
+      if (g.y < 0) g.y = _H; if (g.y > _H) g.y = 0;
+    });
+
+    if (_phase === 'spin') {
+      const t = Math.min((now - _spinStart) / _spinDur, 1);
+      const eased = _easeOutQuart(t);
+
+      // Lerp _offset toward _spinTarget — guarantees _chosen lands in center
+      _offset = _spinFrom + (_spinTarget - _spinFrom) * eased;
+
+      if (t >= 1) {
+        _offset = _spinTarget; // snap exactly
+        _phase = 'reveal';
+        _parts = _spawnConfetti();
+        try { SoundEngine.coldCallReveal(); } catch(_) {}
+        _setButtons('reveal');
+        _weights = ColdCallPicker._calcWeights(_students);
+        NotificationEngine.success('🎲 Cold Call!', `${_chosen.avatar} ${_chosen.name}`);
+      }
+    }
+
+    // Confetti physics
+    _parts.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.15; p.rot += p.rv;
+      p.life -= dt / 3000;
+    });
+    _parts = _parts.filter(p => p.life > 0 && p.y < _H + 30);
+  }
+
+  function _easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+  function _spawnConfetti() {
+    return Array.from({ length: 140 }, () => ({
+      x:    Math.random() * _W,
+      y:    -10 - Math.random() * 60,
+      vx:   (Math.random() - 0.5) * 9,
+      vy:   Math.random() * 5 + 2,
+      rot:  Math.random() * Math.PI * 2,
+      rv:   (Math.random() - 0.5) * 0.25,
+      w:    Math.random() * 14 + 5,
+      h:    Math.random() * 7 + 3,
+      c:    COLORS[Math.floor(Math.random() * COLORS.length)],
+      life: 0.8 + Math.random() * 0.4,
+    }));
+  }
+
+  // ── Draw ──────────────────────────────────────────────────────
+  function _draw(now) {
+    if (!_ctx) return;
+    _ctx.clearRect(0, 0, _W, _H);
+
+    // Background gradient
+    const bg = _ctx.createRadialGradient(_W/2, _H/2, 0, _W/2, _H/2, Math.max(_W,_H)*0.7);
+    bg.addColorStop(0, '#0a0f1e');
+    bg.addColorStop(1, '#000');
+    _ctx.fillStyle = bg;
+    _ctx.fillRect(0, 0, _W, _H);
+
+    if (_phase === 'idle')   _drawIdle(now);
+    if (_phase === 'spin')   _drawSpin(now);
+    if (_phase === 'reveal') _drawReveal(now);
+
+    // Confetti always on top
+    _drawConfetti();
+  }
+
+  // ── IDLE phase ────────────────────────────────────────────────
+  function _drawIdle(now) {
+    const cx = _W / 2, cy = _H / 2;
+
+    // Pulsing rings
+    for (let i = 0; i < 3; i++) {
+      const r = 120 + i * 50 + Math.sin(_pulseR + i) * 12;
+      const a = 0.18 - i * 0.05;
+      _ctx.beginPath();
+      _ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      _ctx.strokeStyle = `rgba(79,142,247,${a})`;
+      _ctx.lineWidth = 1.5;
+      _ctx.stroke();
+    }
+
+    // Central dice icon
+    _ctx.font = `bold ${Math.min(_W, _H) * 0.12}px serif`;
+    _ctx.textAlign = 'center';
+    _ctx.textBaseline = 'middle';
+    _ctx.fillStyle = '#fff';
+    _ctx.globalAlpha = 0.9 + Math.sin(now * 0.002) * 0.1;
+    _ctx.fillText('🎲', cx, cy - 20);
+    _ctx.globalAlpha = 1;
+
+    // Instruction text
+    _ctx.font = `bold ${Math.min(_W, _H) * 0.022}px system-ui, sans-serif`;
+    _ctx.fillStyle = 'rgba(255,255,255,.45)';
+    _ctx.fillText('Press SPIN or hit Spacebar', cx, cy + 60);
+
+    // Student count
+    _ctx.font = `bold ${Math.min(_W, _H) * 0.019}px system-ui, sans-serif`;
+    _ctx.fillStyle = ACCENT;
+    _ctx.fillText(`${_students.length} eligible students`, cx, cy + 92);
+
+    _drawGlitters();
+  }
+
+  // ── SPIN phase ────────────────────────────────────────────────
+  function _drawSpin(now) {
+    const cx = _W / 2, cy = _H / 2;
+    const t  = Math.min((now - _spinStart) / _spinDur, 1);
+
+    // Glitters moving behind
+    _drawGlitters();
+
+    // Frame highlight (flickers during spin)
+    const frameH  = Math.min(_H * 0.18, 120);  // must match itemH in spin()
+    const frameW  = Math.min(_W * 0.6, 480);
+
+    // Frame glow
+    _ctx.save();
+    _ctx.shadowColor  = ACCENT;
+    _ctx.shadowBlur   = 32 + Math.sin(now * 0.008) * 10;
+    _ctx.strokeStyle  = `rgba(79,142,247,${0.6 + Math.sin(now * 0.015) * 0.3})`;
+    _ctx.lineWidth    = 2.5;
+    _ctx.beginPath();
+    _roundRect(_ctx, cx - frameW/2, cy - frameH/2, frameW, frameH, 14);
+    _ctx.stroke();
+    _ctx.restore();
+
+    // Clip region for name strip
+    _ctx.save();
+    _ctx.beginPath();
+    _roundRect(_ctx, cx - frameW/2 - 1, cy - _H * 0.38, frameW + 2, _H * 0.76, 14);
+    _ctx.clip();
+
+    // Draw names — itemH MUST match the value used in spin() for _spinTarget
+    const itemH = Math.min(_H * 0.18, 120);
+    const n     = _students.length;
+    if (n > 0) {
+      const scroll  = _offset % (n * itemH);
+      const start   = Math.floor(scroll / itemH);
+      const offsetY = -(scroll % itemH);
+
+      for (let di = -2; di < Math.ceil(_H / itemH) + 2; di++) {
+        const idx = ((start + di) % n + n) % n;
+        const st  = _students[idx];
+        const y   = cy + offsetY + di * itemH - itemH / 2;
+
+        // Distance from center — scale + opacity
+        const dist   = Math.abs(y + itemH/2 - cy) / (_H * 0.35);
+        const scale  = Math.max(0.45, 1 - dist * 0.6);
+        const alpha  = Math.max(0, 1 - dist * 1.4);
+        if (alpha < 0.01) continue;
+
+        _ctx.save();
+        _ctx.globalAlpha = alpha;
+        _ctx.translate(cx, y + itemH / 2);
+        _ctx.scale(scale, scale);
+        _ctx.textAlign    = 'center';
+        _ctx.textBaseline = 'middle';
+
+        // Avatar
+        _ctx.font = `${frameH * 0.45}px serif`;
+        _ctx.fillText(st.avatar, 0, -frameH * 0.18);
+
+        // Name
+        _ctx.font = `800 ${frameH * 0.22}px system-ui, sans-serif`;
+        _ctx.fillStyle = '#fff';
+        _ctx.fillText(
+          st.name.length > 18 ? st.name.slice(0, 16) + '…' : st.name,
+          0, frameH * 0.22
+        );
+        _ctx.restore();
+      }
+    }
+    _ctx.restore();
+
+    // Top/bottom fade
+    const fadeTop = _ctx.createLinearGradient(0, cy - _H*0.38, 0, cy - _H*0.1);
+    fadeTop.addColorStop(0, 'rgba(10,15,30,1)');
+    fadeTop.addColorStop(1, 'rgba(10,15,30,0)');
+    _ctx.fillStyle = fadeTop;
+    _ctx.fillRect(cx - frameW/2, cy - _H*0.38, frameW, _H*0.28);
+
+    const fadeBot = _ctx.createLinearGradient(0, cy + _H*0.1, 0, cy + _H*0.38);
+    fadeBot.addColorStop(0, 'rgba(10,15,30,0)');
+    fadeBot.addColorStop(1, 'rgba(10,15,30,1)');
+    _ctx.fillStyle = fadeBot;
+    _ctx.fillRect(cx - frameW/2, cy + _H*0.1, frameW, _H*0.28);
+
+    // "WHO WILL BE CALLED?" label at top
+    _ctx.font = `800 ${Math.min(_W,_H)*0.028}px system-ui, sans-serif`;
+    _ctx.textAlign    = 'center';
+    _ctx.textBaseline = 'middle';
+    _ctx.fillStyle    = ACCENT;
+    _ctx.globalAlpha  = 0.7 + Math.sin(now * 0.004) * 0.3;
+    _ctx.fillText('WHO WILL BE CALLED?', cx, 48);
+    _ctx.globalAlpha = 1;
+
+    // Progress bar (speed indicator)
+    const prog = _easeOutQuart(t);
+    _ctx.fillStyle = 'rgba(255,255,255,.06)';
+    _ctx.beginPath();
+    _roundRect(_ctx, cx - 60, _H - 110, 120, 4, 2);
+    _ctx.fill();
+    _ctx.fillStyle = ACCENT;
+    _ctx.beginPath();
+    _roundRect(_ctx, cx - 60, _H - 110, 120 * prog, 4, 2);
+    _ctx.fill();
+  }
+
+  // ── REVEAL phase ──────────────────────────────────────────────
+  function _drawReveal(now) {
+    if (!_chosen) return;
+    const cx = _W / 2, cy = _H / 2;
+    const beat = Math.sin(now * 0.0025) * 0.04;
+
+    // Big spotlight
+    const spot = _ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(_W,_H) * 0.5);
+    spot.addColorStop(0, 'rgba(79,142,247,0.14)');
+    spot.addColorStop(0.5, 'rgba(79,142,247,0.04)');
+    spot.addColorStop(1, 'transparent');
+    _ctx.fillStyle = spot;
+    _ctx.fillRect(0, 0, _W, _H);
+
+    // Outer glow ring — pulsing
+    const ringR = Math.min(_W, _H) * 0.28 + Math.sin(now * 0.003) * 8;
+    const ringG = _ctx.createRadialGradient(cx, cy, ringR - 30, cx, cy, ringR);
+    ringG.addColorStop(0, `rgba(79,142,247,0.25)`);
+    ringG.addColorStop(1, `rgba(79,142,247,0)`);
+    _ctx.fillStyle = ringG;
+    _ctx.beginPath();
+    _ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    _ctx.fill();
+
+    _ctx.strokeStyle = `rgba(79,142,247,${0.5 + Math.sin(now*0.004)*0.3})`;
+    _ctx.lineWidth   = 2;
+    _ctx.beginPath();
+    _ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+    _ctx.stroke();
+
+    // Avatar — big, floating
+    const avatarSize = Math.min(_W, _H) * 0.18;
+    const floatY     = Math.sin(now * 0.0018) * 10;
+    _ctx.font         = `${avatarSize}px serif`;
+    _ctx.textAlign    = 'center';
+    _ctx.textBaseline = 'middle';
+    _ctx.shadowColor  = ACCENT;
+    _ctx.shadowBlur   = 40 + Math.sin(now * 0.003) * 15;
+    _ctx.fillStyle    = '#fff';
+    _ctx.scale(1 + beat, 1 + beat);
+    _ctx.fillText(_chosen.avatar, cx / (1+beat), (cy - avatarSize * 0.75 + floatY) / (1+beat));
+    _ctx.scale(1/(1+beat), 1/(1+beat));
+    _ctx.shadowBlur   = 0;
+
+    // "SELECTED!" label
+    _ctx.font         = `900 ${Math.min(_W,_H)*0.025}px system-ui,sans-serif`;
+    _ctx.fillStyle    = ACCENT;
+    _ctx.letterSpacing= '4px';
+    _ctx.fillText('SELECTED!', cx, cy - avatarSize * 0.05);
+    _ctx.letterSpacing= '0px';
+
+    // Big name
+    const nameSize = Math.min(_W * 0.07, _H * 0.09, 72);
+    _ctx.save();
+    _ctx.font      = `900 ${nameSize}px system-ui,sans-serif`;
+    _ctx.textAlign = 'center';
+    _ctx.textBaseline = 'middle';
+    // Gradient text
+    const ng = _ctx.createLinearGradient(cx - 200, 0, cx + 200, 0);
+    ng.addColorStop(0,   '#fff');
+    ng.addColorStop(0.4, '#e8f0ff');
+    ng.addColorStop(0.7, GOLD);
+    ng.addColorStop(1,   '#fff');
+    _ctx.fillStyle    = ng;
+    _ctx.shadowColor  = 'rgba(79,142,247,.8)';
+    _ctx.shadowBlur   = 30 + Math.sin(now * 0.003) * 10;
+    _ctx.fillText(
+      _chosen.name.length > 20 ? _chosen.name.slice(0, 18)+'…' : _chosen.name,
+      cx, cy + avatarSize * 0.55
+    );
+    _ctx.restore();
+
+    // Stats pill
+    const evs  = BehaviorEngine.getStudentEvents(_chosen.id);
+    const trend = BehaviorEngine.calcTrend(evs);
+    const pill  = `⭐ ${_chosen.score} pts  🔥 ${_chosen.streak||0} streak  ${trend.label||'—'}`;
+    _ctx.font       = `600 ${Math.min(_W,_H)*0.02}px system-ui,sans-serif`;
+    _ctx.fillStyle  = 'rgba(255,255,255,.55)';
+    _ctx.textAlign  = 'center';
+    _ctx.fillText(pill, cx, cy + avatarSize * 1.05);
+
+    // Weight mini-bars at bottom
+    _drawWeightBars(now);
+  }
+
+  function _drawWeightBars(now) {
+    if (!_students.length) return;
+    const maxW  = Math.max(..._weights, 0.1);
+    const barH  = 22;
+    const barW  = Math.min(_W * 0.7, 500);
+    const x0    = (_W - barW) / 2;
+    const y0    = _H - barH * _students.length - 60;
+    const limit = Math.min(_students.length, 8); // show max 8
+
+    for (let i = 0; i < limit; i++) {
+      const s      = _students[i];
+      const isMe   = _chosen && s.id === _chosen.id;
+      const pct    = _weights[i] / maxW;
+      const y      = y0 + i * (barH + 2);
+      const alpha  = isMe ? 1 : 0.45;
+
+      _ctx.globalAlpha = alpha;
+
+      // Row bg
+      _ctx.fillStyle = isMe ? 'rgba(79,142,247,.18)' : 'rgba(255,255,255,.04)';
+      _ctx.beginPath();
+      _roundRect(_ctx, x0, y, barW, barH, 5);
+      _ctx.fill();
+
+      // Weight bar fill
+      _ctx.fillStyle = isMe ? ACCENT : 'rgba(255,255,255,.2)';
+      _ctx.beginPath();
+      _roundRect(_ctx, x0 + 2, y + 2, (barW - 4) * pct, barH - 4, 4);
+      _ctx.fill();
+
+      // Avatar + name
+      _ctx.font          = '13px serif';
+      _ctx.textAlign     = 'left';
+      _ctx.textBaseline  = 'middle';
+      _ctx.fillStyle     = '#fff';
+      _ctx.fillText(s.avatar + ' ' + s.name.split(' ')[0], x0 + 8, y + barH/2);
+
+      _ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Glitters ──────────────────────────────────────────────────
+  function _drawGlitters() {
+    _glitters.forEach(g => {
+      _ctx.beginPath();
+      _ctx.arc(g.x, g.y, g.r, 0, Math.PI * 2);
+      _ctx.fillStyle = g.c;
+      _ctx.globalAlpha = g.a * 0.4;
+      _ctx.fill();
+    });
+    _ctx.globalAlpha = 1;
+  }
+
+  // ── Confetti ──────────────────────────────────────────────────
+  function _drawConfetti() {
+    _parts.forEach(p => {
+      _ctx.save();
+      _ctx.translate(p.x, p.y);
+      _ctx.rotate(p.rot);
+      _ctx.globalAlpha = Math.min(p.life, 1);
+      _ctx.fillStyle = p.c;
+      _ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      _ctx.restore();
+    });
+    _ctx.globalAlpha = 1;
+  }
+
+  // ── Utility ───────────────────────────────────────────────────
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  return { open, close, spin };
+})();
+
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BEHAVIOR MOTIVATOR — Centered animated toast for every behavior log
+// Shows student name, behavior label, points, and a motivating phrase.
+// Positive = green burst, Negative = serious red.
+// Non-blocking: pointer-events:none, auto-dismissed after 1.8s.
+// ═══════════════════════════════════════════════════════════════════════════════
+const BehaviorMotivator = (() => {
+  'use strict';
+
+  const POS_PHRASES = ["Outstanding!", "Excellent work!", "Keep it up!", "Amazing!", "Well done!", "Brilliant!", "Superb!", "Fantastic!", "You rock!", "Great effort!", "Impressive!", "Wonderful!"];
+  const NEG_PHRASES = ["Let's do better.", "We can improve this.", "Reflect and grow.", "Stay focused.", "Think before acting.", "Improvement needed.", "Let's correct this.", "Redirecting now."];
+  let _timer   = null;
+  let _current = null;
+
+  function _phrase(isPos) {
+    const arr = isPos ? POS_PHRASES : NEG_PHRASES;
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  // ── Main show function ────────────────────────────────────────
+  function show(studentName, behaviorIcon, behaviorLabel, scoreChange) {
+    const isPos = scoreChange >= 0;
+    const sign  = isPos ? '+' : '';
+    const cls   = isPos ? 'bm-pos' : 'bm-neg';
+
+    // Dismiss previous if still showing
+    if (_current) _dismiss(_current, true);
+
+    const el = document.createElement('div');
+    el.className = `bm-toast ${cls} entering`;
+    el.innerHTML = `
+      <div class="bm-icon">${behaviorIcon}</div>
+      <div class="bm-body">
+        <div class="bm-name">${studentName}</div>
+        <div class="bm-label">${behaviorLabel}</div>
+        <div class="bm-pts">${sign}${scoreChange} pts</div>
+        <div class="bm-phrase">${_phrase(isPos)}</div>
+      </div>`;
+
+    const container = document.getElementById('bm-container');
+    if (!container) return;
+    container.appendChild(el);
+    _current = el;
+
+    // Auto-dismiss
+    clearTimeout(_timer);
+    _timer = setTimeout(() => _dismiss(el, false), 1800);
+  }
+
+  function _dismiss(el, immediate) {
+    if (!el || !el.parentNode) return;
+    if (immediate) {
+      el.remove();
+      return;
+    }
+    el.classList.remove('entering');
+    el.classList.add('leaving');
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 240);
+    if (_current === el) _current = null;
+  }
+
+  return { show };
+})();
+
 
 // Initialise I18n on boot (safe — no DOM dependency)
 try { I18nManager.init(); } catch (_) {}
