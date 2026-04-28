@@ -4409,6 +4409,109 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
   animation:bmOut .22s ease-in both;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   LESSON TIMER TOOL
+═══════════════════════════════════════════════════════════ */
+.lt-ring-wrap{
+  position:relative;width:160px;height:160px;flex-shrink:0;margin:0 auto;
+}
+.lt-ring-svg{ transform:rotate(-90deg); }
+.lt-ring-bg{ fill:none;stroke:var(--bg-elevated);stroke-width:10; }
+.lt-ring-fill{
+  fill:none;stroke-width:10;
+  stroke-linecap:round;
+  transition:stroke-dashoffset .9s linear, stroke .3s ease;
+}
+.lt-time-display{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+}
+.lt-time-text{
+  font-family:var(--mono);font-size:32px;font-weight:800;
+  color:var(--text-primary);letter-spacing:1px;line-height:1;
+}
+.lt-state-label{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1.5px;
+}
+.lt-state-label.running{ color:var(--green) }
+.lt-state-label.paused { color:var(--orange) }
+.lt-state-label.ready  { color:var(--text-muted) }
+.lt-state-label.done   { color:var(--red);animation:ltPulse .7s ease-in-out infinite alternate }
+@keyframes ltPulse{ to{ opacity:.4 } }
+
+.lt-presets{
+  display:flex;gap:6px;flex-wrap:wrap;justify-content:center;
+}
+.lt-preset{
+  padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;
+  background:var(--bg-card);border:1px solid var(--border);
+  color:var(--text-secondary);cursor:pointer;
+  transition:var(--t-safe);
+}
+.lt-preset:hover{ background:var(--accent-dim);border-color:var(--accent);color:var(--accent) }
+.lt-preset.lt-active{ background:var(--accent-dim);border-color:var(--accent);color:var(--accent) }
+
+.lt-custom-row{
+  display:flex;align-items:center;gap:8px;justify-content:center;
+}
+.lt-custom-row input{
+  width:56px;text-align:center;font-family:var(--mono);font-weight:700;
+  padding:6px 8px;border-radius:8px;font-size:14px;
+}
+.lt-custom-row .lt-sep{
+  font-size:18px;font-weight:800;color:var(--text-muted);
+  line-height:1;margin-bottom:2px;
+}
+.lt-controls{
+  display:flex;gap:8px;justify-content:center;flex-wrap:wrap;
+}
+
+/* ── Cold Call quick-behavior buttons ──────────────────────── */
+.cc-qb-btn{
+  display:flex;flex-direction:column;align-items:center;
+  gap:3px;padding:10px 12px;border-radius:11px;
+  cursor:pointer;border:1.5px solid transparent;
+  transition:all .13s ease;min-width:70px;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.cc-qb-btn.pos{
+  background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.25);
+}
+.cc-qb-btn.pos:hover,.cc-qb-btn.pos:active{
+  background:rgba(34,197,94,.35);border-color:rgba(34,197,94,.7);
+  transform:scale(1.06);
+}
+.cc-qb-btn.neg{
+  background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.22);
+}
+.cc-qb-btn.neg:hover,.cc-qb-btn.neg:active{
+  background:rgba(239,68,68,.32);border-color:rgba(239,68,68,.65);
+  transform:scale(1.06);
+}
+.cc-qb-btn:active{ transform:scale(.94)!important }
+.cc-qb-icon{ font-size:22px;line-height:1 }
+.cc-qb-label{
+  font-size:9px;font-weight:700;color:#fff;
+  text-align:center;white-space:nowrap;
+}
+.cc-qb-pts{
+  font-size:8px;font-family:monospace;font-weight:800;
+  opacity:.8;
+}
+.cc-qb-pts.pos{ color:#4ade80 }
+.cc-qb-pts.neg{ color:#f87171 }
+/* Logged flash */
+.cc-qb-btn.cc-logged{
+  animation:ccQbFlash .4s ease;
+}
+@keyframes ccQbFlash{
+  0%,100%{transform:scale(1)}
+  40%{transform:scale(1.18)}
+}
+
 </style>
 </head>
 <body>
@@ -4515,6 +4618,8 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
     <div style="margin:10px 0 4px;padding:0 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Tools</div>
     <div onclick="Drawer.close();ColdCallPicker.open()"       class="drawer-nav-item">🎲 Cold Call</div>
     <div onclick="Drawer.close();SmartGroupEngine.open()"    class="drawer-nav-item">🧩 Smart Groups</div>
+    <div onclick="Drawer.close();LessonTimer.open()"          class="drawer-nav-item">⏱️ Timer</div>
+    <div onclick="Drawer.close();LessonTimer.open()"          class="drawer-nav-item">⏱️ Timer</div>
   </div>
   <!-- Footer -->
   <div id="drawer-school-name"
@@ -4661,6 +4766,11 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
     </div>
     <div class="nav-item" data-screen="seating" onclick="App.navigate('seating')" data-title="Seating Chart 🪑" data-description="Visual classroom layout. Use Smart Seating to arrange students using 4 pedagogical strategies based on behavior data.">
       <span class="nav-icon">🪑</span> Seating Chart
+    </div>
+    <div class="nav-item" onclick="LessonTimer.open()"
+      data-title="Lesson Timer ⏱️" data-description="Countdown timer for activities, group work, exams. Presets for 1–25 min. Plays sound when done."
+      style="color:var(--cyan);font-weight:600">
+      <span class="nav-icon">⏱️</span> Timer
     </div>
     <div class="nav-item" data-screen="settings" onclick="App.navigate('settings')" 
       data-title="Settings" data-description="Configure school name, teacher info, behavior point values, and connect Supabase for cloud sync.">
@@ -5688,23 +5798,34 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
       ✕
     </button>
   </div>
+  <!-- Reveal action panel — shown after student is picked -->
   <div id="cc-btn-again" style="
-    display:none;position:absolute;bottom:32px;left:0;right:0;
-    justify-content:center;gap:12px;">
-    <button onclick="ColdCallOverlay.spin()" style="
-      padding:14px 28px;border-radius:12px;font-size:15px;font-weight:800;
-      background:linear-gradient(135deg,#4f8ef7,#6c63ff);
-      color:#fff;border:none;cursor:pointer;
-      box-shadow:0 6px 28px rgba(79,142,247,.45)">
-      🎲 Pick Again
-    </button>
-    <button onclick="ColdCallOverlay.close()" style="
-      padding:14px 24px;border-radius:12px;font-size:15px;font-weight:700;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.18);
-      color:rgba(255,255,255,.7);cursor:pointer">
-      ✕ Close
-    </button>
+    display:none;position:absolute;bottom:0;left:0;right:0;
+    flex-direction:column;align-items:center;gap:10px;
+    padding:18px 20px 28px;
+    background:linear-gradient(to top,rgba(0,0,0,.92) 80%,transparent);
+    pointer-events:all;">
+
+    <!-- Quick behavior buttons -->
+    <div id="cc-quick-behs" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:520px"></div>
+
+    <!-- Navigation buttons -->
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button onclick="ColdCallOverlay.spin()" style="
+        padding:11px 24px;border-radius:10px;font-size:14px;font-weight:800;
+        background:linear-gradient(135deg,#4f8ef7,#6c63ff);
+        color:#fff;border:none;cursor:pointer;
+        box-shadow:0 4px 18px rgba(79,142,247,.45)">
+        🎲 Pick Again
+      </button>
+      <button onclick="ColdCallOverlay.close()" style="
+        padding:11px 20px;border-radius:10px;font-size:14px;font-weight:700;
+        background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.18);
+        color:rgba(255,255,255,.7);cursor:pointer">
+        ✕ Close
+      </button>
+    </div>
   </div>
 </div>
 
@@ -13300,17 +13421,61 @@ const ColdCallPicker = {
   _history:  [],
   _students: [],
   _weights:  [],
+  _spinning: false,       // spin-lock: prevents overlapping spins
+  _revealTimer: null,     // cancelable reveal timeout
+  _spinTimer:   null,     // cancelable spin animation timeout
+  _open:     false,       // tracks whether modal is currently open
+
+  // ── Reset all transient state — safe to call before every open ──
+  _reset(){
+    this._spinning    = false;
+    this._students    = [];
+    this._weights     = [];
+    clearTimeout(this._revealTimer);
+    clearTimeout(this._spinTimer);
+    this._revealTimer = null;
+    this._spinTimer   = null;
+  },
+
+  // ── Cancel any pending timers (called on modal close) ──────────
+  _cleanupTimers(){
+    clearTimeout(this._revealTimer);
+    clearTimeout(this._spinTimer);
+    this._revealTimer = null;
+    this._spinTimer   = null;
+    this._spinning    = false;
+    this._open        = false;
+    // Ensure spin button never stays visually stuck
+    const btn = document.getElementById('picker-spin-btn');
+    if(btn){ btn.classList.remove('spinning'); btn.disabled = false; }
+  },
+
+  // ── Normalize weights: ensure valid array, never all-zero ──────
+  _normalizeWeights(weights, count){
+    if(!weights || weights.length !== count) {
+      return Array(count).fill(1);
+    }
+    const valid = weights.map(w => (Number.isFinite(w) && w > 0) ? w : 0.1);
+    const total = valid.reduce((a,b) => a+b, 0);
+    return total > 0 ? valid : Array(count).fill(1);
+  },
 
   open(){
-    if(typeof ColdCallOverlay!=='undefined'){ ColdCallOverlay.open(); return; }
+    if(typeof ColdCallOverlay !== 'undefined'){ ColdCallOverlay.open(); return; }
+
+    // Cleanup any leftover state from a previous open
+    this._reset();
+    this._open = true;
+
     const all = StudentManager.getAll().filter(s => !s.exemptFromPicker);
     if(!all.length){
       NotificationEngine.warning('No Students','Add students to use Cold Call Picker');
+      this._open = false;
       return;
     }
     this._students = all;
-    this._weights  = this._calcWeights(all);
-    const maxW     = Math.max(...this._weights);
+    this._weights  = this._normalizeWeights(this._calcWeights(all), all.length);
+    const maxW     = Math.max(...this._weights, 0.1);
 
     const rows = all.map((s,i) => {
       const pct = Math.round(this._weights[i]/maxW*100);
@@ -13353,98 +13518,119 @@ const ColdCallPicker = {
       </div>`;
 
     App._openModalRaw('🎲 Cold Call Picker', body, 'sm', [
-      {label:'Close', class:'btn-ghost', onclick:'App.closeModal()'}
+      {label:'Close', class:'btn-ghost', onclick:'ColdCallPicker._cleanupTimers();App.closeModal()'}
     ]);
   },
 
   _calcWeights(students){
     return students.map(s => {
-      const evs    = BehaviorEngine.getStudentEvents(s.id);
-      const cutoff = Date.now() - 7 * 86400000;
-      const recent = evs.filter(e => new Date(e.createdAt).getTime() > cutoff && !e.corrected);
-
-      // Participation = voluntary positive behaviors only (not just any positive event)
-      const PARTICIPATION_IDS = new Set([
-        'participation','great_answer','good_question','volunteer',
-        'leadership','teamwork','helping','creativity'
-      ]);
-      const participated = recent.filter(e =>
-        e.scoreChange > 0 && PARTICIPATION_IDS.has(e.behaviorId)
-      ).length;
-      const totalPos = recent.filter(e => e.scoreChange > 0).length;
-
-      // Engagement: weight participation higher than generic positive events
-      // eng=1 means very engaged (low pick weight), eng=0 means silent (high pick weight)
-      const eng = totalPos > 0
-        ? Math.min(1, (participated * 0.7 + totalPos * 0.3) / Math.max(totalPos, 1))
-        : 0;  // no events this week → least engaged, highest priority
-
-      // Recency penalty: last 3 picks get 35% weight (not last 3 IDs — actual ordered history)
-      const recentlyPicked = this._history.slice(-3).includes(s.id) ? 0.35 : 1;
-
-      // At-risk students get a slight push toward front (teacher attention)
-      const riskBoost = s.riskLevel === 'high' ? 1.15 : s.riskLevel === 'medium' ? 1.05 : 1;
-
-      return Math.max(0.1, (1 - eng * 0.65) * recentlyPicked * riskBoost);
+      try {
+        const evs    = BehaviorEngine.getStudentEvents(s.id);
+        const cutoff = Date.now() - 7 * 86400000;
+        const recent = evs.filter(e => new Date(e.createdAt).getTime() > cutoff && !e.corrected);
+        const PARTICIPATION_IDS = new Set([
+          'participation','great_answer','good_question','volunteer',
+          'leadership','teamwork','helping','creativity'
+        ]);
+        const participated = recent.filter(e =>
+          e.scoreChange > 0 && PARTICIPATION_IDS.has(e.behaviorId)
+        ).length;
+        const totalPos = recent.filter(e => e.scoreChange > 0).length;
+        const eng = totalPos > 0
+          ? Math.min(1, (participated * 0.7 + totalPos * 0.3) / Math.max(totalPos, 1))
+          : 0;
+        const recentlyPicked = this._history.slice(-3).includes(s.id) ? 0.35 : 1;
+        const riskBoost = s.riskLevel === 'high' ? 1.15 : s.riskLevel === 'medium' ? 1.05 : 1;
+        return Math.max(0.1, (1 - eng * 0.65) * recentlyPicked * riskBoost);
+      } catch(_) { return 1; }  // fallback weight on any error
     });
   },
 
   _spin(){
+    // ── Spin-lock: prevent overlapping spins ──
+    if(this._spinning) return;
+    if(!this._open)    return;  // ignore if modal was closed
+
     const students = this._students;
-    const weights  = this._weights;
     if(!students?.length) return;
 
-    const btn = document.getElementById('picker-spin-btn');
-    if(btn){ btn.classList.add('spinning'); setTimeout(()=>btn.classList.remove('spinning'),520); }
+    // ── Rebuild/validate weights each spin (always fresh) ──────
+    this._weights = this._normalizeWeights(this._calcWeights(students), students.length);
+    const weights = this._weights;
 
-    // Play spin sound immediately for tactile feedback
+    this._spinning = true;
+
+    // ── Lock spin button ───────────────────────────────────────
+    const btn = document.getElementById('picker-spin-btn');
+    if(btn){ btn.disabled = true; btn.classList.add('spinning'); }
+
+    // Cancel any leftover timers from a previous spin
+    clearTimeout(this._revealTimer);
+    clearTimeout(this._spinTimer);
+
     try { SoundEngine.coldCallSpin(); } catch(_) {}
 
-    // Weighted random selection — fixed edge case where idx could stay 0
-    const total = weights.reduce((a,b)=>a+b,0);
+    // ── Weighted random selection ──────────────────────────────
+    const total = weights.reduce((a,b) => a+b, 0);
     let rand = Math.random() * total;
-    let idx  = students.length - 1;   // default: last student (edge case fix)
+    let idx  = students.length - 1;
     for(let i = 0; i < weights.length; i++){
       rand -= weights[i];
       if(rand <= 0){ idx = i; break; }
     }
+    // Clamp idx defensively
+    idx = Math.max(0, Math.min(idx, students.length - 1));
     const chosen = students[idx];
+
     this._history.push(chosen.id);
     if(this._history.length > 20) this._history.shift();
 
-    // Refresh weights after pick (so next spin reflects updated history)
-    this._weights = this._calcWeights(students);
+    // Refresh weights for NEXT spin after recording history
+    this._weights = this._normalizeWeights(this._calcWeights(students), students.length);
 
-    // Delayed reveal sound — plays after spin animation finishes
-    setTimeout(() => {
+    // ── Remove spin animation ──────────────────────────────────
+    this._spinTimer = setTimeout(() => {
+      if(!this._open) return;  // modal closed — abort
+      const b = document.getElementById('picker-spin-btn');
+      if(b) b.classList.remove('spinning');
+    }, 520);
+
+    // ── Reveal after animation ─────────────────────────────────
+    this._revealTimer = setTimeout(() => {
+      if(!this._open) return;  // modal closed — abort
+
       try { SoundEngine.coldCallReveal(); } catch(_) {}
+
+      const evs  = BehaviorEngine.getStudentEvents(chosen.id);
+      const trend = BehaviorEngine.calcTrend(evs);
+
+      const resEl  = document.getElementById('picker-result');
+      const nameEl = document.getElementById('picker-name');
+      const metaEl = document.getElementById('picker-meta');
+      if(resEl)  resEl.style.display = 'block';
+      if(nameEl) nameEl.textContent  = chosen.avatar + ' ' + chosen.name;
+      if(metaEl) metaEl.textContent  =
+        `Score: ${chosen.score} · Streak: ${chosen.streak||0}🔥 · Trend: ${trend?.label||'—'}`;
+
+      NotificationEngine.success('🎲 Cold Call!', `${chosen.avatar} ${chosen.name}`);
+
+      // Update weight bars
+      const maxW = Math.max(...this._weights, 0.1);
+      document.querySelectorAll('#picker-weight-list > div').forEach((row, i) => {
+        const bar = row.querySelector('.picker-weight-bar');
+        if(bar && this._weights[i] != null){
+          bar.style.width = Math.round(this._weights[i]/maxW*100) + '%';
+        }
+        row.style.background = (students[i]?.id === chosen.id)
+          ? 'rgba(79,142,247,0.12)' : '';
+      });
+
+      // ── Unlock spin button (always runs, even if DOM is gone) ──
+      const b = document.getElementById('picker-spin-btn');
+      if(b){ b.disabled = false; b.classList.remove('spinning'); }
+      this._spinning = false;
+
     }, 480);
-
-    const evs   = BehaviorEngine.getStudentEvents(chosen.id);
-    const trend = BehaviorEngine.calcTrend(evs);
-
-    const resEl  = document.getElementById('picker-result');
-    const nameEl = document.getElementById('picker-name');
-    const metaEl = document.getElementById('picker-meta');
-    if(resEl)  resEl.style.display = 'block';
-    if(nameEl) nameEl.textContent  = chosen.avatar + ' ' + chosen.name;
-    if(metaEl) metaEl.textContent  =
-      `Score: ${chosen.score} · Streak: ${chosen.streak}🔥 · Trend: ${trend.label}`;
-
-    NotificationEngine.success('🎲 Cold Call!', `${chosen.avatar} ${chosen.name}`);
-
-    // Update weight bars for all students to reflect new weights
-    document.querySelectorAll('#picker-weight-list > div').forEach((row, i) => {
-      const maxW = Math.max(...this._weights);
-      const bar  = row.querySelector('.picker-weight-bar');
-      if(bar && this._weights[i] != null) {
-        const pct = Math.round(this._weights[i] / maxW * 100);
-        bar.style.width = pct + '%';
-      }
-      // Highlight chosen row
-      row.style.background = (students[i]?.id === chosen.id)
-        ? 'rgba(79,142,247,0.12)' : '';
-    });
   },
 };
 
@@ -25921,6 +26107,9 @@ const ColdCallOverlay = (() => {
   // ── Spin ──────────────────────────────────────────────────────
   function spin() {
     if (_phase === 'spin') return;
+    // Clear previous quick behavior buttons when starting a new spin
+    const qb = document.getElementById('cc-quick-behs');
+    if (qb) qb.innerHTML = '';
     _chosen    = _pickWeighted();
     _chosenIdx = _students.findIndex(s => s.id === _chosen.id);
 
@@ -26005,6 +26194,8 @@ const ColdCallOverlay = (() => {
         _setButtons('reveal');
         _weights = ColdCallPicker._calcWeights(_students);
         NotificationEngine.success('🎲 Cold Call!', `${_chosen.avatar} ${_chosen.name}`);
+        // Render quick behavior buttons for the chosen student
+        setTimeout(() => { try { _renderQuickBehs(); } catch(_) {} }, 20);
       }
     }
 
@@ -26196,6 +26387,41 @@ const ColdCallOverlay = (() => {
     _ctx.fill();
   }
 
+  // ── Quick behavior render ─────────────────────────────────────
+  function _renderQuickBehs() {
+    const container = document.getElementById('cc-quick-behs');
+    if (!container || !_chosen) return;
+
+    const FEATURED_POS = ['great_answer','participation','good_question','leadership','creativity'];
+
+    const allPos = CONFIG.BEHAVIORS?.positive || [];
+    const allNeg = CONFIG.BEHAVIORS?.negative || [];
+
+    // Build ordered list: cold-call-relevant first, then fill to 5
+    const posBehs = [
+      ...FEATURED_POS.map(id => allPos.find(b => b.id === id)).filter(Boolean),
+      ...allPos.filter(b => !FEATURED_POS.includes(b.id)),
+    ].slice(0, 5);
+
+    // 1 negative: no_response → off_task → first available
+    const negBeh = allNeg.find(b => b.id === 'no_response')
+                || allNeg.find(b => b.id === 'off_task')
+                || allNeg[0];
+    const behs = negBeh ? [...posBehs, negBeh] : posBehs;
+
+    container.innerHTML = behs.map(b => {
+      const isPos  = b.pts >= 0;
+      const cls    = isPos ? 'pos' : 'neg';
+      const ptsStr = (isPos ? '+' : '') + b.pts;
+      return `<button class="cc-qb-btn ${cls}"
+        onclick="ColdCallOverlay.logQuickBeh('${b.id}',this)">
+        <span class="cc-qb-icon">${b.icon}</span>
+        <span class="cc-qb-label">${b.label}</span>
+        <span class="cc-qb-pts ${cls}">${ptsStr}</span>
+      </button>`;
+    }).join('');
+  }
+
   // ── REVEAL phase ──────────────────────────────────────────────
   function _drawReveal(now) {
     if (!_chosen) return;
@@ -26362,7 +26588,41 @@ const ColdCallOverlay = (() => {
     ctx.closePath();
   }
 
-  return { open, close, spin };
+  // ── Log behavior directly from Cold Call reveal ──────────────
+  function logQuickBeh(behaviorId, btn) {
+    if (!_chosen) return;
+    try {
+      // Flash animation
+      if (btn) {
+        btn.classList.remove('cc-logged');
+        void btn.offsetWidth;
+        btn.classList.add('cc-logged');
+        setTimeout(() => btn.classList.remove('cc-logged'), 420);
+      }
+
+      // Log to behavior engine (sound + banner handled by engine patch)
+      BehaviorEngine.handle(_chosen.id, behaviorId, 'Cold Call quick-log', 'coldcall');
+
+      // Update student score on canvas reveal (re-fetch fresh data)
+      const updated = StudentManager.getById(_chosen.id);
+      if (updated) {
+        _chosen = updated;
+        const scoreEl = document.getElementById('cc-rev-score');
+        if (scoreEl) scoreEl.textContent = updated.score + ' pts';
+        const streakEl = document.getElementById('cc-rev-streak');
+        if (streakEl) streakEl.textContent = (updated.streak || 0) + '🔥 streak';
+      }
+
+      // Refresh weight bars to reflect new engagement data
+      _weights = ColdCallPicker._calcWeights(_students);
+      _renderWeights(_students.findIndex(s => s.id === _chosen.id));
+
+    } catch(e) {
+      console.error('[ColdCall] logQuickBeh error:', e);
+    }
+  }
+
+  return { open, close, spin, logQuickBeh };
 })();
 
 
@@ -26429,6 +26689,284 @@ const BehaviorMotivator = (() => {
   }
 
   return { show };
+})();
+
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LESSON TIMER
+// Countdown timer for classroom activities. Accurate even after tab switches.
+// Stores start timestamp — calculates remaining time from wall clock, not
+// tick count — so it stays correct after backgrounding or rerender.
+//
+// States: ready | running | paused | done
+// ═══════════════════════════════════════════════════════════════════════════════
+const LessonTimer = (() => {
+  'use strict';
+
+  // ── State ─────────────────────────────────────────────────────
+  let _totalSecs    = 5 * 60;   // default: 5 min
+  let _remainSecs   = 5 * 60;
+  let _state        = 'ready';  // ready|running|paused|done
+  let _startedAt    = null;     // Date.now() when last resumed
+  let _interval     = null;
+  let _modalOpen    = false;
+
+  const PRESETS = [
+    { label:'1m',   secs: 60   },
+    { label:'2m',   secs: 120  },
+    { label:'5m',   secs: 300  },
+    { label:'10m',  secs: 600  },
+    { label:'15m',  secs: 900  },
+    { label:'20m',  secs: 1200 },
+    { label:'25m',  secs: 1500 },
+  ];
+
+  // Ring circumference for r=66
+  const CIRC = 2 * Math.PI * 66;
+
+  // ── Format mm:ss ──────────────────────────────────────────────
+  function _fmt(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }
+
+  // ── Tick ──────────────────────────────────────────────────────
+  function _tick() {
+    if (_state !== 'running' || !_startedAt) return;
+    const elapsed = Math.floor((Date.now() - _startedAt) / 1000);
+    _remainSecs = Math.max(0, _totalSecs - elapsed);
+
+    if (_modalOpen) _render();
+
+    if (_remainSecs <= 0) {
+      _state = 'done';
+      _stopInterval();
+      if (_modalOpen) _render();
+      _onDone();
+    }
+  }
+
+  function _stopInterval() {
+    clearInterval(_interval);
+    _interval = null;
+  }
+
+  function _startInterval() {
+    _stopInterval();
+    _interval = setInterval(_tick, 250);  // 250ms for smooth ring update
+  }
+
+  // ── Done handler ──────────────────────────────────────────────
+  function _onDone() {
+    try { SoundEngine.coldCallReveal(); } catch(_) {}
+    NotificationEngine.show('success', '⏱️ Time\'s Up!', 'Timer finished.', 4000);
+  }
+
+  // ── Ring SVG update ───────────────────────────────────────────
+  function _render() {
+    const pct    = _totalSecs > 0 ? _remainSecs / _totalSecs : 0;
+    const offset = CIRC * (1 - pct);
+
+    const timeEl  = document.getElementById('lt-time');
+    const stateEl = document.getElementById('lt-state');
+    const ringEl  = document.getElementById('lt-ring-fill');
+    const minInp  = document.getElementById('lt-min');
+    const secInp  = document.getElementById('lt-sec');
+
+    if (timeEl)  timeEl.textContent  = _fmt(_remainSecs);
+    if (stateEl) {
+      stateEl.textContent = _state === 'running' ? 'Running'
+                          : _state === 'paused'  ? 'Paused'
+                          : _state === 'done'    ? 'Done!'
+                          :                        'Ready';
+      stateEl.className = 'lt-state-label ' + _state;
+    }
+    if (ringEl) {
+      const color = _state === 'done'    ? 'var(--red)'
+                  : _remainSecs <= 10    ? 'var(--red)'
+                  : _remainSecs <= 30    ? 'var(--orange)'
+                  :                        'var(--accent)';
+      ringEl.style.stroke           = color;
+      ringEl.style.strokeDashoffset = offset;
+    }
+
+    // Input fields — only update when not running (avoid jitter)
+    if (_state === 'ready') {
+      const m = Math.floor(_totalSecs / 60);
+      const s = _totalSecs % 60;
+      if (minInp) minInp.value = String(m).padStart(2,'0');
+      if (secInp) secInp.value = String(s).padStart(2,'0');
+    }
+
+    // Buttons
+    const btnStart  = document.getElementById('lt-btn-start');
+    const btnPause  = document.getElementById('lt-btn-pause');
+    const btnReset  = document.getElementById('lt-btn-reset');
+    if (btnStart) btnStart.style.display  = (_state==='ready'||_state==='done') ? 'inline-flex' : 'none';
+    if (btnPause) btnPause.style.display  = _state==='running' ? 'inline-flex' : _state==='paused' ? 'inline-flex' : 'none';
+    if (btnReset) btnReset.style.display  = _state!=='ready' ? 'inline-flex' : 'none';
+    if (btnPause) btnPause.textContent    = _state==='paused' ? '▶ Resume' : '⏸ Pause';
+
+    // Preset buttons highlight
+    document.querySelectorAll('.lt-preset').forEach(el => {
+      const isActive = parseInt(el.dataset.secs) === _totalSecs;
+      el.classList.toggle('lt-active', isActive);
+    });
+  }
+
+  // ── Public controls ───────────────────────────────────────────
+  function start() {
+    if (_state === 'done') reset();
+    if (_state !== 'ready') return;
+    // Read inputs
+    const minInp = document.getElementById('lt-min');
+    const secInp = document.getElementById('lt-sec');
+    const m = Math.max(0, parseInt(minInp?.value) || 0);
+    const s = Math.max(0, Math.min(59, parseInt(secInp?.value) || 0));
+    _totalSecs  = m * 60 + s;
+    if (_totalSecs <= 0) { NotificationEngine.warning('Set Time','Enter a duration first'); return; }
+    _remainSecs = _totalSecs;
+    _startedAt  = Date.now();
+    _state      = 'running';
+    _startInterval();
+    _render();
+  }
+
+  function pause() {
+    if (_state === 'running') {
+      // Snapshot remaining before pausing
+      _remainSecs = Math.max(0, _remainSecs - Math.floor((Date.now() - _startedAt) / 1000));
+      _totalSecs  = _remainSecs;  // treat remaining as new total for ring %
+      _state      = 'paused';
+      _stopInterval();
+    } else if (_state === 'paused') {
+      _startedAt  = Date.now();
+      _state      = 'running';
+      _startInterval();
+    }
+    _render();
+  }
+
+  function reset() {
+    _stopInterval();
+    _state      = 'ready';
+    _startedAt  = null;
+    // Restore from input values
+    const minInp = document.getElementById('lt-min');
+    const secInp = document.getElementById('lt-sec');
+    const m = Math.max(0, parseInt(minInp?.value) || 0);
+    const s = Math.max(0, Math.min(59, parseInt(secInp?.value) || 0));
+    const t = m * 60 + s;
+    _totalSecs  = t > 0 ? t : 5 * 60;
+    _remainSecs = _totalSecs;
+    _render();
+  }
+
+  function setPreset(secs) {
+    if (_state === 'running') return;  // don't interrupt a running timer
+    _stopInterval();
+    _state      = 'ready';
+    _totalSecs  = secs;
+    _remainSecs = secs;
+    _startedAt  = null;
+    _render();
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────
+  function open() {
+    _modalOpen = true;
+
+    const presetHTML = PRESETS.map(p =>
+      `<button class="lt-preset${_totalSecs===p.secs?' lt-active':''}" data-secs="${p.secs}"
+         onclick="LessonTimer.setPreset(${p.secs})">${p.label}</button>`
+    ).join('');
+
+    const m = Math.floor(_totalSecs / 60);
+    const s = _totalSecs % 60;
+
+    const body = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:18px;padding:6px 0">
+
+        <!-- Ring -->
+        <div class="lt-ring-wrap">
+          <svg class="lt-ring-svg" viewBox="0 0 160 160" width="160" height="160">
+            <circle class="lt-ring-bg" cx="80" cy="80" r="66"/>
+            <circle class="lt-ring-fill" id="lt-ring-fill" cx="80" cy="80" r="66"
+              stroke="var(--accent)"
+              stroke-dasharray="${CIRC}"
+              stroke-dashoffset="0"/>
+          </svg>
+          <div class="lt-time-display">
+            <div class="lt-time-text" id="lt-time">${_fmt(_remainSecs)}</div>
+            <div class="lt-state-label ${_state}" id="lt-state">${_state.charAt(0).toUpperCase()+_state.slice(1)}</div>
+          </div>
+        </div>
+
+        <!-- Custom time input -->
+        <div class="lt-custom-row">
+          <input class="input" id="lt-min" type="number" min="0" max="99"
+            value="${String(m).padStart(2,'0')}"
+            onchange="LessonTimer._onInput()"
+            style="width:56px;text-align:center;font-family:var(--mono);font-size:16px;font-weight:800;padding:6px 4px"/>
+          <span class="lt-sep">:</span>
+          <input class="input" id="lt-sec" type="number" min="0" max="59"
+            value="${String(s).padStart(2,'0')}"
+            onchange="LessonTimer._onInput()"
+            style="width:56px;text-align:center;font-family:var(--mono);font-size:16px;font-weight:800;padding:6px 4px"/>
+        </div>
+
+        <!-- Presets -->
+        <div class="lt-presets">${presetHTML}</div>
+
+        <!-- Controls -->
+        <div class="lt-controls">
+          <button id="lt-btn-start" class="btn btn-success btn-sm"
+            onclick="LessonTimer.start()"
+            style="display:${(_state==='ready'||_state==='done')?'inline-flex':'none'}">
+            ▶ Start
+          </button>
+          <button id="lt-btn-pause" class="btn btn-primary btn-sm"
+            onclick="LessonTimer.pause()"
+            style="display:${_state==='running'||_state==='paused'?'inline-flex':'none'}">
+            ${_state==='paused'?'▶ Resume':'⏸ Pause'}
+          </button>
+          <button id="lt-btn-reset" class="btn btn-ghost btn-sm"
+            onclick="LessonTimer.reset()"
+            style="display:${_state!=='ready'?'inline-flex':'none'}">
+            ↺ Reset
+          </button>
+        </div>
+      </div>`;
+
+    App._openModalRaw('⏱️ Lesson Timer', body, 'sm', [
+      {label:'Close', class:'btn-ghost',
+       onclick:'LessonTimer._onModalClose();App.closeModal()'}
+    ]);
+
+    // Kick off render so ring + state are correct immediately
+    setTimeout(() => _render(), 40);
+  }
+
+  function _onInput() {
+    if (_state !== 'ready') return;
+    const minInp = document.getElementById('lt-min');
+    const secInp = document.getElementById('lt-sec');
+    const m = Math.max(0, parseInt(minInp?.value) || 0);
+    const s = Math.max(0, Math.min(59, parseInt(secInp?.value) || 0));
+    _totalSecs  = m * 60 + s;
+    _remainSecs = _totalSecs;
+    _render();
+  }
+
+  function _onModalClose() {
+    _modalOpen = false;
+    // Timer keeps running in background — only interval stops when done
+    // If running, interval continues but _render() won't fire (no DOM)
+  }
+
+  return { open, start, pause, reset, setPreset, _onInput, _onModalClose };
 })();
 
 
