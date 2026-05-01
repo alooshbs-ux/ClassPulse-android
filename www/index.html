@@ -211,7 +211,7 @@ body.day-mode #ep-watermark { color: rgba(37,99,235,0.25); border-color: rgba(37
   padding: 8px 14px; border-radius: 20px; cursor: pointer;
   border: 1px solid var(--border-strong); background: var(--bg-card);
   color: var(--text-secondary); font-size: 12px; font-weight: 600;
-  transition: all var(--transition);
+  transition:var(--t-safe);
 }
 #theme-toggle-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 
@@ -220,7 +220,7 @@ body.day-mode #ep-watermark { color: rgba(37,99,235,0.25); border-color: rgba(37
   display:flex;align-items:center;gap:5px;
   padding:3px 8px;border-radius:10px;
   font-size:9px;font-weight:600;
-  transition:all .10s ease;
+  transition:var(--t-safe);
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-muted);white-space:nowrap;
 }
@@ -250,7 +250,7 @@ html,body{
 @supports(height:100dvh){
   html,body{ min-height:100dvh }
 }
-body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);font-size:14px;line-height:1.5}
+body{font-family:var(--font);background:var(--bg-base);color:var(--text-primary);font-size:14px;line-height:1.5;text-rendering:optimizeSpeed}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:4px}
@@ -311,7 +311,7 @@ a{text-decoration:none;color:inherit}
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-secondary);font-size:16px;
   display:flex;align-items:center;justify-content:center;
-  transition:all var(--transition);cursor:pointer;
+  transition:var(--t-safe);cursor:pointer;
   flex-shrink:0;
 }
 .header-btn:hover{color:var(--text-primary);border-color:var(--border-strong);background:var(--bg-hover)}
@@ -342,7 +342,7 @@ a{text-decoration:none;color:inherit}
   padding:10px 16px;margin:1px 8px;
   border-radius:var(--radius-sm);
   color:var(--text-secondary);
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
   font-size:13px;font-weight:500;
   position:relative;
 }
@@ -505,12 +505,10 @@ a{text-decoration:none;color:inherit}
 @keyframes slideOutLeftBlur{
   from{
     transform:translateX(0) scale(1);
-    filter:blur(0px) brightness(1);
     opacity:1;
   }
   to{
     transform:translateX(-22%) scale(0.96);
-    filter:blur(14px) brightness(0.5) saturate(0.6);
     opacity:0;
   }
 }
@@ -521,12 +519,10 @@ a{text-decoration:none;color:inherit}
 @keyframes slideOutRightBlur{
   from{
     transform:translateX(0) scale(1);
-    filter:blur(0px) brightness(1);
     opacity:1;
   }
   to{
     transform:translateX(100%) scale(0.96);
-    filter:blur(8px) brightness(0.6);
     opacity:0.6;
   }
 }
@@ -534,24 +530,20 @@ a{text-decoration:none;color:inherit}
   from{
     opacity:0;
     transform:scale(0.96) translateY(8px);
-    filter:blur(4px);
   }
   to{
     opacity:1;
     transform:scale(1) translateY(0);
-    filter:blur(0px);
   }
 }
 @keyframes screenFadeOutBlur{
   from{
     opacity:1;
     transform:scale(1);
-    filter:blur(0px);
   }
   to{
     opacity:0;
     transform:scale(1.04);
-    filter:blur(14px) brightness(0.5);
   }
 }
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -598,7 +590,7 @@ a{text-decoration:none;color:inherit}
   display:inline-flex;align-items:center;gap:6px;
   padding:8px 14px;border-radius:var(--radius-sm);
   font-size:12px;font-weight:600;
-  transition:all var(--transition);cursor:pointer;
+  transition:var(--t-safe);cursor:pointer;
 }
 .btn-primary{background:var(--accent);color:#fff}
 .active-chart-btn{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
@@ -678,7 +670,7 @@ a{text-decoration:none;color:inherit}
 .stat-card{
   background:var(--bg-card);border:1px solid var(--border);
   border-radius:var(--radius-md);padding:14px;
-  transition:all var(--transition);
+  transition:var(--t-safe);
 }
 .stat-card:hover{border-color:var(--border-strong);transform:translateY(-2px)}
 .stat-card .stat-icon{font-size:22px;margin-bottom:8px}
@@ -732,9 +724,10 @@ a{text-decoration:none;color:inherit}
 .student-quick-card{
   background:var(--bg-elevated);border:1px solid var(--border);
   border-radius:var(--radius-md);padding:7px 5px;
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
   text-align:center;position:relative;
   user-select:none;
+  contain:layout style;
 }
 .student-quick-card:hover{border-color:var(--border-strong);background:var(--bg-hover)}
 .student-quick-card.selected{
@@ -858,7 +851,7 @@ a{text-decoration:none;color:inherit}
   width:100%;min-height:66px;
   border-radius:10px;
   border:none;cursor:pointer;
-  transition:background .15s,transform .12s,box-shadow .12s;
+  transition:background .15s,transform .12s;
   flex-shrink:0;
   position:relative;
   overflow:visible;        /* never clip children */
@@ -996,7 +989,7 @@ a{text-decoration:none;color:inherit}
 .score-float.pos{color:var(--success)}
 .score-float.neg{color:var(--danger)}
 @keyframes floatUp{
-  0%{opacity:1;transform:translateY(0) scale(1)}
+  0%{opacity:1;transform:translate3d(0,0,0) scale(1)}
   60%{opacity:1;transform:translateY(-40px) scale(1.1)}
   100%{opacity:0;transform:translateY(-80px) scale(0.8)}
 }
@@ -1007,7 +1000,7 @@ a{text-decoration:none;color:inherit}
   display:flex;align-items:center;gap:10px;
   padding:8px 10px;border-radius:var(--radius-sm);
   background:var(--bg-elevated);border:1px solid var(--border);
-  transition:all var(--transition);
+  transition:var(--t-safe);
 }
 .activity-item:hover{border-color:var(--border-strong)}
 .activity-item .a-avatar{
@@ -1044,7 +1037,7 @@ a{text-decoration:none;color:inherit}
 .student-full-card{
   background:var(--bg-card);border:1px solid var(--border);
   border-radius:var(--radius-md);padding:14px;
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
   position:relative;
 }
 .student-full-card:hover{border-color:var(--border-strong);transform:translateY(-2px);box-shadow:var(--shadow)}
@@ -1170,7 +1163,7 @@ a{text-decoration:none;color:inherit}
   border-radius:var(--radius-md);padding:16px 14px;
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.18);
-  position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s;
+  position:relative;overflow:hidden;transition:transform .18s;
 }
 .metric-card:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 8px 32px rgba(0,0,0,0.24)}
 .metric-card::before{
@@ -1193,7 +1186,7 @@ a{text-decoration:none;color:inherit}
   display:flex;align-items:center;gap:12px;
   padding:12px 16px;border-radius:var(--radius-md);
   background:var(--bg-card);border:1px solid var(--border);
-  transition:all var(--transition);cursor:pointer;
+  transition:var(--t-safe);cursor:pointer;
 }
 .lb-item:hover{border-color:var(--border-strong);transform:translateX(4px)}
 .lb-item.top-1{background:linear-gradient(90deg,rgba(255,215,0,0.08),transparent);border-color:rgba(255,215,0,0.19)}
@@ -1279,7 +1272,7 @@ a{text-decoration:none;color:inherit}
   width:100%;padding:7px;background:var(--bg-elevated);
   border:1px solid var(--border);border-radius:var(--radius-sm);
   color:var(--text-secondary);font-size:11px;font-weight:600;
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
   display:flex;align-items:center;justify-content:center;gap:6px;
 }
 .insights-refresh-btn:hover{border-color:var(--border-strong);color:var(--text-primary)}
@@ -1316,7 +1309,7 @@ a{text-decoration:none;color:inherit}
   pointer-events:all;cursor:pointer;
   display:flex;align-items:flex-start;gap:10px;
   animation:notifIn 0.3s cubic-bezier(.175,.885,.32,1.275) both;
-  transition:all 0.2s;
+  transition:var(--t-safe);
   max-width:300px;
 }
 .notif.leaving{animation:notifOut 0.25s ease forwards}
@@ -1393,7 +1386,7 @@ a{text-decoration:none;color:inherit}
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-secondary);font-size:16px;
   display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
 }
 .modal-close:hover{color:var(--text-primary);border-color:var(--border-strong)}
 .modal-footer{
@@ -1518,7 +1511,7 @@ a{text-decoration:none;color:inherit}
   display:flex;align-items:center;gap:8px;
   padding:7px 9px;border-radius:7px;margin-bottom:5px;
   border:1px solid var(--border);background:var(--bg-card);
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
 }
 .pred-card:hover{border-color:var(--border-strong);background:var(--bg-hover)}
 .pred-avatar{
@@ -1549,7 +1542,7 @@ a{text-decoration:none;color:inherit}
   padding:5px 8px;border-radius:6px;
   background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.15);
   font-size:10px;color:var(--text-secondary);
-  transition:all var(--transition);cursor:default;
+  transition:var(--t-safe);cursor:default;
 }
 .intervention-item:hover{background:rgba(79,142,247,.12);color:var(--text-primary)}
 .intervention-item .iv-icon{font-size:12px;flex-shrink:0}
@@ -1573,7 +1566,7 @@ a{text-decoration:none;color:inherit}
 .heat-cell{
   border-radius:var(--radius-sm);padding:7px 5px 5px;
   text-align:center;cursor:pointer;
-  transition:all var(--transition);
+  transition:var(--t-safe);
   border:1px solid transparent;
   position:relative;overflow:hidden;
 }
@@ -1674,7 +1667,7 @@ a{text-decoration:none;color:inherit}
   width:28px;height:28px;border-radius:7px;font-size:14px;
   background:transparent;border:none;
   color:var(--text-secondary);cursor:pointer;
-  transition:all var(--transition);
+  transition:var(--t-safe);
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
 }
@@ -1702,7 +1695,7 @@ a{text-decoration:none;color:inherit}
   padding:4px 10px;border-radius:20px;
   background:var(--bg-card);border:1px solid var(--border);
   font-size:11px;font-weight:500;color:var(--text-secondary);
-  transition:all var(--transition);cursor:pointer;
+  transition:var(--t-safe);cursor:pointer;
   white-space:nowrap;user-select:none;
 }
 .sync-pill:hover{border-color:var(--border-strong)}
@@ -1736,7 +1729,7 @@ a{text-decoration:none;color:inherit}
   padding:4px 10px;border-radius:20px;
   background:var(--accent-dim);border:1px solid var(--accent-glow);
   color:var(--accent);font-size:11px;font-weight:600;
-  cursor:pointer;transition:all var(--transition);
+  cursor:pointer;transition:var(--t-safe);
   white-space:nowrap;
 }
 .sync-save-btn:hover{background:var(--accent);color:#fff}
@@ -1800,7 +1793,7 @@ a{text-decoration:none;color:inherit}
 .conflict-versions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .conflict-version{
   padding:8px 10px;border-radius:6px;border:1px solid var(--border);
-  font-size:10px;cursor:pointer;transition:all var(--transition);
+  font-size:10px;cursor:pointer;transition:var(--t-safe);
 }
 .conflict-version:hover{border-color:var(--accent);background:var(--accent-dim)}
 .conflict-version.selected{border-color:var(--accent);background:var(--accent-dim)}
@@ -2455,8 +2448,7 @@ a{text-decoration:none;color:inherit}
   cursor:pointer;
   align-items:center; justify-content:center;
   box-shadow:0 4px 20px rgba(79,142,247,0.45),0 2px 8px rgba(0,0,0,0.4);
-  transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1),
-             box-shadow 0.2s ease;
+  transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
   -webkit-tap-highlight-color:transparent;
 }
 .mob-fab:active{
@@ -2551,7 +2543,7 @@ body.privacy-mode .private-field{filter:blur(5px)!important;pointer-events:none!
 body.privacy-mode .hide-privacy{display:none!important}
 
 /* ── PRIVACY TOGGLE ─────────────────────────────────────── */
-.privacy-toggle{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:16px;background:var(--bg-card);border:1px solid var(--border);font-size:10px;color:var(--text-secondary);cursor:pointer;transition:all var(--transition);white-space:nowrap}
+.privacy-toggle{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:16px;background:var(--bg-card);border:1px solid var(--border);font-size:10px;color:var(--text-secondary);cursor:pointer;transition:var(--t-safe);white-space:nowrap}
 .privacy-toggle:hover{border-color:var(--border-strong);color:var(--text-primary)}
 .privacy-toggle.on{background:rgba(155,89,182,.15);border-color:rgba(155,89,182,.4);color:var(--purple)}
 .ptoggle-track{width:26px;height:14px;border-radius:7px;background:var(--text-muted);position:relative;transition:background var(--transition);flex-shrink:0}
@@ -2561,7 +2553,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 
 /* ── MOOD BAR ───────────────────────────────────────────── */
 .mood-bar{display:flex;align-items:center;gap:3px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:3px}
-.mood-btn{width:28px;height:28px;border-radius:7px;font-size:14px;background:transparent;border:none;transition:all var(--transition);display:flex;align-items:center;justify-content:center;opacity:.42;cursor:pointer;flex-shrink:0}
+.mood-btn{width:28px;height:28px;border-radius:7px;font-size:14px;background:transparent;border:none;transition:var(--t-safe);display:flex;align-items:center;justify-content:center;opacity:.42;cursor:pointer;flex-shrink:0}
 .mood-btn:hover{opacity:.8;background:var(--bg-hover)}
 .mood-btn.active{opacity:1;background:rgba(255,255,255,.1);box-shadow:0 0 0 1px rgba(255,255,255,.18)}
 
@@ -2571,7 +2563,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 #global-dropdown-root{position:fixed;top:0;left:0;z-index:999998;pointer-events:none}
 #global-dropdown-root .qe-dropdown{pointer-events:all}
 @keyframes qeIn{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
-.qe-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:6px;font-size:11px;color:var(--text-secondary);cursor:pointer;transition:all var(--transition);white-space:nowrap}
+.qe-item{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:6px;font-size:11px;color:var(--text-secondary);cursor:pointer;transition:var(--t-safe);white-space:nowrap}
 .qe-item:hover{background:var(--bg-hover);color:var(--text-primary)}
 .qe-item.danger{color:var(--red)}.qe-item.danger:hover{background:var(--red-dim)}
 .qe-sep{height:1px;background:var(--border);margin:3px 5px}
@@ -2580,7 +2572,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 .sfc-qedit-btn:hover{background:var(--bg-hover);color:var(--text-primary);border-color:var(--border-strong)}
 
 /* ── COLD CALL PICKER ───────────────────────────────────── */
-.picker-spin-btn{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#6c63ff);color:#fff;font-size:22px;border:none;cursor:pointer;transition:all var(--transition);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(79,142,247,.4)}
+.picker-spin-btn{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#6c63ff);color:#fff;font-size:22px;border:none;cursor:pointer;transition:var(--t-safe);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(79,142,247,.4)}
 .picker-spin-btn:hover{transform:scale(1.06) rotate(-8deg)}
 .picker-spin-btn:active{transform:scale(.93)}
 .picker-spin-btn.spinning{animation:pickerSpin .5s ease}
@@ -2594,7 +2586,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   padding:8px 9px;margin:4px 7px 0;
   background:var(--bg-card);border:1px solid var(--border);
   border-radius:var(--radius-sm);
-  transition:all var(--transition);
+  transition:var(--t-safe);
 }
 .cs-label{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-muted);margin-bottom:5px}
 .cs-current{
@@ -2722,7 +2714,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   background: rgba(4, 6, 20, 0.78);
   pointer-events: all;
   z-index: 89990;
-  transition: all 280ms cubic-bezier(0.4,0,0.2,1);
+  transition:transform 280ms cubic-bezier(0.4,0,0.2,1),opacity 280ms cubic-bezier(0.4,0,0.2,1);
 }
 
 /* Spotlight ring around target */
@@ -2734,7 +2726,7 @@ body.privacy-mode .hide-privacy{display:none!important}
     0 0 0 3px rgba(79,142,247,0.7),
     0 0 0 6px rgba(79,142,247,0.18),
     0 0 40px rgba(79,142,247,0.25);
-  transition: all 280ms cubic-bezier(0.4,0,0.2,1);
+  transition:transform 280ms cubic-bezier(0.4,0,0.2,1),opacity 280ms cubic-bezier(0.4,0,0.2,1);
   pointer-events: none;
   animation: obPulse 2s ease infinite;
 }
@@ -2755,7 +2747,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   box-shadow:
     0 20px 60px rgba(0,0,0,0.65),
     0 0 0 1px rgba(255,255,255,0.05) inset;
-  transition: all 280ms cubic-bezier(0.4,0,0.2,1);
+  transition:transform 280ms cubic-bezier(0.4,0,0.2,1),opacity 280ms cubic-bezier(0.4,0,0.2,1);
   font-family: DM Sans, system-ui, sans-serif;
 }
 #ep-onboard-card.ob-entering {
@@ -2791,7 +2783,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   font-size: 11px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s;
+  transition:var(--t-safe);
   flex-shrink: 0;
 }
 .ob-close-btn:hover { background: rgba(231,76,60,0.2); color: var(--red); border-color: rgba(231,76,60,0.4); }
@@ -2831,7 +2823,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 .ob-btn {
   padding: 6px 14px; border-radius: 7px;
   font-size: 11px; font-weight: 600;
-  cursor: pointer; transition: all 0.15s;
+  cursor: pointer; transition:var(--t-safe);
   font-family: DM Sans, system-ui, sans-serif;
   border: none; outline: none;
   white-space: nowrap;
@@ -2922,6 +2914,7 @@ body.privacy-mode .hide-privacy{display:none!important}
    PWA — Install Banner & Mobile Touch Enhancements
 ═══════════════════════════════════════════════════════════════ */
 #pwa-install-banner {
+  display: none !important;
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: 99995;
@@ -2949,7 +2942,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   color: #fff; font-size: 12px; font-weight: 700;
   cursor: pointer; border: none; font-family: DM Sans,sans-serif;
   box-shadow: 0 3px 14px rgba(79,142,247,0.4);
-  transition: all 0.15s;
+  transition:var(--t-safe);
 }
 .pwa-install-btn:hover { transform: translateY(-1px); }
 .pwa-dismiss-btn {
@@ -2957,7 +2950,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
   color: rgba(136,146,176,0.6); font-size: 13px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s;
+  transition:var(--t-safe);
 }
 .pwa-dismiss-btn:hover { background: rgba(231,76,60,0.2); color: var(--red); }
 
@@ -3083,7 +3076,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 .quest-complete .quest-icon::after{content:'🎉';position:absolute;font-size:16px}
 .quest-edit-btn{flex-shrink:0;background:none;border:1px solid rgba(255,255,255,.1);border-radius:8px;
   padding:4px 9px;font-size:10px;color:var(--text-muted);cursor:pointer;font-family:var(--font);
-  transition:all .15s}
+  transition:var(--t-safe)}
 .quest-edit-btn:hover{border-color:var(--accent);color:var(--accent)}
 
 /* -═════════════════════════════════════════════════════════════
@@ -3103,7 +3096,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   background:var(--bg-card);border:1px solid var(--border);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   cursor:pointer;position:relative;
-  transition:all .18s;user-select:none;
+  transition:var(--t-safe);user-select:none;
   -webkit-tap-highlight-color:transparent;
   padding:4px;
 }
@@ -3157,7 +3150,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 .tag-chip{
   padding:3px 9px;border-radius:99px;border:1px solid var(--border);
   font-size:10px;font-weight:600;cursor:pointer;background:var(--bg-card);
-  color:var(--text-secondary);transition:all .15s;white-space:nowrap;
+  color:var(--text-secondary);transition:var(--t-safe);white-space:nowrap;
 }
 .tag-chip:hover{border-color:var(--accent);color:var(--accent)}
 .tag-chip.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
@@ -3182,7 +3175,7 @@ body.privacy-mode .hide-privacy{display:none!important}
   display:flex;align-items:center;gap:10px;
   padding:11px 12px;border-radius:10px;
   font-size:13px;font-weight:600;color:var(--text-secondary);
-  cursor:pointer;transition:all .15s;margin-bottom:3px;
+  cursor:pointer;transition:var(--t-safe);margin-bottom:3px;
 }
 .drawer-nav-item:hover,.drawer-nav-item:active{
   background:var(--accent-dim);color:var(--accent);
@@ -3193,7 +3186,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 .drawer-class-item{
   display:flex;align-items:center;gap:10px;
   padding:10px 12px;border-radius:10px;border:1px solid var(--border);
-  margin-bottom:6px;cursor:pointer;transition:all .15s;
+  margin-bottom:6px;cursor:pointer;transition:var(--t-safe);
   background:var(--bg-card);
 }
 .drawer-class-item:hover{border-color:var(--accent);background:var(--accent-dim)}
@@ -3685,9 +3678,13 @@ body.privacy-mode .hide-privacy{display:none!important}
 .notif        { will-change: transform, opacity; }
 .score-float  { will-change: transform, opacity; }
 .modal        { will-change: transform, opacity; }
+/* Promote bm-container to own layer — motivator banners composite-only */
+#bm-container { will-change: contents; }
+/* Picker spin btn on own layer during animation */
+.picker-spin-btn.spinning { will-change: transform; }
 .beh-btn:hover,
 .btn:hover,
-.student-quick-card:hover { will-change: transform; }
+.student-quick-card:active { will-change: transform; }  /* only during active press */
 
 /* ── Layout containment — prevents paint outside element bounds ───────────── */
 .student-quick-card,
@@ -3724,6 +3721,7 @@ body.privacy-mode .hide-privacy{display:none!important}
 /* ── content-visibility: auto for offscreen sections ──────────────────────── */
 .screen:not(.active) {
   content-visibility: hidden;
+  contain-intrinsic-size: 0 600px;
 }
 
 /* ── Ultra-fast CSS transitions — ×0.4 ────────────────────────────────────── */
@@ -3838,7 +3836,7 @@ canvas {
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-secondary);font-size:16px;
   display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s ease;flex-shrink:0;
+  cursor:pointer;transition:var(--t-safe);flex-shrink:0;
 }
 .sg-modal-close:hover{background:var(--red-dim);color:var(--red);border-color:var(--red)}
 .sg-modal-body{
@@ -3863,7 +3861,7 @@ canvas {
 .sg-strategy-card{
   padding:10px 14px;border-radius:10px;cursor:pointer;
   border:1.5px solid var(--border);background:var(--bg-card);
-  transition:all .15s ease;min-width:130px;
+  transition:var(--t-safe);min-width:130px;
   display:flex;flex-direction:column;gap:3px;
 }
 .sg-strategy-card:hover{ border-color:var(--accent);background:var(--accent-dim); }
@@ -3938,7 +3936,7 @@ canvas {
   display:flex;align-items:center;gap:7px;
   padding:6px 8px;border-radius:8px;
   background:var(--bg-elevated);border:1px solid var(--border);
-  transition:all .12s ease;cursor:default;
+  transition:var(--t-safe);cursor:default;
   position:relative;
 }
 .sg-student-pill:hover{ border-color:var(--border-strong) }
@@ -4039,7 +4037,7 @@ body.day-mode .sg-group-col{ background:var(--bg-card) }
   background:var(--bg-card);border:1px solid var(--border);
   color:var(--text-secondary);font-size:16px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:all .15s ease;flex-shrink:0;
+  transition:var(--t-safe);flex-shrink:0;
 }
 .ss-close:hover{ background:var(--red-dim);color:var(--red);border-color:var(--red) }
 .ss-body{
@@ -4057,7 +4055,7 @@ body.day-mode .sg-group-col{ background:var(--bg-card) }
   flex:1;min-width:150px;
   padding:12px 14px;border-radius:12px;cursor:pointer;
   border:1.5px solid var(--border);background:var(--bg-card);
-  transition:all .15s ease;
+  transition:var(--t-safe);
 }
 .ss-strat:hover{ border-color:var(--accent);background:var(--accent-dim); }
 .ss-strat.ss-active{
@@ -4090,7 +4088,7 @@ body.day-mode .sg-group-col{ background:var(--bg-card) }
   text-align:center;min-height:48px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   font-size:9px;position:relative;
-  transition:all .15s ease;
+  transition:var(--t-safe);
 }
 .ss-preview-seat.ss-empty{
   border-style:dashed;border-color:rgba(255,255,255,.08);
@@ -4280,7 +4278,7 @@ body.day-mode .ss-strat{ background:var(--bg-card) }
 #cc-footer{ display:flex;gap:10px;align-items:center }
 .cc-btn{
   padding:10px 22px;border-radius:10px;font-size:13px;font-weight:700;
-  cursor:pointer;border:none;transition:all .15s ease;
+  cursor:pointer;border:none;transition:var(--t-safe);
 }
 .cc-btn-primary{
   background:var(--accent);color:#fff;
@@ -4329,7 +4327,8 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
   top:0;left:0;right:0;bottom:0;
   display:flex;align-items:center;justify-content:center;
   pointer-events:none;
-  z-index:calc(var(--z-notif) + 5);
+  z-index:calc(var(--z-notif) + 10);  /* above mobile nav bar */
+  padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px);  /* clear mobile nav */
 }
 .bm-toast{
   display:flex;
@@ -4473,7 +4472,7 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
   display:flex;flex-direction:column;align-items:center;
   gap:3px;padding:10px 12px;border-radius:11px;
   cursor:pointer;border:1.5px solid transparent;
-  transition:all .13s ease;min-width:70px;
+  transition:var(--t-safe);min-width:70px;
   -webkit-tap-highlight-color:transparent;
   user-select:none;
 }
@@ -4510,6 +4509,210 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
 @keyframes ccQbFlash{
   0%,100%{transform:scale(1)}
   40%{transform:scale(1.18)}
+}
+
+/* ── Performance hints ─────────────────────────────────────────
+   Applied globally to avoid layout thrashing and maximize
+   compositor-thread work. ──────────────────────────────────── */
+
+/* Scrollable containers: force GPU-accelerated scrolling */
+.app-sidebar,
+.screen.active,
+.insights-body,
+#students-grid,
+.sync-log-list,
+.modal,
+.modal-body{
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: auto;             /* instant scroll = no janky CSS animation */
+  overscroll-behavior: contain;      /* prevent scroll chaining to parent */
+}
+
+/* Prevent layout thrashing on frequently repainted elements */
+.student-quick-card,
+.beh-btn,
+.nav-item,
+.btn{
+  -webkit-tap-highlight-color: transparent;
+  backface-visibility: hidden;       /* hint: element unlikely to flip */
+  perspective: 1000px;
+}
+
+/* Reduce paint area for score floats */
+.score-float{
+  isolation: isolate;
+  contain: layout style;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE OVERRIDES — Mobile & Tablet
+   Covers all new features added after initial build.
+   Target sizes: 320px (small phone), 375–414px (standard phone),
+   768px (tablet portrait), 1024px (tablet landscape)
+══════════════════════════════════════════════════════════════ */
+
+/* ── 768px and below: tablets in portrait + all phones ─────── */
+@media (max-width: 768px) {
+
+  /* BehaviorMotivator: full-width banner on mobile */
+  .bm-toast{
+    max-width: calc(100vw - 24px);
+    min-width: 240px;
+    padding: 14px 16px;
+    border-radius: 14px;
+  }
+  .bm-icon{ font-size: 32px; }
+  .bm-label{ font-size: 17px; }
+
+  /* Smart Seating modal: full screen on mobile */
+  #ss-modal{
+    width: 100vw;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .ss-strategies{
+    flex-direction: column;
+    gap: 6px;
+  }
+  .ss-strat{
+    min-width: unset;
+    padding: 10px 12px;
+  }
+  .ss-preview-grid{
+    font-size: 9px;
+  }
+
+  /* Smart Groups modal: full width */
+  #sg-modal{
+    width: 100vw;
+    border-radius: 16px 16px 0 0;
+    max-height: 90dvh;
+  }
+
+  /* Lesson Timer: compact on small screens */
+  .lt-ring-wrap{
+    width: 140px;
+    height: 140px;
+  }
+  .lt-time-text{ font-size: 26px; }
+  .lt-presets{ gap: 5px; }
+  .lt-preset{ padding: 5px 9px; font-size: 10px; }
+
+  /* Cold Call overlay: canvas fills screen */
+  #cc-root{ touch-action: none; }
+  #cc-btns button:first-child{
+    padding: 12px 28px;
+    font-size: 15px;
+  }
+  #cc-btn-again button{
+    padding: 11px 20px;
+    font-size: 14px;
+  }
+
+  /* Dispatch panel: narrower, higher on small phones */
+  #ep-dispatch-panel{
+    width: min(92vw, 360px) !important;
+    bottom: 70px !important;  /* above mobile nav */
+  }
+
+  /* Quick behavior buttons in Cold Call: compact */
+  .cc-qb-btn{
+    min-width: 58px;
+    padding: 8px 8px;
+  }
+  .cc-qb-icon{ font-size: 18px; }
+  .cc-qb-label{ font-size: 8px; }
+  .cc-qb-pts{ font-size: 7px; }
+}
+
+/* ── 480px and below: standard phones ──────────────────────── */
+@media (max-width: 480px) {
+
+  /* Behavior buttons: slightly taller on phone for easier tap */
+  .beh-btn{ min-height: 62px !important; }
+  .beh-btn .beh-icon{ font-size: 16px !important; }
+  .beh-btn .beh-label{ font-size: 8px !important; }
+
+  /* Dispatch panel: nearly full width */
+  #ep-dispatch-panel{
+    width: min(96vw, 340px) !important;
+    right: 2vw !important;
+    left: 2vw !important;
+    bottom: 68px !important;
+  }
+
+  /* BehaviorMotivator: simpler layout on tiny phones */
+  .bm-toast{
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .bm-icon{ font-size: 28px; }
+  .bm-phrase{ display: none; }  /* hide italic phrase on tiny screens */
+
+  /* Smart Seating overlay: hide preview zone labels */
+  .ss-teacher-desk{ font-size: 10px; padding: 5px 10px; }
+
+  /* ColdCall quick behaviors: 3 per row max */
+  #cc-quick-behs{
+    gap: 6px;
+    max-width: 100%;
+  }
+  .cc-qb-btn{ min-width: 54px; }
+}
+
+/* ── 380px and below: smallest phones (iPhone SE, etc) ─────── */
+@media (max-width: 380px) {
+
+  /* Behavior buttons: ultra compact */
+  .beh-btn{ min-height: 56px !important; padding: 4px 2px !important; }
+  .beh-btn .beh-icon{ font-size: 14px !important; }
+  .beh-btn .beh-label{ font-size: 7px !important; }
+  .beh-btn .beh-pts{ font-size: 6px !important; }
+
+  /* Smart Groups: smaller strategy cards */
+  .sg-strat-card{
+    padding: 10px 10px;
+    min-width: 130px;
+  }
+
+  /* LessonTimer: smaller ring */
+  .lt-ring-wrap{ width: 120px; height: 120px; }
+  .lt-time-text{ font-size: 22px; }
+  .lt-preset{ padding: 4px 8px; font-size: 9px; }
+}
+
+/* ── Tablet landscape: 1024px ───────────────────────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+
+  /* Smart Seating: medium modal */
+  #ss-modal{ width: min(96vw, 700px); }
+
+  /* Dispatch panel: wider on tablet */
+  #ep-dispatch-panel{
+    width: min(80vw, 420px) !important;
+  }
+}
+
+/* ── Universal: ensure overlays never overflow viewport ─────── */
+#ss-overlay, #sg-overlay, #cc-root, #bm-container {
+  max-width: 100vw;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+/* Safe area insets for notched phones (iPhone X+) */
+@supports (padding: max(0px)) {
+  .mobile-nav{
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  #ep-dispatch-panel{
+    bottom: max(72px, calc(60px + env(safe-area-inset-bottom)));
+  }
+  #cc-btns, #cc-btn-again{
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
+  }
 }
 
 </style>
@@ -4615,11 +4818,12 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
     <div onclick="Drawer.close();App.navigate('reports')"   class="drawer-nav-item">📄 Reports</div>
     <div onclick="Drawer.close();App.navigate('ai')"        class="drawer-nav-item">🧠 AI Engine</div>
     <div onclick="Drawer.close();App.navigate('settings')"  class="drawer-nav-item">⚙️ Settings</div>
+    <div onclick="Drawer.close();App.navigate('leaderboard')" class="drawer-nav-item">🏆 Leaderboard</div>
     <div style="margin:10px 0 4px;padding:0 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted)">Tools</div>
     <div onclick="Drawer.close();ColdCallPicker.open()"       class="drawer-nav-item">🎲 Cold Call</div>
     <div onclick="Drawer.close();SmartGroupEngine.open()"    class="drawer-nav-item">🧩 Smart Groups</div>
     <div onclick="Drawer.close();LessonTimer.open()"          class="drawer-nav-item">⏱️ Timer</div>
-    <div onclick="Drawer.close();LessonTimer.open()"          class="drawer-nav-item">⏱️ Timer</div>
+    
   </div>
   <!-- Footer -->
   <div id="drawer-school-name"
@@ -5078,11 +5282,11 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
                   <button id="rpt-lang-en" onclick="ReportEngine.setLang('en')"
                     style="padding:3px 12px;border-radius:99px;border:none;
                            background:var(--accent);color:#fff;font-size:10px;font-weight:700;
-                           cursor:pointer;font-family:var(--font);transition:all .15s">EN</button>
+                           cursor:pointer;font-family:var(--font);transition:var(--t-safe)">EN</button>
                   <button id="rpt-lang-ar" onclick="ReportEngine.setLang('ar')"
                     style="padding:3px 12px;border-radius:99px;border:none;
                            background:transparent;color:var(--text-muted);font-size:10px;font-weight:700;
-                           cursor:pointer;font-family:Arial,sans-serif;transition:all .15s">عربي</button>
+                           cursor:pointer;font-family:Arial,sans-serif;transition:var(--t-safe)">عربي</button>
                 </div>
               </div>
 
@@ -5778,15 +5982,15 @@ body.day-mode .cc-drum-item .cc-di-name{ color:#fff }
   <canvas id="cc-canvas" style="display:block;width:100%;height:100%"></canvas>
   <!-- DOM buttons — always on top of canvas -->
   <div id="cc-btns" style="
-    position:absolute;bottom:32px;left:0;right:0;
-    display:flex;justify-content:center;gap:12px;
-    pointer-events:all;">
+    position:absolute;bottom:max(28px,env(safe-area-inset-bottom,16px));left:0;right:0;
+    display:flex;justify-content:center;gap:10px;flex-wrap:wrap;
+    pointer-events:all;padding:0 12px;">
     <button id="cc-btn-spin" onclick="ColdCallOverlay.spin()" style="
-      padding:14px 36px;border-radius:12px;font-size:16px;font-weight:800;
+      padding:clamp(11px,3vw,14px) clamp(22px,6vw,36px);border-radius:12px;font-size:clamp(14px,4vw,16px);font-weight:800;
       background:linear-gradient(135deg,#4f8ef7,#6c63ff);
       color:#fff;border:none;cursor:pointer;
       box-shadow:0 6px 28px rgba(79,142,247,.55);
-      transition:transform .1s,box-shadow .1s;letter-spacing:.5px">
+      transition:transform .1s;letter-spacing:.5px">
       🎲 &nbsp; SPIN
     </button>
     <button onclick="ColdCallOverlay.close()" style="
@@ -6742,8 +6946,7 @@ const DeletionManager = (() => {
       }
       _removeFromTrash(entityType, entityId, classId || _cid());
       _journal('restore', entityType, entityId, classId || _cid(), { via: 'manual' });
-      try { UI && UI.renderStudents && UI.renderStudents(); } catch (e) {}
-      try { UI && UI._refreshHeaderStats && UI._refreshHeaderStats(); } catch (e) {}
+      try { UpdateBatch.add('students', ()=>UI.renderStudents()); UpdateBatch.add('header-stats', ()=>UI._refreshHeaderStats()); } catch(e) {}
       NotificationEngine.success('Restored', 'Record restored from trash.');
       return true;
     } catch (e) {
@@ -6777,8 +6980,7 @@ const DeletionManager = (() => {
       _journal('permanent', entityType, entityId, classId);
       try { Analytics && Analytics.invalidate && Analytics.invalidate(); } catch (e) {}
       try { InsightEngine && InsightEngine.invalidate && InsightEngine.invalidate(); } catch (e) {}
-      try { UI && UI.renderStudents && UI.renderStudents(); } catch (e) {}
-      try { UI && UI._refreshHeaderStats && UI._refreshHeaderStats(); } catch (e) {}
+      try { UpdateBatch.add('students', ()=>UI.renderStudents()); UpdateBatch.add('header-stats', ()=>UI._refreshHeaderStats()); } catch(e) {}
       // Sync immediately after permanent delete
       setTimeout(() => {
         try {
@@ -9017,7 +9219,7 @@ const ReportEngine = {
         <div class="form-group">
           <label class="label" style="${ar?'direction:rtl;text-align:right;display:block':''}">${numLabel}</label>
           <div class="ep-row">
-            <span id="wa-flag" style="font-size:26px;min-width:34px;text-align:center;line-height:1;transition:all .2s">${flag||'🌍'}</span>
+            <span id="wa-flag" style="font-size:26px;min-width:34px;text-align:center;line-height:1;transition:opacity .2s,transform .2s,background-color .2s">${flag||'🌍'}</span>
             <input class="input" id="wa-number-input" type="tel"
                    value="${saved}"
                    placeholder="+971501234567"
@@ -9194,6 +9396,20 @@ const ReportEngine = {
   },
 
   // -─ English WhatsApp message ───────────────────────────────────────────────
+
+  // WA emoji sanitizer — removes emojis that show as boxes on older clients
+  _sanitizeEmoji(text){
+    if(!text) return text;
+    // Remove variation selectors (FE0F etc) and skin tone modifiers
+    return text
+      .replace(/\uFE0F/g, '')       // variation selector-16 (causes boxes)
+      .replace(/\u20E3/g, '')       // combining enclosing keycap
+      .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')  // skin tone modifiers
+      .replace(/[\u{1F9D1}-\u{1F9DD}]\u{200D}[^\u{200D}]+/gu, match => {
+        // ZWJ sequences — keep first emoji, drop the rest
+        return match.split('\u200D')[0];
+      });
+  },
   _buildWA_EN(st, sets, tr, dna, sym, notes){
     const first    = st.name.split(' ')[0];
     const weekSign = CONFIG.fmt.weekly(st.weeklyScore);
@@ -9296,18 +9512,21 @@ const ReportEngine = {
       negLines.forEach(l => lines.push(l));
     }
 
-    // 7-day chart
+    // 7-day chart — monospace via ```
+    if(chartLines.length){chartLines.splice(0,0,'```');chartLines.push('```');}
     lines.push(...chartLines);
 
     // Phase 4: Professional indicator bars
     lines.push(
       '📊 *PERFORMANCE INDICATORS*',
       SEP,
-      statRow('🎯', 'Focus',         focus),
-      statRow('⚡', 'Participation', part),
-      statRow('📊', 'Consistency',   cons),
+      '```',
+      statRow('>>>', 'Focus',         focus),
+      statRow('>>>', 'Participation', part),
+      statRow('>>>', 'Consistency',   cons),
       '',
-      '  Overall Average: ' + String(Math.round((focus+part+cons)/3)).padStart(3) + '%   ' + this._grade(Math.round((focus+part+cons)/3)),
+      '  Overall: ' + String(Math.round((focus+part+cons)/3)).padStart(3) + '%   ' + this._grade(Math.round((focus+part+cons)/3)),
+      '```',
     );
 
     // Phase 5: Radar chart as text (always works, no image needed)
@@ -9345,8 +9564,8 @@ const ReportEngine = {
       '-- ' + (sets.teacher||'Teacher') + ', ' + (sets.school||'EduPulse')
     );
 
-    return lines.filter(l => l !== null && l !== undefined)
-                .join('\n').replace(/\n{3,}/g, '\n\n');
+    const msg=lines.filter(l=>l!==null&&l!==undefined).join('\n').replace(/\n{3,}/g,'\n\n');
+    return this._sanitizeEmoji(msg);
   },
 
   // -─ Arabic WhatsApp message ────────────────────────────────────────────────
@@ -9446,7 +9665,8 @@ const ReportEngine = {
       negLines.forEach(l => lines.push(l));
     }
 
-    // 7-day chart
+    // 7-day chart — monospace via ```
+    if(chartLines.length){chartLines.splice(0,0,'```');chartLines.push('```');}
     lines.push(...chartLines);
 
     // Indicators table
@@ -9455,12 +9675,20 @@ const ReportEngine = {
     lines.push(
       '📊 *مؤشرات الأداء الدراسي*',
       SEP,
-      statRowAr('🎯', 'التركيز',   focus),
-      statRowAr('⚡', 'المشاركة',  part),
-      statRowAr('📊', 'الانتظام',  cons),
+      '```',
+      statRowAr('>>>', 'التركيز',   focus),
+      statRowAr('>>>', 'المشاركة',  part),
+      statRowAr('>>>', 'الانتظام',  cons),
       '',
-      '  المتوسط العام : ' + '■'.repeat(avgF) + '□'.repeat(12-avgF) + '  ' + String(avg).padStart(3) + '%   ' + this._gradeAr(avg),
+      '  المتوسط : ' + '■'.repeat(avgF) + '□'.repeat(12-avgF) + '  ' + String(avg).padStart(3) + '%   ' + this._gradeAr(avg),
+      '```',
     );
+
+    // DNA Radar as text
+    try{
+      const rt=(typeof RadarChartEngine!=='undefined')?RadarChartEngine.formatAsText(st.id):null;
+      if(rt)lines.push('',rt);
+    }catch(e){}
 
     // Badges
     if(earnedBadges.length){
@@ -9492,8 +9720,8 @@ const ReportEngine = {
       '-- ' + (sets.teacher||'المعلم') + '، ' + (sets.school||'EduPulse')
     );
 
-    return lines.filter(l => l !== null && l !== undefined)
-                .join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    const msgAr=lines.filter(l=>l!==null&&l!==undefined).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+    return this._sanitizeEmoji(msgAr);
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -10961,7 +11189,14 @@ const UI = {
       // Batch deferred updates via UpdateBatch — deduped, rAF-flushed
       UpdateBatch.add('header-stats',     () => this._refreshHeaderStats());
       UpdateBatch.add('activity-feed',    () => this._renderActivityFeed());
-      UpdateBatch.add('insights',         () => this.renderInsights());
+      UpdateBatch.add('insights', () => {
+        // Insights are non-critical — defer to idle if browser supports it
+        if(typeof requestIdleCallback !== 'undefined'){
+          requestIdleCallback(() => { try{ this.renderInsights(); }catch(e){} }, { timeout: 1500 });
+        } else {
+          this.renderInsights();
+        }
+      });
       UpdateBatch.add('mini-leaderboard', () => this.renderMiniLeaderboard());
       UpdateBatch.add('quest',            () => { try{ QuestEngine.render(); }catch(e){} });
       UpdateBatch.add('session-reflection', () => { try{ SessionReflection.render(); }catch(e){} });
@@ -12078,10 +12313,10 @@ const UI = {
   // -─ Header refresh ─────────────────────────────────────────────────
   _refreshHeaderStats(){
     const s=StudentManager.getStats();
-    const el1=document.getElementById('hdr-avg');
-    const el2=document.getElementById('hdr-pos');
-    const el3=document.getElementById('hdr-neg');
-    const el4=document.getElementById('hdr-risk');
+    const el1=this._el1||(this._el1=document.getElementById('hdr-avg'));
+    const el2=this._el2||(this._el2=document.getElementById('hdr-pos'));
+    const el3=this._el3||(this._el3=document.getElementById('hdr-neg'));
+    const el4=this._el4||(this._el4=document.getElementById('hdr-risk'));
     const el5=document.getElementById('nav-student-count');
     if(el1) el1.textContent=s.avgScore;
     if(el2) el2.textContent='+'+s.todayPos;
@@ -15186,7 +15421,7 @@ const EventReplicationEngine = (() => {
           signal: AbortSignal.timeout(6000),
         });
         if (probe.status === 999) {
-          console.warn('[EventReplicationEngine] 401 — invalid API key. Aborting connection.');
+          console.warn('[EventReplicationEngine] 999 — invalid API key. Aborting connection.');
           localStorage.removeItem('ep_sb_creds');
           _client = null;
           SyncStatusManager.setState('local');
@@ -16558,8 +16793,8 @@ const AIView = {
       );
     } catch(_) {}
 
-    // ── AI pipeline (non-blocking, isolated from core) ─────────────
-    setTimeout(()=>{
+    // ── AI pipeline — deferred to idle time (never blocks UI) ──────
+    const _idleFn = () => {
       try{ StudentDNA.update(studentId, result.event); }catch(e){}
       try{ PredictiveEngine.update(studentId); }catch(e){}
       try{
@@ -16570,7 +16805,12 @@ const AIView = {
         }
         TeacherAssistant._dirty = true;
       }catch(e){}
-    }, 0);
+    };
+    if(typeof requestIdleCallback !== 'undefined'){
+      requestIdleCallback(_idleFn, { timeout: 2000 });
+    } else {
+      setTimeout(_idleFn, 0);
+    }
     return result;
   };
 })();
@@ -22372,17 +22612,14 @@ const DispatchQueue = {
       return;
     }
 
-    // ── Step 2: open WhatsApp for the FIRST student (synchronous, in-gesture)
-    const first   = this.dispatchQueue[0];
-    const firstURL = 'https://wa.me/' + first.phone +
-                     '?text=' + encodeURIComponent(first.message);
-    this.startDispatchSession(firstURL);
-
-    // ── Step 3: show the session controller panel ─────────────────────────
+    // ── Step 2: show the session controller panel
+    // Teacher presses "Send & Next" for each student — one click per student
     this._running = true;
     this._panelCreate();
-    this._log('🚀  Session started — WhatsApp opened for ' + first.name);
+    this._log('🚀  ' + this.dispatchQueue.length + ' students queued — press "Send & Next" for each');
     this._updatePanel();
+    NotificationEngine.info('📲 Ready to Send',
+      `Press "Send & Next" for each student — WhatsApp opens automatically`);
   },
 
   // ── Pre-generate ALL reports synchronously (no async, index-based loop) ──
@@ -22432,76 +22669,52 @@ const DispatchQueue = {
     }
   },
 
-  // ── Open the SINGLE WhatsApp window — called once, synchronously ──────────
-  startDispatchSession(firstURL){
-    this.waWindow = window.open(firstURL, 'EduPulseWA');
-  },
+  // ── Legacy stub — window opening now done per-student in openCurrentWA ──────
+  startDispatchSession(firstURL){ /* no-op */ },
 
-  // ── Called by "NEXT STUDENT →" button — user confirms previous send ───────
-  // No window.open — navigates the existing waWindow via location.href.
+  // ── CORE ACTION: "📲 Send & Next" ────────────────────────────────────────
+  // This is called with onclick (user gesture) so window.open() works!
+  // It BOTH opens WhatsApp for current student AND advances to next.
+  // One click = one student. No manual confirmation needed.
   nextStudent(){
-    // Count the current student as successfully dispatched
     const current = this.dispatchQueue[this.currentIndex];
+    if(!current) return;
+
+    // ── Open WhatsApp NOW (we are inside a click handler = user gesture) ──
+    const url = 'https://wa.me/' + current.phone + '?text=' + encodeURIComponent(current.message);
+    WAWindowManager.open(url);  // reuses same WA tab
+    this._log(`📲  WhatsApp opened for ${current.name}`);
+
+    // ── Mark current as sent ──────────────────────────────────────────────
     this.dispatchSuccess++;
-    this._log(`✅  ${current.name} — marked as sent`);
-
-    try{
-      StudentManager.update(current.studentId,
-        { parentCommunication:{ language: current.language } });
-    }catch(_){}
-    if(typeof OperationLogger !== 'undefined'){
+    this._log(`✅  ${current.name} — sent`);
+    WALogEngine.record(current.studentId, 'DISPATCH', current.language).catch(()=>{});
+    // Immediately mark as sent in local cache (prevents re-appearing on reopen)
+    this._markSentToday(current.studentId);
+    this._cooldownCache[String(current.studentId)] = true;
+    try{ StudentManager.update(current.studentId, { parentCommunication:{ language: current.language } }); }catch(_){}
+    if(typeof OperationLogger !== 'undefined')
       OperationLogger.record(`Dispatch:${current.name}`, 'SUCCESS', current.language);
-    }
 
+    // ── Advance ───────────────────────────────────────────────────────────
     this.currentIndex++;
-
     if(this.currentIndex >= this.dispatchQueue.length){
       this.finalizeDispatch();
       return;
     }
-
-    // ── Navigate existing window to next student — NO window.open ─────────
-    const next = this.dispatchQueue[this.currentIndex];
-    const url  = 'https://wa.me/' + next.phone +
-                 '?text=' + encodeURIComponent(next.message);
-
-    try{
-      this.waWindow.location.href = url;
-      this.waWindow.focus();
-      this._log(`📤  Navigated to ${next.name}`);
-    }catch(e){
-      // waWindow was closed by user — reopen (this IS within a click gesture)
-      this.waWindow = window.open(url, 'EduPulseWA');
-      this._log(`🔄  Window was closed — reopened for ${next.name}`);
-    }
-
     this._updatePanel();
   },
 
-  // ── Skip current student without counting as sent ─────────────────────────
+  // ── Legacy stub (no longer used but kept for compatibility) ──────────────
+  openCurrentWA(){ this.nextStudent(); },
+
+  // ── Skip without sending ─────────────────────────────────────────────────
   skipStudent(){
     const current = this.dispatchQueue[this.currentIndex];
     this._failedItems.push({ name: current.name, reason: 'Skipped by teacher' });
     this._log(`⏭  ${current.name} — skipped`);
-
     this.currentIndex++;
-
-    if(this.currentIndex >= this.dispatchQueue.length){
-      this.finalizeDispatch();
-      return;
-    }
-
-    const next = this.dispatchQueue[this.currentIndex];
-    const url  = 'https://wa.me/' + next.phone +
-                 '?text=' + encodeURIComponent(next.message);
-
-    try{
-      this.waWindow.location.href = url;
-      this.waWindow.focus();
-    }catch(e){
-      this.waWindow = window.open(url, 'EduPulseWA');
-    }
-
+    if(this.currentIndex >= this.dispatchQueue.length){ this.finalizeDispatch(); return; }
     this._updatePanel();
   },
 
@@ -22525,11 +22738,20 @@ const DispatchQueue = {
     if(progEl) progEl.textContent = `${idx + 1} / ${total}`;
     if(barEl)  barEl.style.width  = Math.round((idx + 1) / total * 100) + '%';
 
-    // Disable NEXT button if this is the last student
-    const nextBtn = document.getElementById('ep-dp-next-btn');
-    if(nextBtn){
+    // Update primary button
+    const mainBtn = document.getElementById('ep-dp-next-btn');
+    if(mainBtn){
       const isLast = idx === total - 1;
-      nextBtn.textContent = isLast ? '✅ Mark Sent & Finish' : 'NEXT STUDENT →';
+      mainBtn.innerHTML = isLast
+        ? '📲 Send to Last Student ✅'
+        : '📲 Send &amp; Next →';
+    }
+
+    // Update language badge
+    const langBadge = document.getElementById('ep-dp-lang-badge');
+    if(langBadge){
+      langBadge.textContent = student.language === 'arabic' ? '🇸🇦 AR'
+                             : student.language === 'bilingual' ? '🌐 BI' : '🇬🇧 EN';
     }
 
     this._log(`📋  Now showing: ${student.name}  (${idx + 1}/${total})`);
@@ -22576,10 +22798,17 @@ const DispatchQueue = {
     }
 
     if(success > 0){
-      NotificationEngine.success('Dispatch Complete', summary);
+      const sentCount = this._sentToday.size;
+      NotificationEngine.success('Dispatch Complete',
+        summary + (sentCount > 0 ? `  ·  ${sentCount} excluded from next session today` : ''));
     } else {
       NotificationEngine.info('Dispatch Finished', summary);
     }
+    // Clear dispatch queue
+    this.dispatchQueue  = [];
+    this.currentIndex   = 0;
+    this.dispatchSuccess= 0;
+    this._failedItems   = [];
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -22643,32 +22872,49 @@ const DispatchQueue = {
 
         <!-- Current student card -->
         <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
-                    border-radius:10px;padding:12px 14px;margin-bottom:14px">
-          <div style="font-size:9px;font-weight:700;letter-spacing:.8px;
-                      color:rgba(255,255,255,.35);text-transform:uppercase;
-                      margin-bottom:6px">
-            Currently Sending To
+                    border-radius:10px;padding:12px 14px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.8px;
+                        color:rgba(255,255,255,.35);text-transform:uppercase">
+              Now Sending To
+            </div>
+            <div id="ep-dp-lang-badge"
+                 style="font-size:9px;padding:1px 7px;border-radius:10px;
+                        background:rgba(79,142,247,.2);color:#7db3ff;font-weight:700">
+              ${this.dispatchQueue[0]?.language === 'arabic' ? '🇸🇦 AR' : this.dispatchQueue[0]?.language === 'bilingual' ? '🌐 BI' : '🇬🇧 EN'}
+            </div>
           </div>
           <div id="ep-dp-student-name"
-               style="font-size:18px;font-weight:700;color:#fff;margin-bottom:2px">
+               style="font-size:17px;font-weight:700;color:#fff;margin-bottom:2px;
+                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
             ${this.dispatchQueue[0]?.name || '—'}
           </div>
           <div id="ep-dp-student-num"
                style="font-size:11px;color:rgba(255,255,255,.4)">
             Student 1 of ${total}
           </div>
+          <div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:3px">
+            Open WhatsApp → confirm message is sent → press "Sent"
+          </div>
         </div>
 
-        <!-- PRIMARY ACTION: NEXT STUDENT button -->
+        <!-- SINGLE ACTION: Opens WA + marks sent + advances (one click) -->
         <button id="ep-dp-next-btn"
                 onclick="DispatchQueue.nextStudent()"
-                style="width:100%;padding:14px;margin-bottom:8px;border-radius:10px;
-                       border:none;background:#25d366;color:#fff;font-weight:800;
-                       font-size:15px;cursor:pointer;font-family:inherit;
-                       letter-spacing:.3px;transition:opacity .15s;
-                       display:flex;align-items:center;justify-content:center;gap:8px">
-          ${total > 1 ? 'NEXT STUDENT →' : '✅ Mark Sent & Finish'}
+                style="width:100%;padding:15px;margin-bottom:8px;border-radius:12px;
+                       border:none;background:linear-gradient(135deg,#25d366,#128c7e);
+                       color:#fff;font-weight:800;font-size:16px;cursor:pointer;
+                       font-family:inherit;letter-spacing:.3px;
+                       box-shadow:0 4px 18px rgba(37,211,102,.35);
+                       display:flex;align-items:center;justify-content:center;gap:10px">
+          📲 Send &amp; Next →
         </button>
+
+        <!-- Hint -->
+        <div style="text-align:center;font-size:10px;color:rgba(255,255,255,.3);
+                    margin-bottom:10px;line-height:1.5">
+          Opens WhatsApp, marks as sent, advances automatically
+        </div>
 
         <!-- Secondary row: skip + cancel -->
         <div style="display:flex;gap:6px">
@@ -22973,7 +23219,7 @@ const WALogEngine = (() => {
   function _localGetRecent(studentId, hoursBack) {
     const cutoff = Date.now() - hoursBack * 3600000;
     return _localRead().filter(r =>
-      r.studentId == studentId &&
+      (studentId === '*' || r.studentId == studentId) &&  // '*' = all students
       r.classId   === _classId() &&
       new Date(r.sentAt).getTime() > cutoff
     );
@@ -23093,6 +23339,28 @@ CREATE POLICY IF NOT EXISTS ep_wa_log_anon
 
 const CommunicationDecisionEngine = {
 
+  // ── Sent-today local tracking ──────────────────────────────────────────────
+  // Works 100% locally, no Supabase needed.
+  // Key: ep_sent_today_YYYY-MM-DD  → JSON array of studentIds
+  // Resets automatically at midnight (new date = new key).
+  _sentToday: new Set(),
+  _sentTodayKey: () => 'ep_sent_today_' + new Date().toISOString().slice(0,10),
+
+  _loadSentToday(){
+    try{
+      const saved = JSON.parse(localStorage.getItem(this._sentTodayKey()) || '[]');
+      this._sentToday = new Set(saved.map(String));
+      // Clean up yesterday's key
+      const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+      localStorage.removeItem('ep_sent_today_' + yesterday);
+    }catch(e){ this._sentToday = new Set(); }
+  },
+
+  _markSentToday(studentId){
+    this._sentToday.add(String(studentId));
+    try{ localStorage.setItem(this._sentTodayKey(), JSON.stringify([...this._sentToday])); }catch(e){}
+  },
+
   // ── Report type constants ────────────────────────────────────────────────────
   TYPE: {
     INTERVENTION:   { id:'INTERVENTION',   icon:'🚨', label:'Intervention',         color:'var(--red)'    },
@@ -23175,12 +23443,19 @@ const CommunicationDecisionEngine = {
   // 3. ReportEngine._lang
   // 4. 'en' fallback
   // ─────────────────────────────────────────────────────────────────────────────
+  // ── Auto-detect language from student/parent name (Arabic chars) ─
+  _isArabicName(name){
+    return (name||'').replace(/\s/g,'').split('').filter(c=>c.charCodeAt(0)>=0x0600&&c.charCodeAt(0)<=0x06FF).length >= 3;
+  },
+
   resolveLanguage(st){
     const pref = st.parentCommunication?.language;
     if(pref && pref !== 'auto') return pref;
     const settings = StorageManager.getSettings();
     if(settings?.defaultReportLang && settings.defaultReportLang !== 'auto')
       return settings.defaultReportLang;
+    // Smart auto-detect: Arabic name → Arabic, else use current app lang
+    if(this._isArabicName(st.name)) return 'arabic';
     return ReportEngine._lang || 'en';
   },
 
@@ -23193,7 +23468,9 @@ const CommunicationDecisionEngine = {
   isSafeToSend(st){
     if(!st.parentPhone || st.parentPhone.trim().length < 7) return false;
     if(st.exemptFromPicker) return false;
-    // Check cross-device cooldown cache (populated async before panel opens)
+    // Local sent-today check (always works, no Supabase needed)
+    if(this._sentToday.has(String(st.id))) return false;
+    // Cross-device cooldown cache (from WALogEngine/Supabase)
     if(this._cooldownCache[st.id] === true) return false;
     return true;
   },
@@ -23254,7 +23531,9 @@ const CommunicationDecisionEngine = {
   // STEP 6+7: Open the Smart Dispatch Panel
   // ─────────────────────────────────────────────────────────────────────────────
   async openDispatchPanel(){
-    // Refresh cross-device cooldown data before analysing
+    // Load local sent-today tracking (always works, no Supabase needed)
+    this._loadSentToday();
+    // Refresh cross-device cooldown data (Supabase, if connected)
     await this.refreshCooldownCache();
     const items = this.analyze();
 
@@ -23265,6 +23544,28 @@ const CommunicationDecisionEngine = {
       );
       return;
     }
+
+    // Pre-apply smart language detection to all items
+    items.forEach(item => {
+      if(!item.student.parentCommunication?.language ||
+          item.student.parentCommunication.language === 'auto') {
+        item.language = this.resolveLanguage(item.student);
+      }
+    });
+
+    // Show a prominent notification before the panel opens
+    const recommended = items.filter(i=>i.priority==='recommended').length;
+    const optional    = items.filter(i=>i.priority==='optional').length;
+    const arCount     = items.filter(i=>i.language==='arabic').length;
+    const enCount     = items.filter(i=>i.language==='english'||i.language==='en').length;
+    const langSummary = [
+      arCount ? arCount + ' 🇸🇦' : '',
+      enCount ? enCount + ' 🇬🇧' : '',
+    ].filter(Boolean).join(' · ');
+    const sentToday = this._sentToday.size;
+    const sentLabel = sentToday > 0 ? ` · ${sentToday} already sent today` : '';
+    NotificationEngine.show('info','📤 Smart Dispatch Ready',
+      `${recommended} priority · ${optional} optional${langSummary?' · '+langSummary:''}${sentLabel}`, 5000);
 
     // Store items on window for panel actions
     window._EP_DISPATCH = items.map((item,i) => ({...item, _idx:i}));
@@ -23287,7 +23588,7 @@ const CommunicationDecisionEngine = {
              opacity:${item.approved?'1':'0.55'};transition:.2s">
 
           <input type="checkbox" ${item.approved?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)"
-                 onchange="window._EP_DISPATCH[${i}].approved=this.checked; document.getElementById('dispatch-row-${i}').style.opacity=this.checked?'1':'0.55'">
+                 onchange="if(window._EP_DISPATCH&&window._EP_DISPATCH[${i}]){window._EP_DISPATCH[${i}].approved=this.checked;document.getElementById('dispatch-row-${i}').style.opacity=this.checked?'1':'0.55'}">
 
           <div style="flex:1;min-width:0">
             <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${st.avatar} ${st.name} ${cooldownTag}</div>
@@ -23301,7 +23602,7 @@ const CommunicationDecisionEngine = {
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
             <select style="font-size:10px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);
                            background:var(--bg-elevated);color:var(--text-secondary);cursor:pointer"
-                    onchange="window._EP_DISPATCH[${i}].language=this.value">
+                    onchange="if(window._EP_DISPATCH&&window._EP_DISPATCH[${i}])window._EP_DISPATCH[${i}].language=this.value">
               <option value="english"  ${item.language==='english' ?'selected':''}>🇬🇧 EN</option>
               <option value="arabic"   ${item.language==='arabic'  ?'selected':''}>🇸🇦 AR</option>
               <option value="bilingual"${item.language==='bilingual'?'selected':''}>🌐 BI</option>
@@ -23321,9 +23622,6 @@ const CommunicationDecisionEngine = {
         </div>`;
     }).join('');
 
-    const recommended = items.filter(i=>i.priority==='recommended').length;
-    const optional    = items.filter(i=>i.priority==='optional').length;
-
     UI._openModal({
       title: '📤 Smart Dispatch',
       size:  'sm',
@@ -23331,8 +23629,45 @@ const CommunicationDecisionEngine = {
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.7">
           <span style="color:var(--red);font-weight:700">${recommended} recommended</span>
           ${optional?` · <span style="color:var(--orange)">${optional} optional</span>`:''}
-          — pre-selected students that need communication today.<br>
-          Uncheck to skip · change language per student · then send all.
+          — languages auto-detected from student names.
+        </div>
+        <!-- Global language override -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;
+                    padding:8px 10px;background:var(--bg-card);border-radius:8px;
+                    border:1px solid var(--border)">
+          <span style="font-size:10px;color:var(--text-muted);font-weight:600;white-space:nowrap">
+            Set all to:
+          </span>
+          <button class="btn btn-xs btn-ghost" style="font-size:10px;padding:3px 9px"
+                  onclick="(()=>{
+                    (window._EP_DISPATCH||[]).forEach((it,i)=>{
+                      it.language='arabic';
+                      const sel=document.querySelector('#dispatch-row-'+i+' select');
+                      if(sel) sel.value='arabic';
+                    });
+                    NotificationEngine.success('Language','All set to 🇸🇦 Arabic');
+                  })()">🇸🇦 Arabic</button>
+          <button class="btn btn-xs btn-ghost" style="font-size:10px;padding:3px 9px"
+                  onclick="(()=>{
+                    (window._EP_DISPATCH||[]).forEach((it,i)=>{
+                      it.language='english';
+                      const sel=document.querySelector('#dispatch-row-'+i+' select');
+                      if(sel) sel.value='english';
+                    });
+                    NotificationEngine.success('Language','All set to 🇬🇧 English');
+                  })()">🇬🇧 English</button>
+          <button class="btn btn-xs btn-ghost" style="font-size:10px;padding:3px 9px"
+                  onclick="(()=>{
+                    (window._EP_DISPATCH||[]).forEach((it,i)=>{
+                      it.language='bilingual';
+                      const sel=document.querySelector('#dispatch-row-'+i+' select');
+                      if(sel) sel.value='bilingual';
+                    });
+                    NotificationEngine.success('Language','All set to 🌐 Bilingual');
+                  })()">🌐 Both</button>
+          <span style="margin-left:auto;font-size:9px;color:var(--text-muted);font-style:italic">
+            or override per student ↓
+          </span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="btn btn-xs btn-ghost" style="font-size:10px"
@@ -23647,7 +23982,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   })();
   CountryManager.init();
   DispatchScheduler.init();
-  try{ EduPulseGuardian.init(); }catch(e){ console.warn('[Guardian] init failed:', e); }
+  if(typeof requestIdleCallback!=='undefined'){requestIdleCallback(()=>{try{EduPulseGuardian.init();}catch(e){}},{timeout:3000});}else{setTimeout(()=>{try{EduPulseGuardian.init();}catch(e){}},800);}
   App.init();
   try{ IdleReminder.check(); }catch(e){}
   // Emit system boot complete event (Phase 2: SYSTEM_EVENT)
@@ -23713,7 +24048,7 @@ const PWAManager = {
 
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
-      this._installPrompt = e;
+      return; // install banner removed by design
       try{
         if(!localStorage.getItem(this._DISMISSED_KEY)) setTimeout(() => this._showBanner(), 3000);
       }catch(e){}
@@ -25825,7 +26160,8 @@ const SmartSeating = (() => {
     const grid = document.getElementById('ss-preview-grid');
     if(!grid) return;
 
-    grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},minmax(56px,1fr));gap:4px`;
+    const minCell = window.innerWidth < 480 ? '40px' : '52px';
+    grid.style.cssText = `display:grid;grid-template-columns:repeat(${cols},minmax(${minCell},1fr));gap:${window.innerWidth<480?'3px':'4px'}`;
     grid.innerHTML = [...Array(total).keys()].map(idx => {
       const sid = layout[idx];
       const row = Math.floor(idx / cols);
@@ -26603,14 +26939,10 @@ const ColdCallOverlay = (() => {
       // Log to behavior engine (sound + banner handled by engine patch)
       BehaviorEngine.handle(_chosen.id, behaviorId, 'Cold Call quick-log', 'coldcall');
 
-      // Update student score on canvas reveal (re-fetch fresh data)
+      // Update _chosen with fresh data — canvas _drawReveal reads from it each frame
       const updated = StudentManager.getById(_chosen.id);
       if (updated) {
-        _chosen = updated;
-        const scoreEl = document.getElementById('cc-rev-score');
-        if (scoreEl) scoreEl.textContent = updated.score + ' pts';
-        const streakEl = document.getElementById('cc-rev-streak');
-        if (streakEl) streakEl.textContent = (updated.streak || 0) + '🔥 streak';
+        _chosen = updated;  // canvas will show updated score on next render tick
       }
 
       // Refresh weight bars to reflect new engagement data
@@ -26951,13 +27283,16 @@ const LessonTimer = (() => {
 
   function _onInput() {
     if (_state !== 'ready') return;
-    const minInp = document.getElementById('lt-min');
-    const secInp = document.getElementById('lt-sec');
-    const m = Math.max(0, parseInt(minInp?.value) || 0);
-    const s = Math.max(0, Math.min(59, parseInt(secInp?.value) || 0));
-    _totalSecs  = m * 60 + s;
-    _remainSecs = _totalSecs;
-    _render();
+    try {
+      const minInp = document.getElementById('lt-min');
+      const secInp = document.getElementById('lt-sec');
+      if (!minInp || !secInp) return;  // modal closed — ignore
+      const m = Math.max(0, parseInt(minInp.value) || 0);
+      const s = Math.max(0, Math.min(59, parseInt(secInp.value) || 0));
+      _totalSecs  = m * 60 + s;
+      _remainSecs = _totalSecs;
+      _render();
+    } catch(_) {}
   }
 
   function _onModalClose() {
@@ -26970,6 +27305,22 @@ const LessonTimer = (() => {
 })();
 
 
+
+// WhatsApp Window Manager: reuses same browser tab for all sends
+const WAWindowManager = {
+  _win: null,
+  open(url){
+    if(this._win && !this._win.closed){
+      try{
+        this._win.location.href = url;
+        this._win.focus();
+        return this._win;
+      }catch(e){/* cross-origin block — open fresh */}
+    }
+    this._win = window.open(url, 'EduPulseWA');
+    return this._win;
+  },
+};
 // Initialise I18n on boot (safe — no DOM dependency)
 try { I18nManager.init(); } catch (_) {}
 
